@@ -459,6 +459,9 @@ Data Serialize(const google::protobuf::Message& message) {
 		out.push_back(0xffU);
 		return out;
 	}
+	if (fields.size() == 1 && fields[0]->name() == "_") {
+		return parts[0];	// trim message wrapper
+	}
 
 	auto section = (parts.size() + 12) / 25;
 	if (section > 0xff) {

@@ -12,6 +12,7 @@ Following [benchmark](https://github.com/jviotti/binary-json-size-benchmark), we
 | Entry Point Regulation Manifest | 247 | 352 | 504 | 536 | 195 | 236 | 318 |
 | ESLint Configuration Document | 161 | 276 | 320 | 216 | 158 | 136 | 131 |
 | ECMAScript Module Loader Definition | 23 | 44 | 80 | 80 | 36 | 57 | 35 |
+| GeoJSON Example Document | 325 | 432 | 680 | 448 | 128 | 165 | 228 | 165 |
 | GitHub FUNDING Sponsorship Definition (Empty) | 17 | 24 | 68 | 40 | 30 | 37 | 25 |
 | GitHub Workflow Definition | 189 | 288 | 440 | 464 | 170 | 212 | 242 |
 | Grunt.js Clean Task Definition | 20 | 48 | 116 | 96 | 33 | 51 | 39 |
