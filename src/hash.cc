@@ -115,14 +115,6 @@ V128 Hash128(const uint8_t* msg, unsigned len, uint64_t seed) noexcept {
 	return v;
 }
 
-uint64_t Hash64(const uint8_t* msg, unsigned len, uint64_t seed) noexcept {
-	return Hash128(msg, len, seed).u64[0];
-}
-
-uint32_t Hash32(const uint8_t* msg, unsigned len, uint64_t seed) noexcept {
-	return Hash128(msg, len, seed).u32[0];
-}
-
 XorShift::XorShift(uint32_t seed) noexcept {
 	m_state[0] = 0x6c078965;
 	m_state[1] = 0x9908b0df;

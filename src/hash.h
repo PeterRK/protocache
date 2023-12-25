@@ -17,8 +17,6 @@ union V128 {
 };
 
 extern V128 Hash128(const uint8_t* msg, unsigned len, uint64_t seed=0) noexcept;
-extern uint64_t Hash64(const uint8_t* msg, unsigned len, uint64_t seed=0) noexcept;
-extern uint32_t Hash32(const uint8_t* msg, unsigned len, uint64_t seed=0) noexcept;
 
 class XorShift  {
 public:

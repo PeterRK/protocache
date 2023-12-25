@@ -27,6 +27,10 @@ static unsigned WriteVarInt(uint8_t* buf, uint32_t n) noexcept {
 	return w;
 }
 
+static inline uint32_t Offset(uint32_t off) noexcept {
+	return (off<<2U) | 3U;
+}
+
 template <typename T>
 static inline T* Cast(const void* p) noexcept {
 	return const_cast<T*>(reinterpret_cast<const T*>(p));
@@ -80,7 +84,7 @@ static size_t BestArraySize(const std::vector<Data>& parts, unsigned& m) {
 		}
 		sizes[2] += one.size();
 	}
-	auto mode = 0;
+	unsigned mode = 0;
 	for (unsigned i = 1; i < 3; i++) {
 		if (sizes[i] < sizes[mode]) {
 			mode = i;
@@ -108,13 +112,7 @@ static Data SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array) {
 		return {};
 	}
 	out.reserve(size);
-	uint32_t mark = 1;
-	if (m == 2) {
-		mark = 3;
-	} else if (m == 3) {
-		mark = 2;
-	}
-	out.push_back((array.size() << 2U) | mark);
+	out.push_back((array.size() << 2U) | m);
 
 	for (auto& one : parts) {
 		auto next = out.size() + m;
@@ -126,7 +124,7 @@ static Data SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array) {
 	unsigned off = 1;
 	for (auto& one : parts) {
 		if (one.size() > m) {
-			out[off] = (out.size()-off)*4-2;
+			out[off] = Offset(out.size()-off);
 			out += one;
 		}
 		off += m;
@@ -140,13 +138,7 @@ static Data SerializeScalarArray(const google::protobuf::RepeatedFieldRef<T>& ar
 	static_assert(std::is_scalar<T>::value, "");
 	auto m = WordSize(sizeof(T));
 	Data out(1 + m*array.size(), 0);
-	if (m == 1) {
-		out[0] = (array.size() << 2U) | 1;
-	} else if (m == 2) {
-		out[0] = (array.size() << 2U) | 3;
-	} else {
-		return {};
-	}
+	out[0] = (array.size() << 2U) | m;
 	auto p = out.data() + 1;
 	for (auto v : array) {
 		*Cast<T>(p) = v;
@@ -200,8 +192,9 @@ static Data SerializeArrayField(const google::protobuf::Message& message, const 
 			auto n = reflection->FieldSize(message, field);
 			Data out(1 + n, 0);
 			out[0] = (n << 2U) | 1;
+			auto vec = Cast<int32_t>(out.data()+1);
 			for (int i = 0; i < n; i++) {
-				out[i+1] = reflection->GetRepeatedEnumValue(message, field, i);
+				vec[i] = reflection->GetRepeatedEnumValue(message, field, i);
 			}
 			return out;
 		}
@@ -245,7 +238,7 @@ static Data SerializeField(const google::protobuf::Message& message, const googl
 			return Serialize(reflection->GetBool(message, field));
 
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
-			return Serialize(reflection->GetEnumValue(message, field));
+			return Serialize<int32_t>(reflection->GetEnumValue(message, field));
 
 		default:
 			return {};;
@@ -289,8 +282,8 @@ struct StringReader : public ScalarReader {
 
 static Data SerializeMapField(const google::protobuf::Message& message, const google::protobuf::FieldDescriptor* field) {
 	assert(field->is_map());
-	auto key_field = field->message_type()->map_key();
-	auto value_field = field->message_type()->map_value();
+	auto key_field = field->message_type()->field(0);
+	auto value_field = field->message_type()->field(1);
 	auto elements = message.GetReflection()->GetRepeatedFieldRef<google::protobuf::Message>(message, field);
 
 	if (key_field->is_repeated() || value_field->is_repeated()) {
@@ -398,12 +391,12 @@ static Data SerializeMapField(const google::protobuf::Message& message, const go
 	unsigned off = index_size;
 	for (unsigned i = 0; i < keys.size(); i++) {
 		if (keys[i].size() > m1) {
-			out[off] = (out.size()-off)*4-2;
+			out[off] = Offset(out.size()-off);
 			out += keys[i];
 		}
 		off += m1;
 		if (values[i].size() > m2) {
-			out[off] = (out.size()-off)*4-2;
+			out[off] = Offset(out.size()-off);
 			out += values[i];
 		}
 		off += m2;
@@ -461,68 +454,33 @@ Data Serialize(const google::protobuf::Message& message) {
 		parts.pop_back();
 	}
 
-	uint32_t magic = Hash32(reinterpret_cast<const uint8_t*>(descriptor->full_name().data()),
-							descriptor->full_name().size()) & 0xffffff00U;
-
 	Data out;
 	if (parts.empty()) {
-		out.push_back(magic);
+		out.push_back(0xffU);
 		return out;
 	}
 
-	auto fill_tail = [&parts, &out]() {
-		size_t off = out.size();
-		for (auto& one : parts) {
-			if (one.empty()) {
-				continue;
-			}
-			if (one.size() < 4) {
-				out += one;
-			} else {
-				out.push_back(0);
-			}
-		}
-		for (auto& one : parts) {
-			if (one.size() < 4) {
-				off += one.size();
-			} else {
-				out[off] = (out.size()-off)*4-2;
-				out += one;
-				off++;
-			}
-		}
-	};
-
-	if (parts.size() <= 16) {
-		uint32_t mark = 0;
-		size_t size = 2;
-		for (unsigned i = 0; i < parts.size(); i++) {
-			auto& one = parts[i];
-			if (one.size() < 4) {
-				mark |= one.size() << i*2U;
-				size += one.size();
-			} else {
-				mark |= 1U << i*2U;
-				size += 1 + one.size();
-			}
-		}
-		if (size >= (1U<<30U)) {
-			return {};
-		}
-		out.reserve(size);
-		out.push_back(magic | 0xffU);
-		out.push_back(mark);
-		fill_tail();
-		return out;
-	}
-
-	auto section = (parts.size() + 24) / 25;
+	auto section = (parts.size() + 12) / 25;
 	if (section > 0xff) {
 		return {};
 	}
-
 	size_t size = 1 + section*2;
-	for (auto& one : parts) {
+	uint32_t cnt = 0;
+	uint32_t head = section;
+	for (unsigned i = 0; i < std::min(12UL, parts.size()); i++) {
+		auto& one = parts[i];
+		if (one.size() < 4) {
+			head |= one.size() << (8U+i*2U);
+			size += one.size();
+			cnt += one.size();
+		} else {
+			head |= 1U << (8U+i*2U);
+			size += 1 + one.size();
+			cnt += 1;
+		}
+	}
+	for (unsigned i = 12; i < parts.size(); i++) {
+		auto& one = parts[i];
 		if (one.size() < 4) {
 			size += one.size();
 		} else {
@@ -533,12 +491,11 @@ Data Serialize(const google::protobuf::Message& message) {
 		return {};
 	}
 	out.reserve(size);
-	out.push_back(magic | section);
+	out.push_back(head);
 	out.resize(1+section*2, 0);
 
-	uint32_t cnt = 0;
 	auto blk = Cast<uint64_t>(out.data()+1);
-	for (unsigned i = 0; i < parts.size(); ) {
+	for (unsigned i = 12; i < parts.size(); ) {
 		auto next = i + 25;
 		if (next > parts.size()) {
 			next = parts.size();
@@ -556,7 +513,28 @@ Data Serialize(const google::protobuf::Message& message) {
 		}
 		*blk++ = mark;
 	}
-	fill_tail();
+
+	size_t off = out.size();
+	for (auto& one : parts) {
+		if (one.empty()) {
+			continue;
+		}
+		if (one.size() < 4) {
+			out += one;
+		} else {
+			out.push_back(0);
+		}
+	}
+	for (auto& one : parts) {
+		if (one.size() < 4) {
+			off += one.size();
+		} else {
+			out[off] = Offset(out.size()-off);
+			out += one;
+			off++;
+		}
+	}
+	assert(out.size() == size);
 	return out;
 }
 

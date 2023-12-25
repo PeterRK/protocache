@@ -53,9 +53,8 @@ TEST(Proto, Basic) {
 	ASSERT_FALSE(data.empty());
 
 	auto end = data.data() + data.size();
-	protocache::Message root(data.data());
+	protocache::Message root(data.data(), end);
 	ASSERT_FALSE(!root);
-	ASSERT_EQ(root.GetMagic(), protocache::CalcMagic("test.Main"));
 
 	ASSERT_EQ(-999, protocache::GetInt32(root.GetField(0, end), end));
 	ASSERT_EQ(1234, protocache::GetUInt32(root.GetField(1, end), end));
@@ -74,8 +73,6 @@ TEST(Proto, Basic) {
 
 	auto leaf = protocache::GetMessage(root.GetField(10, end), end);
 	ASSERT_FALSE(!leaf);
-	auto identity = protocache::CalcMagic("test.Small");
-	ASSERT_EQ(leaf.GetMagic(), identity);
 	ASSERT_EQ(88, protocache::GetInt32(leaf.GetField(0, end), end));
 	ASSERT_FALSE(protocache::GetBool(leaf.GetField(1, end), end));
 	expected_str = "tmp";

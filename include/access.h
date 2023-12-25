@@ -62,8 +62,8 @@ public:
 			return nullptr;
 		}
 		auto ptr = ptr_;
-		if ((*ptr & 3) == 2) {
-			ptr += (*ptr+2)/4;
+		if ((*ptr & 3) == 3) {
+			ptr += *ptr >> 2U;
 		}
 		if (end != nullptr && ptr >= end) {
 			return nullptr;
@@ -79,13 +79,9 @@ private:
 class Message final {
 public:
 	Message() noexcept = default;
-	explicit Message(const uint32_t* ptr) noexcept : ptr_(ptr) {};
+	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(ptr) {};
 	bool operator!() const noexcept {
 		return ptr_ == nullptr;
-	}
-
-	uint32_t GetMagic() const noexcept {
-		return *ptr_ >> 8U;
 	}
 
 	Field GetField(unsigned id, const uint32_t* end=nullptr) const noexcept;
@@ -118,13 +114,19 @@ public:
 		Field operator*() const noexcept {
 			return Field(ptr_, width_);
 		}
-		Iterator& operator+=(int step) noexcept {
-			ptr_ += static_cast<int>(width_) * step;
+		Iterator& operator+=(ptrdiff_t step) noexcept {
+			ptr_ += static_cast<ptrdiff_t>(width_) * step;
 			return *this;
 		}
-		Iterator& operator-=(int step) noexcept {
-			ptr_ -= static_cast<int>(width_) * step;
+		Iterator& operator-=(ptrdiff_t step) noexcept {
+			ptr_ -= static_cast<ptrdiff_t>(width_) * step;
 			return *this;
+		}
+		Iterator operator+(ptrdiff_t step) noexcept {
+			return {ptr_ + static_cast<ptrdiff_t>(width_) * step, width_};
+		}
+		Iterator operator-(ptrdiff_t step) noexcept {
+			return {ptr_ - static_cast<ptrdiff_t>(width_) * step, width_};
 		}
 		Iterator& operator++() noexcept {
 			ptr_ += width_;
@@ -225,13 +227,19 @@ public:
 		Pair operator*() const noexcept {
 			return Pair(ptr_, key_width_, value_width_);
 		}
-		Iterator& operator+=(int step) noexcept {
-			ptr_ += static_cast<int>(key_width_ + value_width_) * step;
+		Iterator& operator+=(ptrdiff_t step) noexcept {
+			ptr_ += static_cast<ptrdiff_t>(key_width_ + value_width_) * step;
 			return *this;
 		}
-		Iterator& operator-=(int step) noexcept {
-			ptr_ -= static_cast<int>(key_width_ + value_width_) * step;
+		Iterator& operator-=(ptrdiff_t step) noexcept {
+			ptr_ -= static_cast<ptrdiff_t>(key_width_ + value_width_) * step;
 			return *this;
+		}
+		Iterator operator+(ptrdiff_t step) noexcept {
+			return {ptr_ + static_cast<ptrdiff_t>(key_width_ + value_width_) * step, key_width_, value_width_};
+		}
+		Iterator operator-(ptrdiff_t step) noexcept {
+			return {ptr_ - static_cast<ptrdiff_t>(key_width_ + value_width_) * step, key_width_, value_width_};
 		}
 		Iterator& operator++() noexcept {
 			ptr_ += key_width_ + value_width_;
@@ -263,12 +271,10 @@ public:
 	};
 
 	Iterator begin() const noexcept {
-		auto width = GetWidth();
-		return {body_, width.key, width.value};
+		return {body_, key_width_, value_width_};
 	}
 	Iterator end() const noexcept {
-		auto width = GetWidth();
-		return {body_ + (width.key + width.value) * Size(), width.key, width.value};
+		return {body_ + (key_width_ + value_width_) * Size(), key_width_, value_width_};
 	}
 
 	Iterator Find(const char* str, unsigned len, const uint32_t* end=nullptr) const noexcept;
@@ -295,20 +301,10 @@ public:
 private:
 	PerfectHash index_;
 	const uint32_t* body_ = nullptr;
+	unsigned key_width_ = 0;
+	unsigned value_width_ = 0;
 
 	Iterator Find(const uint32_t* val, unsigned len, const uint32_t* end= nullptr) const noexcept;
-
-	struct Width {
-		unsigned key;
-		unsigned value;
-	};
-	Width GetWidth() const noexcept {
-		auto ptr = reinterpret_cast<const uint32_t*>(index_.Data().data());
-		if (ptr == nullptr) {
-			return {0, 0};
-		}
-		return {(*ptr >> 30U) & 3U, (*ptr >> 28U) & 3U};
-	}
 };
 
 static inline size_t WordSize(size_t sz) noexcept {
@@ -428,7 +424,7 @@ static inline Map GetMap(const Field& field, const uint32_t* end=nullptr) noexce
 }
 
 static inline Message GetMessage(const Field& field, const uint32_t* end=nullptr) noexcept {
-	return Message(field.GetObject(end));
+	return Message(field.GetObject(end), end);
 }
 
 } // protocache

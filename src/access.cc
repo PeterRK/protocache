@@ -12,10 +12,6 @@ namespace protocache {
 #error "little endian only"
 #endif
 
-uint32_t CalcMagic(const char* name, unsigned len) noexcept {
-	return Hash32(reinterpret_cast<const uint8_t*>(name), len) >> 8U;
-}
-
 Slice<uint8_t> String::Get(const uint32_t* end) const noexcept {
 	auto send = reinterpret_cast<const uint8_t*>(end);
 	auto ptr = ptr_;
@@ -41,83 +37,68 @@ Slice<uint8_t> String::Get(const uint32_t* end) const noexcept {
 
 Field Message::GetField(unsigned id, const uint32_t* end) const noexcept {
 	uint32_t section = *ptr_ & 0xff;
-	if (section == 0xff) {
-		if (id >= 16) {
+	auto body = ptr_ + 1 + section*2;
+	if (end != nullptr && body >= end) {
+		return {};
+	}
+	unsigned off = 0;
+	unsigned width = 0;
+	if (id < 12) {
+		uint32_t v = *ptr_ >> 8U;
+		width = (v >> id*2) & 3;
+		if (width == 0) {
 			return {};
 		}
-		if (end != nullptr && ptr_ + 2 >= end) {
-			return {};
-		}
-		unsigned w = (ptr_[1] >> id * 2) & 3;
-		if (w == 0) {
-			return {};
-		}
-		uint32_t mask = ~(0xffffffffU << id*2);
-		uint32_t v = ptr_[1] & mask;
+		v &= ~(0xffffffffU << id*2);
 		v = (v&0x33333333U) + ((v>>2)&0x33333333U);
 		v = (v&0xf0f0f0fU) + ((v>>4)&0xf0f0f0fU);
 		v = (v&0xff00ffU) + ((v>>8)&0xff00ffU);
 		v = (v&0xffffU) + ((v>>16)&0xffffU);
-		if (end != nullptr && ptr_ + 2 + v + w > end) {
+		off = v;
+	} else {
+		auto vec = reinterpret_cast<const uint64_t*>(ptr_ + 1);
+		auto a = (id-12) / 25;
+		auto b = (id-12) % 25;
+		if (a >= section) {
 			return {};
 		}
-		return Field(ptr_ + 2 + v, w);
+		width = (vec[a] >> b*2) & 3;
+		if (width == 0) {
+			return {};
+		}
+		uint64_t mask = ~(0xffffffffffffffffULL << b*2);
+		uint64_t v = vec[a] & mask;
+		v = (v&0x3333333333333333ULL) + ((v>>2)&0x3333333333333333ULL);
+		v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>4)&0xf0f0f0f0f0f0f0fULL);
+		v = (v&0xff00ff00ff00ffULL) + ((v>>8)&0xff00ff00ff00ffULL);
+		v = (v&0xffff0000ffffULL) + ((v>>16)&0xffff0000ffffULL);
+		v = (v&0xffffffffULL) + ((v>>32)&0xffffffffULL);
+		off = v + (vec[a] >> 50U);
 	}
-
-	if (end != nullptr && ptr_ + 2 + 2 * section >= end) {
+	if (end != nullptr && body + off + width > end) {
 		return {};
 	}
-	auto vec = reinterpret_cast<const uint64_t*>(ptr_ + 1);
-	auto a = id / 25;
-	auto b = id % 25;
-	if (a >= section) {
-		return {};
-	}
-	unsigned w = (vec[a] >> b*2) & 3;
-	if (w == 0) {
-		return {};
-	}
-	uint64_t mask = ~(0xffffffffffffffffULL << b*2);
-	uint64_t v = vec[a] & mask;
-	v = (v&0x3333333333333333ULL) + ((v>>2)&0x3333333333333333ULL);
-	v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>4)&0xf0f0f0f0f0f0f0fULL);
-	v = (v&0xff00ff00ff00ffULL) + ((v>>8)&0xff00ff00ff00ffULL);
-	v = (v&0xffff0000ffffULL) + ((v>>16)&0xffff0000ffffULL);
-	v = (v&0xffffffffULL) + ((v>>32)&0xffffffffULL);
-	v += vec[a] >> 50U;
-	if (end != nullptr && ptr_ + 1 + 2 * section + v + w > end) {
-		return {};
-	}
-	return Field(ptr_ + 1 + 2 * section + v, w);
+	return Field(body + off, width);
 }
 
 Array::Array(const uint32_t* ptr, const uint32_t* end) noexcept : ptr_(ptr) {
 	if (ptr_ == nullptr) {
 		return;
 	}
-	switch (*ptr_ & 3) {
-		case 1:
-			width_ = 1;
-			break;
-		case 2:
-			width_ = 3;
-			break;
-		case 3:
-			width_ = 2;
-			break;
-		default:
-			ptr_ = nullptr;
-			return;
-	}
 	size_ = *ptr_ >> 2U;
-	if (end != nullptr && ptr_ + 1 + width_ * size_ > end) {
+	width_ = *ptr_ & 3U;
+	if (width_ == 0 || (end != nullptr && ptr_ + 1 + width_ * size_ > end)) {
 		ptr_ = nullptr;
-		return;
 	}
 }
 
 Map::Map(const uint32_t* ptr, const uint32_t* end) noexcept {
-	if (ptr == nullptr || ((*ptr >> 30U) & 3U) == 0 || ((*ptr >> 28U) & 3U) == 0) {
+	if (ptr == nullptr) {
+		return;
+	}
+	key_width_ = (*ptr >> 30U) & 3U;
+	value_width_ = (*ptr >> 28U) & 3U;
+	if (key_width_ == 0 || value_width_ == 0) {
 		return;
 	}
 	if (end == nullptr) {
@@ -132,9 +113,7 @@ Map::Map(const uint32_t* ptr, const uint32_t* end) noexcept {
 			return;
 		}
 		body_ = ptr + WordSize(index_.Data().size());
-		auto width = GetWidth();
-		assert(width.key != 0 && width.value != 0);
-		if (body_ + (width.key + width.value) * Size() > end) {
+		if (body_ + (key_width_ + value_width_) * Size() > end) {
 			body_ = nullptr;
 		}
 	}
@@ -145,8 +124,7 @@ Map::Iterator Map::Find(const char* str, unsigned len, const uint32_t* end) cons
 	if (pos >= index_.Size()) {
 		return this->end();
 	}
-	auto width = GetWidth();
-	Iterator it(body_ + (width.key + width.value) * pos, width.key, width.value);
+	Iterator it(body_ + (key_width_ + value_width_) * pos, key_width_, value_width_);
 	String key((*it).Key().GetObject(end));
 	if (!key) {
 		return this->end();
@@ -163,8 +141,7 @@ Map::Iterator Map::Find(const uint32_t* val, unsigned len, const uint32_t* end) 
 	if (pos >= index_.Size()) {
 		return this->end();
 	}
-	auto width = GetWidth();
-	Iterator it(body_ + (width.key + width.value) * pos, width.key, width.value);
+	Iterator it(body_ + (key_width_ + value_width_) * pos, key_width_, value_width_);
 	auto view= (*it).Key().GetValue();
 	if (!view || view.size() < len) {
 		return this->end();
