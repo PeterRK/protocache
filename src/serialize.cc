@@ -408,6 +408,9 @@ static Data SerializeMapField(const google::protobuf::Message& message, const go
 Data Serialize(const google::protobuf::Message& message) {
 	auto descriptor = message.GetDescriptor();
 	auto field_count = descriptor->field_count();
+	if (field_count <= 0) {
+		return {};
+	}
 	std::vector<const google::protobuf::FieldDescriptor*> fields(field_count);
 	for (int i = 0; i < field_count; i++) {
 		fields[i] = descriptor->field(i);
@@ -416,15 +419,29 @@ Data Serialize(const google::protobuf::Message& message) {
 			  [](const google::protobuf::FieldDescriptor* a, const google::protobuf::FieldDescriptor* b)->bool{
 				  return a->number() < b->number();
 			  });
-	for (int i = 0; i < field_count; i++) {
-		if (fields[i]->number() != i+1) {
+	if (fields[0]->number() <= 0) {
+		return {};
+	}
+	for (int i = 1; i < field_count; i++) {
+		if (fields[i]->number() == fields[i-1]->number()) {
 			return {};
 		}
 	}
+	auto max_id = fields.back()->number();
+	if (max_id - field_count > 6 && max_id > field_count*2) {
+		return {};
+	}
+	fields.resize(max_id, nullptr);
+	for (int i = field_count-1; i >= 0; i--) {
+		auto j = fields[i]->number() - 1;
+		if (i != j) {
+			std::swap(fields[i], fields[j]);
+		}
+	}
 
-	std::vector<Data> parts(field_count);
+	std::vector<Data> parts(fields.size());
 	auto reflection = message.GetReflection();
-	for (unsigned i = 0; i < field_count; i++) {
+	for (unsigned i = 0; i < fields.size(); i++) {
 		auto field = fields[i];
 		auto& unit = parts[i];
 		auto name = field->name().c_str();
