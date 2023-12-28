@@ -50,10 +50,10 @@ Field Message::GetField(unsigned id, const uint32_t* end) const noexcept {
 			return {};
 		}
 		v &= ~(0xffffffffU << id*2);
-		v = (v&0x33333333U) + ((v>>2)&0x33333333U);
-		v = (v&0xf0f0f0fU) + ((v>>4)&0xf0f0f0fU);
-		v = (v&0xff00ffU) + ((v>>8)&0xff00ffU);
-		v = (v&0xffffU) + ((v>>16)&0xffffU);
+		v = (v&0x33333333U) + ((v>>2U)&0x33333333U);
+		v = (v&0xf0f0f0fU) + ((v>>4U)&0xf0f0f0fU);
+		v = (v&0xff00ffU) + ((v>>8U)&0xff00ffU);
+		v = (v&0xffffU) + ((v>>16U)&0xffffU);
 		off = v;
 	} else {
 		auto vec = reinterpret_cast<const uint64_t*>(ptr_ + 1);
@@ -68,11 +68,11 @@ Field Message::GetField(unsigned id, const uint32_t* end) const noexcept {
 		}
 		uint64_t mask = ~(0xffffffffffffffffULL << b*2);
 		uint64_t v = vec[a] & mask;
-		v = (v&0x3333333333333333ULL) + ((v>>2)&0x3333333333333333ULL);
-		v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>4)&0xf0f0f0f0f0f0f0fULL);
-		v = (v&0xff00ff00ff00ffULL) + ((v>>8)&0xff00ff00ff00ffULL);
-		v = (v&0xffff0000ffffULL) + ((v>>16)&0xffff0000ffffULL);
-		v = (v&0xffffffffULL) + ((v>>32)&0xffffffffULL);
+		v = (v&0x3333333333333333ULL) + ((v>>2U)&0x3333333333333333ULL);
+		v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>4U)&0xf0f0f0f0f0f0f0fULL);
+		v = (v&0xff00ff00ff00ffULL) + ((v>>8U)&0xff00ff00ff00ffULL);
+		v = (v&0xffff0000ffffULL) + ((v>>16U)&0xffff0000ffffULL);
+		v = (v&0xffffffffULL) + ((v>>32U)&0xffffffffULL);
 		off = v + (vec[a] >> 50U);
 	}
 	if (end != nullptr && body + off + width > end) {

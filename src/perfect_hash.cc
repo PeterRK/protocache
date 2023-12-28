@@ -22,8 +22,13 @@ static inline void SetBit2on11(uint8_t* vec, size_t pos, uint8_t val) noexcept {
 
 static inline unsigned CountValidSlot(uint64_t block) noexcept {
 	block &= (block>>1);
-	block = ~block & 0x5555555555555555UL;
-	return __builtin_popcountll(block);
+	auto v = ~block;
+	v = (v & 0x1111111111111111ULL) + ((v>>2U) & 0x1111111111111111ULL);
+	v = (v & 0xf0f0f0f0f0f0f0fULL) + ((v>>4U) & 0xf0f0f0f0f0f0f0fULL);
+	v = (v&0xff00ff00ff00ffULL) + ((v>>8U)&0xff00ff00ff00ffULL);
+	v = (v&0xffff0000ffffULL) + ((v>>16U)&0xffff0000ffffULL);
+	v = (v&0xffffffffULL) + ((v>>32U)&0xffffffffULL);
+	return v;
 }
 
 static inline void SetBit(uint8_t bitmap[], size_t pos) noexcept {
@@ -41,7 +46,7 @@ static inline bool TestAndSetBit(uint8_t bitmap[], size_t pos) noexcept {
 }
 
 static inline uint32_t Section(uint32_t size) noexcept {
-	return std::max(10UL, (size*105UL + 255U) / 256U);
+	return std::max(10ULL, (size*105ULL + 255U) / 256U);
 }
 
 static inline uint32_t BitmapSize(uint32_t section) noexcept {
