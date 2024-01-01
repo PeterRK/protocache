@@ -4,6 +4,8 @@ project(protocache)
 set(CMAKE_CXX_STANDARD 11)
 
 find_package(Protobuf REQUIRED)
+find_package(gflags REQUIRED)
+find_package(GTest REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -21,4 +23,7 @@ file(GLOB test_src
 )
 
 add_executable(test ${test_src})
-target_link_libraries(test gtest protocache protobuf pthread)
+target_link_libraries(test protocache protobuf gtest pthread)
+
+add_executable(json-to-binary tools/json-to-binary.cc)
+target_link_libraries(json-to-binary protocache protobuf gflags pthread)

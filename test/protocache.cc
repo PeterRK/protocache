@@ -15,22 +15,6 @@
 #include "access.h"
 #include "utils.h"
 
-static bool ParseJsonToProto(const std::string& data, ::google::protobuf::Message* message) {
-	::google::protobuf::util::JsonParseOptions option;
-	option.ignore_unknown_fields = true;
-	auto status = ::google::protobuf::util::JsonStringToMessage(data, message, option);
-	if (!status.ok()) {
-		std::cerr << "JsonStringToMessage: " << status << std::endl;
-		return false;
-	}
-	return true;
-}
-
-static bool LoadJson(const std::string& path, ::google::protobuf::Message* message) {
-	std::string raw;
-	return protocache::LoadFile(path, &raw) && ParseJsonToProto(raw, message);
-}
-
 TEST(Proto, Basic) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
@@ -47,7 +31,7 @@ TEST(Proto, Basic) {
 	ASSERT_NE(prototype, nullptr);
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 
-	ASSERT_TRUE(LoadJson("test.json", message.get()));
+	ASSERT_TRUE(protocache::LoadJson("test.json", message.get()));
 	auto data = protocache::Serialize(*message);
 	ASSERT_FALSE(data.empty());
 
