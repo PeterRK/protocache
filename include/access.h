@@ -105,7 +105,7 @@ private:
 class Message final {
 public:
 	Message() noexcept = default;
-	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(ptr) {};
+	explicit Message(const uint32_t* ptr) noexcept : ptr_(ptr) {};
 	bool operator!() const noexcept {
 		return ptr_ == nullptr;
 	}
@@ -796,7 +796,7 @@ static inline MapT<K,V> GetMap(const Message& message, unsigned id, const uint32
 }
 
 static inline Message GetMessage(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Message(message.GetField(id, end).GetObject(end), end);
+	return Message(message.GetField(id, end).GetObject(end));
 }
 
 } // protocache
