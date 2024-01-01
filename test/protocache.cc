@@ -97,7 +97,7 @@ TEST(Proto, Basic) {
 	ASSERT_EQ(strv.Size(), expected_strv.size());
 	auto sit = expected_strv.begin();
 	for (const auto& one : strv) {
-		ASSERT_EQ(one.Get(end), *sit++);
+		ASSERT_EQ(one, *sit++);
 	}
 
 	auto f32v = protocache::GetFloatArray(root, 15, end);
@@ -125,10 +125,10 @@ TEST(Proto, Basic) {
 	auto objects = protocache::GetArray<protocache::Message>(root, 18, end);
 	ASSERT_FALSE(!objects);
 	ASSERT_EQ(objects.Size(), 3);
-	ASSERT_EQ(protocache::GetInt32(objects[0].Get(end), 0, end), 1);
-	ASSERT_TRUE(protocache::GetBool(objects[1].Get(end), 1, end));
+	ASSERT_EQ(protocache::GetInt32(objects[0], 0, end), 1);
+	ASSERT_TRUE(protocache::GetBool(objects[1], 1, end));
 	expected_str = "good luck!";
-	str = protocache::GetString(objects[2].Get(end), 2, end);
+	str = protocache::GetString(objects[2], 2, end);
 	ASSERT_EQ(str, expected_str);
 
 	ASSERT_EQ(0, protocache::GetUInt32(root, 19));
