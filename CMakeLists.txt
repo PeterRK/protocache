@@ -4,10 +4,6 @@ project(protocache)
 set(CMAKE_CXX_STANDARD 11)
 
 find_package(Protobuf REQUIRED)
-execute_process(
-        COMMAND protoc --cpp_out=. test.proto
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test
-)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 

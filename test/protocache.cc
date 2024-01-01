@@ -4,15 +4,16 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <vector>
 #include <gtest/gtest.h>
-#include <google/protobuf/arena.h>
 #include <google/protobuf/message.h>
-#include <google/protobuf/reflection.h>
+#include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/util/json_util.h>
 #include "serialize.h"
 #include "access.h"
-#include "test.pb.h"
+#include "utils.h"
 
 static bool ParseJsonToProto(const std::string& data, ::google::protobuf::Message* message) {
 	::google::protobuf::util::JsonParseOptions option;
@@ -25,30 +26,28 @@ static bool ParseJsonToProto(const std::string& data, ::google::protobuf::Messag
 	return true;
 }
 
-static bool LoadFile(const std::string& path, std::string* out) {
-	std::ifstream ifs(path, std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
-	if (!ifs) {
-		std::cerr << "fail to load file: " << path << std::endl;
-		return false;
-	}
-	size_t size = ifs.tellg();
-	ifs.seekg(0);
-	out->resize(size);
-	if (!ifs.read(const_cast<char*>(out->data()), size)) {
-		return false;
-	}
-	return true;
-}
-
 static bool LoadJson(const std::string& path, ::google::protobuf::Message* message) {
 	std::string raw;
-	return LoadFile(path, &raw) && ParseJsonToProto(raw, message);
+	return protocache::LoadFile(path, &raw) && ParseJsonToProto(raw, message);
 }
 
 TEST(Proto, Basic) {
-	google::protobuf::Arena arena;
-	auto message = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
-	ASSERT_TRUE(LoadJson("test.json", message));
+	std::string err;
+	google::protobuf::FileDescriptorProto file;
+	ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
+
+	google::protobuf::DescriptorPool pool;
+	ASSERT_NE(pool.BuildFile(file), nullptr);
+
+	auto descriptor = pool.FindMessageTypeByName("test.Main");
+	ASSERT_NE(descriptor, nullptr);
+
+	google::protobuf::DynamicMessageFactory factory(&pool);
+	auto prototype = factory.GetPrototype(descriptor);
+	ASSERT_NE(prototype, nullptr);
+	std::unique_ptr<google::protobuf::Message> message(prototype->New());
+
+	ASSERT_TRUE(LoadJson("test.json", message.get()));
 	auto data = protocache::Serialize(*message);
 	ASSERT_FALSE(data.empty());
 
