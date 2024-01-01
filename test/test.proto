@@ -16,6 +16,18 @@ message Small {
     string str = 3;
 }
 
+message Vec1D {
+    repeated float _ = 1;
+}
+
+message Vec2D {
+    repeated Vec1D _ = 1;
+}
+
+message VecMap {
+    map<string,Vec1D> _ = 1;
+}
+
 message Main {
     int32 i32 = 1;
     uint32 u32 = 2;
@@ -44,4 +56,6 @@ message Main {
     sint64 t_s64 = 25;
     map<string,int32> index = 26;
     map<int32,Small> objects = 27;
+    Vec2D matrix = 28;
+    repeated VecMap vector = 29;
 }

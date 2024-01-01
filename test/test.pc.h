@@ -39,6 +39,10 @@ private:
 	protocache::Message core_;
 };
 
+using Vec1D = protocache::ArrayT<float>;
+using Vec2D = protocache::ArrayT<Vec1D>;
+using VecMap = protocache::MapT<protocache::Slice<char>,Vec1D>;
+
 class Main final {
 public:
 	explicit Main(const protocache::Message& message) : core_(message) {}
@@ -127,6 +131,12 @@ public:
 	protocache::MapT<int32_t,Small> objects(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetMap<int32_t,Small>(core_, _Fields::objects, end);
 	}
+	protocache::ArrayT<protocache::ArrayT<float>> matrix(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<protocache::ArrayT<float>>(core_, _Fields::matrix, end);
+	}
+	protocache::ArrayT<VecMap> vector(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<VecMap>(core_, _Fields::vector, end);
+	}
 
 private:
 	struct _Fields {
@@ -157,6 +167,8 @@ private:
 		static constexpr unsigned t_s64 = 24;
 		static constexpr unsigned index = 25;
 		static constexpr unsigned objects = 26;
+		static constexpr unsigned matrix = 27;
+		static constexpr unsigned vector = 28;
 	};
 	protocache::Message core_;
 };
@@ -172,5 +184,29 @@ template<>
 inline test::Main protocache::FieldT<test::Main>::Get(const uint32_t *end) const noexcept {
 	return test::Main(core_.GetObject(end));
 }
+
+#ifndef PROTOCACHE_V_f32
+#define PROTOCACHE_V_f32
+template<>
+inline test::Vec1D protocache::FieldT<test::Vec1D>::Get(const uint32_t *end) const noexcept {
+	return test::Vec1D(protocache::Array(core_.GetObject(end)));
+}
+#endif // PROTOCACHE_V_f32
+
+#ifndef PROTOCACHE_VV_f32
+#define PROTOCACHE_VV_f32
+template<>
+inline test::Vec2D protocache::FieldT<test::Vec2D>::Get(const uint32_t *end) const noexcept {
+	return test::Vec2D(protocache::Array(core_.GetObject(end)));
+}
+#endif // PROTOCACHE_VV_f32
+
+#ifndef PROTOCACHE_MstrV_f32
+#define PROTOCACHE_MstrV_f32
+template<>
+inline test::VecMap protocache::FieldT<test::VecMap>::Get(const uint32_t *end) const noexcept {
+	return test::VecMap(protocache::Map(core_.GetObject(end)));
+}
+#endif // PROTOCACHE_MstrV_f32
 
 #endif // PROTOCACHE_INCLUDED_test_2eproto

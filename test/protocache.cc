@@ -135,4 +135,22 @@ TEST(Proto, Basic) {
 		ASSERT_FALSE(!val);
 		ASSERT_EQ(key, val.i32(end));
 	}
+
+	auto matrix = root.matrix(end);
+	ASSERT_FALSE(!matrix);
+	ASSERT_EQ(matrix.Size(), 3);
+	ASSERT_EQ(matrix[2].Size(), 3);
+	ASSERT_EQ(matrix[2][2], 9);
+
+	auto vector = root.vector(end);
+	ASSERT_FALSE(!vector);
+	ASSERT_EQ(vector.Size(), 2);
+	auto map3 = vector[0];
+	ASSERT_EQ(map3.Size(), 2);
+	auto mit3 = vector[0].Find(protocache::Slice<char>("lv2"));
+	ASSERT_NE(mit3, map3.end());
+	auto vec = (*mit3).Value();
+	ASSERT_EQ(vec.Size(), 2);
+	ASSERT_EQ(vec[0], 21);
+	ASSERT_EQ(vec[1], 22);
 }
