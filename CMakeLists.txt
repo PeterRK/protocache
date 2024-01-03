@@ -27,3 +27,6 @@ target_link_libraries(test protocache protobuf gtest pthread)
 
 add_executable(json-to-binary tools/json-to-binary.cc)
 target_link_libraries(json-to-binary protocache protobuf gflags pthread)
+
+add_executable(protoc-gen-pccx tools/protoc-gen-pccx.cc)
+target_link_libraries(protoc-gen-pccx protoc protobuf pthread)

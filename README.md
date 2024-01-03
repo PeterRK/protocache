@@ -33,4 +33,7 @@ Following [benchmark](https://github.com/jviotti/binary-json-size-benchmark), we
 
 
 ## Code Gen
+```sh
+protoc --pccx_out=. test.proto
+```
 TODO

@@ -16,16 +16,18 @@ message Small {
     string str = 3;
 }
 
-message Vec1D {
-    repeated float _ = 1;
-}
-
 message Vec2D {
-    repeated Vec1D _ = 1;
+	message Vec1D {
+		repeated float _ = 1;
+	}
+	repeated Vec1D _ = 1;
 }
 
-message VecMap {
-    map<string,Vec1D> _ = 1;
+message ArrMap {
+	message Array {
+		repeated float _ = 1;
+	}
+	map<string,Array> _ = 1;
 }
 
 message Main {
@@ -57,5 +59,6 @@ message Main {
     map<string,int32> index = 26;
     map<int32,Small> objects = 27;
     Vec2D matrix = 28;
-    repeated VecMap vector = 29;
+    repeated ArrMap vector = 29;
+    ArrMap arrays = 30;
 }

@@ -761,6 +761,10 @@ static inline Slice<bool> GetBoolArray(const Message& message, unsigned id, cons
 	return FieldT<Slice<bool>>(message.GetField(id, end)).Get(end);
 }
 
+static inline Slice<EnumValue> GetEnumValueArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
+	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<EnumValue>();
+}
+
 static inline Slice<int32_t> GetInt32Array(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
 	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<int32_t>();
 }

@@ -153,4 +153,13 @@ TEST(Proto, Basic) {
 	ASSERT_EQ(vec.Size(), 2);
 	ASSERT_EQ(vec[0], 21);
 	ASSERT_EQ(vec[1], 22);
+
+	auto map4 = root.arrays(end);
+	ASSERT_FALSE(!map4);
+	auto mit4 = map4.Find(protocache::Slice<char>("lv5"));
+	ASSERT_NE(mit4, map3.end());
+	vec = (*mit4).Value();
+	ASSERT_EQ(vec.Size(), 2);
+	ASSERT_EQ(vec[0], 51);
+	ASSERT_EQ(vec[1], 52);
 }
