@@ -2,7 +2,7 @@
 #ifndef PROTOCACHE_INCLUDED_test_proto
 #define PROTOCACHE_INCLUDED_test_proto
 
-#include "access.h"
+#include <protocache/access.h>
 
 namespace test {
 

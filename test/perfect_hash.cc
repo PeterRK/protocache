@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #include <gtest/gtest.h>
-#include "perfect_hash.h"
+#include <protocache/perfect_hash.h>
 
 class StrKeyReader : public protocache::KeyReader {
 public:

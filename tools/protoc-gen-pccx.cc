@@ -466,7 +466,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 		<< "#ifndef PROTOCACHE_INCLUDED_" << header_name << '\n'
 		<< "#define PROTOCACHE_INCLUDED_" << header_name << '\n';
 
-	oss << '\n' << "#include \"access.h\"\n";
+	oss << '\n' << "#include <protocache/access.h>\n";
 	for (auto& one : proto.dependency()) {
 		oss << "#include \"" << ConvertFilename(one) << "\"\n";
 	}

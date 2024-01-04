@@ -7,8 +7,8 @@
 #include <cstring>
 #include <memory>
 #include <algorithm>
+#include "protocache/perfect_hash.h"
 #include "hash.h"
-#include "perfect_hash.h"
 
 namespace protocache {
 

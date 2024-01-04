@@ -1,11 +1,31 @@
-# protocache
+# ProtoCache
 
-Alternative flat binary format for protobuf schema. It' works like flatbuffers, but it's usually smaller than flatbuffers and surpports map.
+Alternative flat binary format for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means [no deserialization overhead](https://flatbuffers.dev/flatbuffers_benchmarks.html).
+
+## Difference to Protobuf
+Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named "_", message with only one such field will be considered as an alias. Alias for array or map is useful. We can declare a 2D array like this.
+```protobuf
+message Vec2D {
+	message Vec1D {
+		repeated float _ = 1;
+	}
+	repeated Vec1D _ = 1;
+}
+```
+Some features in Protobuf, like Services, are not supported.
+
+## Code Gen
+```sh
+protoc --pccx_out=. test.proto
+```
+A protobuf compiler plugin called "protoc-gen-pccx" is available to generate header-only C++ file. The generated file is short and human friendly. Howerver, there is a known flaw that type declaration order may break C++ compilation. Don't mind to edit it if nessasery.
 
 
-Following [benchmark](https://github.com/jviotti/binary-json-size-benchmark), we can find that protocache has smaller binary size than flatbuffers and Cap'n Proto, in most cases.
+## Binary Size
 
-|  | protobuf | protocache | flatbuffers | Cap'n Proto | protobuf-zstd1 | protocache-zstd1 | Cap'n Proto (Packed) |
+Following work in [paper](https://arxiv.org/pdf/2201.02089.pdf), we can find that protocache has smaller binary size than [FlatBuffers](https://flatbuffers.dev/) and [Cap'n Proto](https://capnproto.org/), in most cases.
+
+|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto | Protobuf-ZSTD1 | ProtoCache-ZSTD1 | Cap'n Proto (Packed) |
 |:-------|----:|----:|----:|----:|----:|----:|----:|
 | CircleCI Definition (Blank) | 5 | 8 | 20 | 24 | 18 | 21 | 6 |
 | CircleCI Matrix Definition | 26 | 88 | 104 | 96 | 39 | 61 | 36 |
@@ -29,11 +49,3 @@ Following [benchmark](https://github.com/jviotti/binary-json-size-benchmark), we
 | TSLint Linter Definition (Basic) | 8 | 24 | 60 | 48 | 21 | 37 | 12 |
 | TSLint Linter Definition (Extends Only) | 47 | 68 | 88 | 88 | 53 | 75 | 62 |
 | TSLint Linter Definition (Multi-rule) | 14 | 32 | 84 | 80 | 27 | 45 | 23 |
-
-
-
-## Code Gen
-```sh
-protoc --pccx_out=. test.proto
-```
-TODO

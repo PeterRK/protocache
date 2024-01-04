@@ -10,9 +10,9 @@
 #include <algorithm>
 #include <google/protobuf/message.h>
 #include <google/protobuf/reflection.h>
-#include "perfect_hash.h"
-#include "access.h"
-#include "serialize.h"
+#include "protocache/perfect_hash.h"
+#include "protocache/access.h"
+#include "protocache/serialize.h"
 
 namespace protocache {
 

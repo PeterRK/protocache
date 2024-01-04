@@ -3,8 +3,8 @@
 #include <memory>
 #include <gflags/gflags.h>
 #include <google/protobuf/dynamic_message.h>
-#include "serialize.h"
-#include "utils.h"
+#include <protocache/serialize.h>
+#include <protocache/utils.h>
 
 DEFINE_string(input, "data.json", "input file");
 DEFINE_string(output, "data.bin", "output file");
