@@ -283,7 +283,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 
 	oss << "\texplicit " << proto.name() << "(const protocache::Message& message) : core_(message) {}\n"
 		<< "\texplicit " << proto.name() << "(const uint32_t* ptr) : core_(ptr) {}\n"
-		<< "\tbool operator!() const noexcept { return !core_; }\n\n";
+		<< "\tbool operator!() const noexcept { return !core_; }\n"
+		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n";
 
 	for (auto& one : proto.field()) {
 		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto_Label_LABEL_REPEATED;

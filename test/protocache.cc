@@ -110,6 +110,9 @@ TEST(Proto, Basic) {
 	expected_str = "good luck!";
 	ASSERT_EQ(objects[2].str(end), expected_str);
 
+	ASSERT_TRUE(root.HasField(::test::Main::_::objectv));
+	ASSERT_FALSE(root.HasField(::test::Main::_::t_i32));
+
 	auto map1 = root.index(end);
 	ASSERT_FALSE(!map1);
 	ASSERT_EQ(map1.Size(), 6);

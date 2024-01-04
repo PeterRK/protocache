@@ -110,6 +110,27 @@ public:
 		return ptr_ == nullptr;
 	}
 
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		uint32_t section = *ptr_ & 0xff;
+		auto body = ptr_ + 1 + section*2;
+		if (end != nullptr && body >= end) {
+			return false;
+		}
+		if (id < 12) {
+			uint32_t v = *ptr_ >> 8U;
+			auto width = (v >> id * 2) & 3;
+			return width != 0;
+		}
+		auto vec = reinterpret_cast<const uint64_t*>(ptr_ + 1);
+		auto a = (id-12) / 25;
+		auto b = (id-12) % 25;
+		if (a >= section) {
+			return false;
+		}
+		auto width = (vec[a] >> b*2) & 3;
+		return width != 0;
+	}
+
 	Field GetField(unsigned id, const uint32_t* end=nullptr) const noexcept {
 		uint32_t section = *ptr_ & 0xff;
 		auto body = ptr_ + 1 + section*2;

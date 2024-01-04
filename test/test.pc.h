@@ -25,6 +25,7 @@ public:
 	explicit Small(const protocache::Message& message) : core_(message) {}
 	explicit Small(const uint32_t* ptr) : core_(ptr) {}
 	bool operator!() const noexcept { return !core_; }
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
 	int32_t i32(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetInt32(core_, _::i32, end);
@@ -93,6 +94,7 @@ public:
 	explicit Main(const protocache::Message& message) : core_(message) {}
 	explicit Main(const uint32_t* ptr) : core_(ptr) {}
 	bool operator!() const noexcept { return !core_; }
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
 	int32_t i32(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetInt32(core_, _::i32, end);
