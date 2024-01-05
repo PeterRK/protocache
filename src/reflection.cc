@@ -78,9 +78,11 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 			field.value_type.clear();
 			return true;
 		}
-		if (pool_.find(name) != pool_.end()) {
+		auto it = pool_.find(name);
+		if (it != pool_.end()) {
 			field.value = Field::TYPE_MESSAGE;
 			field.value_type = name;
+			field.value_descriptor = &it->second;
 			return true;
 		}
 		return false;

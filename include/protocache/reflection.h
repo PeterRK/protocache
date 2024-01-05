@@ -15,6 +15,8 @@
 namespace protocache {
 namespace reflection {
 
+struct Descriptor;
+
 struct Field final {
 	enum Type : uint8_t {
 		TYPE_NONE = 0,
@@ -36,6 +38,7 @@ struct Field final {
 	Type key = TYPE_NONE;
 	Type value = TYPE_NONE;
 	std::string value_type;
+	const Descriptor* value_descriptor = nullptr;
 	//std::string default_value;
 
 	bool operator!() const noexcept {
