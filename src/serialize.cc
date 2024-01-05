@@ -346,7 +346,6 @@ static Data SerializeMapField(const google::protobuf::Message& message, const go
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_BOOL:
-		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
 		{
 			ScalarReader reader(keys);
 			build(reader);

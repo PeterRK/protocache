@@ -11,8 +11,10 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/util/json_util.h>
 #include <protocache/serialize.h>
+#include <protocache/reflection.h>
 #include <protocache/utils.h>
 #include "test.pc.h"
+
 
 TEST(Proto, Basic) {
 	std::string err;
@@ -164,4 +166,106 @@ TEST(Proto, Basic) {
 	ASSERT_EQ(vec.Size(), 2);
 	ASSERT_EQ(vec[0], 51);
 	ASSERT_EQ(vec[1], 52);
+}
+
+TEST(Proto, Reflection) {
+	std::string err;
+	google::protobuf::FileDescriptorProto file;
+	ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
+
+	protocache::reflection::DescriptorPool pool;
+	ASSERT_TRUE(pool.Register(file));
+
+	auto root = pool.Find("test.Main");
+	ASSERT_NE(root, nullptr);
+
+	auto it = root->fields.find("f64");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_DOUBLE);
+
+	it = root->fields.find("strv");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_TRUE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_STRING);
+
+	it = root->fields.find("mode");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_ENUM);
+
+	it = root->fields.find("object");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_MESSAGE);
+	auto object = pool.Find(it->second.value_type);
+	ASSERT_NE(object, nullptr);
+	ASSERT_FALSE(object->IsAlias());
+	it = object->fields.find("flag");
+	ASSERT_NE(it, object->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_BOOL);
+
+	it = root->fields.find("index");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_TRUE(it->second.repeated);
+	ASSERT_TRUE(it->second.IsMap());
+
+	it = root->fields.find("matrix");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_MESSAGE);
+	object = pool.Find(it->second.value_type);
+	ASSERT_NE(object, nullptr);
+	ASSERT_TRUE(object->IsAlias());
+	ASSERT_TRUE(object->alias.repeated);
+	ASSERT_FALSE(object->alias.IsMap());
+	ASSERT_EQ(object->alias.value, protocache::reflection::Field::TYPE_MESSAGE);
+	object = pool.Find(object->alias.value_type);
+	ASSERT_NE(object, nullptr);
+	ASSERT_TRUE(object->IsAlias());
+	ASSERT_TRUE(object->alias.repeated);
+	ASSERT_FALSE(object->alias.IsMap());
+	ASSERT_EQ(object->alias.value, protocache::reflection::Field::TYPE_FLOAT);
+
+	it = root->fields.find("arrays");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_MESSAGE);
+	object = pool.Find(it->second.value_type);
+	ASSERT_NE(object, nullptr);
+	ASSERT_TRUE(object->IsAlias());
+	ASSERT_TRUE(object->alias.repeated);
+	ASSERT_TRUE(object->alias.IsMap());
+	ASSERT_EQ(object->alias.key, protocache::reflection::Field::TYPE_STRING);
+	ASSERT_EQ(object->alias.value, protocache::reflection::Field::TYPE_MESSAGE);
+	object = pool.Find(object->alias.value_type);
+	ASSERT_NE(object, nullptr);
+	ASSERT_TRUE(object->IsAlias());
+	ASSERT_TRUE(object->alias.repeated);
+	ASSERT_FALSE(object->alias.IsMap());
+	ASSERT_EQ(object->alias.value, protocache::reflection::Field::TYPE_FLOAT);
+
+	google::protobuf::DescriptorPool pb;
+	ASSERT_NE(pb.BuildFile(file), nullptr);
+
+	auto descriptor = pb.FindMessageTypeByName("test.Main");
+	ASSERT_NE(descriptor, nullptr);
+
+	google::protobuf::DynamicMessageFactory factory(&pb);
+	auto prototype = factory.GetPrototype(descriptor);
+	ASSERT_NE(prototype, nullptr);
+	std::unique_ptr<google::protobuf::Message> message(prototype->New());
+
+	ASSERT_TRUE(protocache::LoadJson("test.json", message.get()));
+	auto data = protocache::Serialize(*message);
+	ASSERT_FALSE(data.empty());
+	auto end = data.data() + data.size();
+	protocache::Message unit(data.data());
+
+	it = root->fields.find("f32");
+	ASSERT_NE(it, root->fields.end());
+	ASSERT_FALSE(it->second.repeated);
+	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_FLOAT);
+	ASSERT_EQ(-2.1f, protocache::GetFloat(unit, it->second.id, end));
 }

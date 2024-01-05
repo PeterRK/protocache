@@ -43,19 +43,17 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 	}
 	AliasUnit unit;
 	unit.value_type = field.type();
-	if (field.type() != ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE) {
-		g_alias_book.emplace(fullname, unit);
-		return true;
+	if (field.type() == ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE) {
+		auto it = map_entries.find(field.type_name());
+		if (it != map_entries.end()) {
+			unit.key_type = it->second->field(0).type();
+			unit.value_type = it->second->field(1).type();
+			unit.value_class = it->second->field(1).type_name();
+		} else {
+			unit.value_class = field.type_name();
+		}
 	}
-	auto it = map_entries.find(field.type_name());
-	if (it != map_entries.end()) {
-		unit.key_type = it->second->field(0).type();
-		unit.value_type = it->second->field(1).type();
-		unit.value_class = it->second->field(1).type_name();
-	} else {
-		unit.value_class = field.type_name();
-	}
-	g_alias_book.emplace(fullname, unit);
+	g_alias_book.emplace(std::move(fullname), std::move(unit));
 	return true;
 }
 
@@ -187,7 +185,6 @@ static bool CanBeKey(::google::protobuf::FieldDescriptorProto::Type type) {
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 			return true;
 		default:
 			return false;
