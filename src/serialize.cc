@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <google/protobuf/message.h>
 #include <google/protobuf/reflection.h>
+#include <google/protobuf/descriptor.pb.h>
 #include "protocache/perfect_hash.h"
 #include "protocache/access.h"
 #include "protocache/serialize.h"
@@ -240,7 +241,7 @@ static Data SerializeField(const google::protobuf::Message& message, const googl
 			return Serialize<int32_t>(reflection->GetEnumValue(message, field));
 
 		default:
-			return {};;
+			return {};
 	}
 }
 
@@ -444,6 +445,9 @@ Data Serialize(const google::protobuf::Message& message) {
 		auto field = fields[i];
 		auto& unit = parts[i];
 		auto name = field->name().c_str();
+		if (field->options().deprecated()) {
+			continue;
+		}
 		if (field->is_map()) {
 			if (reflection->FieldSize(message, field) == 0) {
 				continue;

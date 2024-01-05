@@ -6,13 +6,13 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <unistd.h>
-#include <google/protobuf/arena.h>
 #include <google/protobuf/compiler/plugin.pb.h>
 
+static constexpr ::google::protobuf::FieldDescriptorProto::Type TYPE_NONE = static_cast<::google::protobuf::FieldDescriptorProto::Type>(0);
 
 struct AliasUnit {
-	::google::protobuf::FieldDescriptorProto_Type key_type;
-	::google::protobuf::FieldDescriptorProto_Type value_type;
+	::google::protobuf::FieldDescriptorProto::Type key_type = TYPE_NONE;
+	::google::protobuf::FieldDescriptorProto::Type value_type = TYPE_NONE;
 	std::string value_class;
 };
 
@@ -37,14 +37,13 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 	}
 	// alias
 	auto& field = proto.field(0);
-	if (field.label() != ::google::protobuf::FieldDescriptorProto_Label_LABEL_REPEATED) {
+	if (field.label() != ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
 		std::cerr << "illegal alias: " << fullname << std::endl;
 		return false;
 	}
 	AliasUnit unit;
-	unit.key_type = static_cast<::google::protobuf::FieldDescriptorProto_Type>(-1);
 	unit.value_type = field.type();
-	if (field.type() != ::google::protobuf::FieldDescriptorProto_Type_TYPE_MESSAGE) {
+	if (field.type() != ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE) {
 		g_alias_book.emplace(fullname, unit);
 		return true;
 	}
@@ -94,9 +93,9 @@ static std::string AddIndent(const std::string& raw) {
 	return out;
 }
 
-static std::string TypeName(::google::protobuf::FieldDescriptorProto_Type type, const std::string& clazz) {
+static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type, const std::string& clazz) {
 	switch (type) {
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_MESSAGE:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 		{
 			std::string name;
 			for (auto ch : clazz) {
@@ -111,84 +110,84 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto_Type type, 
 			}
 			return name;
 		}
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BYTES:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
 			return "protocache::Slice<uint8_t>";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_STRING:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
 			return "protocache::Slice<char>";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_DOUBLE:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 			return "double";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FLOAT:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
 			return "float";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 			return "uint64_t";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
 			return "uint32_t";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
 			return "int64_t";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 			return "int32_t";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BOOL:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
 			return "bool";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_ENUM:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 			return "protocache::EnumValue";
 		default:
 			return {};
 	}
 }
 
-static const char* TypeMark(::google::protobuf::FieldDescriptorProto_Type type) {
+static const char* TypeMark(::google::protobuf::FieldDescriptorProto::Type type) {
 	switch (type) {
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BYTES:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
 			return "bytes";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_STRING:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
 			return "str";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_DOUBLE:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 			return "f64";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FLOAT:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
 			return "f32";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 			return "u64";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
 			return "u32";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
 			return "i64";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 			return "i32";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BOOL:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
 			return "bool";
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_ENUM:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 			return "enum";
 		default:
 			return nullptr;
 	}
 }
 
-static bool CanBeKey(::google::protobuf::FieldDescriptorProto_Type type) {
+static bool CanBeKey(::google::protobuf::FieldDescriptorProto::Type type) {
 	switch (type) {
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_STRING:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT64:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT32:
-		case ::google::protobuf::FieldDescriptorProto_Type_TYPE_ENUM:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 			return true;
 		default:
 			return false;
@@ -201,6 +200,9 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto)
 	auto n = proto.value_size();
 	for (int i = 0; i < n; i++) {
 		auto& value = proto.value(i);
+		if (value.options().deprecated()) {
+			continue;
+		}
 		oss << '\t' << value.name() << " = " << value.number();
 		if (i != n-1) {
 			oss << ',';
@@ -241,9 +243,15 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 
 	for (auto& one : proto.enum_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
 		oss << AddIndent(GenEnum(one));
 	}
 	for (auto& one : proto.nested_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
 		if (one.options().map_entry()) {
 			map_entries.emplace(fullname + '.' + one.name(), &one);
 			continue;
@@ -267,7 +275,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			std::cerr << "illegal value type: " << it->second.value_type << std::endl;
 			return {};
 		}
-		if (it->second.key_type == -1) {
+		if (it->second.key_type == TYPE_NONE) {
 			oss << "\tusing _ = protocache::ArrayT<" << value << ">;\n";
 		} else {
 			if (!CanBeKey(it->second.key_type)) {
@@ -287,9 +295,12 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n";
 
 	for (auto& one : proto.field()) {
-		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto_Label_LABEL_REPEATED;
+		if (one.options().deprecated()) {
+			continue;
+		}
+		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
 		switch (one.type()) {
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_MESSAGE:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 				if (repeated) { // array or map
 					auto it = map_entries.find(one.type_name());
 					if (it != map_entries.end()) {
@@ -323,13 +334,13 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 							<< "\t}\n";
 					} else {
 						oss << '\t' << name << ' ' << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-							<< "\t\treturn " << name << "(protocache::" << (it->second.key_type != -1? "Map" : "Array")
+							<< "\t\treturn " << name << "(protocache::" << (it->second.key_type != TYPE_NONE? "Map" : "Array")
 								<< "(core_.GetField(_::" << one.name() << ", end).GetObject(end), end));\n"
 							<< "\t}\n";
 					}
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BYTES:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
 				if (repeated) {
 					oss << "\tprotocache::ArrayT<protocache::Slice<uint8_t>> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetArray<protocache::Slice<uint8_t>>(core_, _::" << one.name() << ", end);\n"
@@ -340,7 +351,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_STRING:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
 				if (repeated) {
 					oss << "\tprotocache::ArrayT<protocache::Slice<char>> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetArray<protocache::Slice<char>>(core_, _::" << one.name() << ", end);\n"
@@ -351,7 +362,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_DOUBLE:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 				if (repeated) {
 					oss << "\tprotocache::Slice<double> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetDoubleArray(core_, _::" << one.name() << ", end);\n"
@@ -362,7 +373,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FLOAT:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
 				if (repeated) {
 					oss << "\tprotocache::Slice<float> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetFloatArray(core_, _::" << one.name() << ", end);\n"
@@ -373,8 +384,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED64:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 				if (repeated) {
 					oss << "\tprotocache::Slice<uint64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetUInt64Array(core_, _::" << one.name() << ", end);\n"
@@ -385,8 +396,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_FIXED32:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_UINT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
 				if (repeated) {
 					oss << "\tprotocache::Slice<uint32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetUInt32Array(core_, _::" << one.name() << ", end);\n"
@@ -397,9 +408,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED64:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT64:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
 				if (repeated) {
 					oss << "\tprotocache::Slice<int64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetInt64Array(core_, _::" << one.name() << ", end);\n"
@@ -410,9 +421,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SFIXED32:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_SINT32:
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_INT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 				if (repeated) {
 					oss << "\tprotocache::Slice<int32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetInt32Array(core_, _::" << one.name() << ", end);\n"
@@ -423,7 +434,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_BOOL:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
 				if (repeated) {
 					oss << "\tprotocache::Slice<bool> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetBoolArray(core_, _::" << one.name() << ", end);\n"
@@ -434,7 +445,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 						<< "\t}\n";
 				}
 				break;
-			case ::google::protobuf::FieldDescriptorProto_Type_TYPE_ENUM:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 				if (repeated) {
 					oss << "\tprotocache::Slice<protocache::EnumValue> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
 						<< "\t\treturn protocache::GetEnumValueArray(core_, _::" << one.name() << ", end);\n"
@@ -487,9 +498,15 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	std::vector<std::string> book;
 
 	for (auto& one : proto.enum_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
 		oss << GenEnum(one);
 	}
 	for (auto& one : proto.message_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
 		auto piece = GenMessage(ns, one, book);
 		if (piece.empty()) {
 			std::cerr << "fail to gen code for message: " << one.name() << std::endl;
@@ -504,7 +521,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	oss << '\n';
 
 	for (auto& one : book) {
-		auto fullname = TypeName(::google::protobuf::FieldDescriptorProto_Type_TYPE_MESSAGE, one);
+		auto fullname = TypeName(::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE, one);
 		auto it = g_alias_book.find(one);
 		if (it == g_alias_book.end()) {
 			oss << "template<>\n"
@@ -515,7 +532,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 		}
 		std::string mark;
 		while (true) {
-			if (it->second.key_type == -1) {
+			if (it->second.key_type == TYPE_NONE) {
 				mark += 'V';
 			} else {
 				mark += 'M';
@@ -525,7 +542,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 				}
 				mark += tm;
 			}
-			if (it->second.value_type != ::google::protobuf::FieldDescriptorProto_Type_TYPE_MESSAGE) {
+			if (it->second.value_type != ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE) {
 				auto tm = TypeMark(it->second.value_type);
 				if (tm == nullptr) {
 					return {};
@@ -561,16 +578,15 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 }
 
 int main() {
-	::google::protobuf::Arena arena;
-	auto request = ::google::protobuf::Arena::CreateMessage<::google::protobuf::compiler::CodeGeneratorRequest>(&arena);
-	auto response = ::google::protobuf::Arena::CreateMessage<::google::protobuf::compiler::CodeGeneratorResponse>(&arena);
+	::google::protobuf::compiler::CodeGeneratorRequest request;
+	::google::protobuf::compiler::CodeGeneratorResponse response;
 
-	if (!request->ParseFromFileDescriptor(STDIN_FILENO)) {
+	if (!request.ParseFromFileDescriptor(STDIN_FILENO)) {
 		std::cerr << "fail to get request" << std::endl;
 		return 1;
 	}
 
-	for (auto& proto : request->proto_file()) {
+	for (auto& proto : request.proto_file()) {
 		std::string ns;
 		if (!proto.package().empty()) {
 			ns = '.' + proto.package();
@@ -584,16 +600,16 @@ int main() {
 	}
 
 	std::unordered_set<std::string> files;
-	files.reserve(request->file_to_generate_size());
-	for (auto& one : request->file_to_generate()) {
+	files.reserve(request.file_to_generate_size());
+	for (auto& one : request.file_to_generate()) {
 		files.insert(one);
 	}
 
-	for (auto& proto : request->proto_file()) {
+	for (auto& proto : request.proto_file()) {
 		if (files.find(proto.name()) == files.end()) {
 			continue;
 		}
-		auto one = response->add_file();
+		auto one = response.add_file();
 		one->set_name(ConvertFilename(proto.name()));
 		one->set_content(GenFile(proto));
 		if (one->content().empty()) {
@@ -602,7 +618,7 @@ int main() {
 		}
 	}
 
-	if (!response->SerializeToFileDescriptor(STDOUT_FILENO)) {
+	if (!response.SerializeToFileDescriptor(STDOUT_FILENO)) {
 		std::cerr << "fail to response" << std::endl;
 		return 2;
 	}
