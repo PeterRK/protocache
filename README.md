@@ -1,6 +1,6 @@
 # ProtoCache
 
-Alternative flat binary format for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead and FlatBuffers has considerable data size overhead. ProtoCache takes balance of size and read speed, so it's useful in data caching.
+Alternative flat binary format for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead. FlatBuffers is fast but wastes space. ProtoCache takes balance of data size and read speed, so it's useful in data caching.
 
 |  | Protobuf | ProtoCache | FlatBuffers |
 |:-------|----:|----:|----:|
@@ -9,7 +9,7 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 | Decode + Traverse + Dealloc (1 million times, reflection) | 13083ms | **531ms** | 864ms |
 
 ## Difference to Protobuf
-Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named "_", message with only one such field will be considered as an alias. Alias for array or map is useful. We can declare a 2D array like this.
+Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named `_`, message with only one such field will be considered as an alias. Alias to array or map is useful. We can declare a 2D array like this.
 ```protobuf
 message Vec2D {
 	message Vec1D {
@@ -18,18 +18,40 @@ message Vec2D {
 	repeated Vec1D _ = 1;
 }
 ```
-Some features in Protobuf, like Services, are not supported.
+Some features in Protobuf, like Services, are not supported by ProtoCache.
 
 ## Code Gen
 ```sh
 protoc --pccx_out=. test.proto
 ```
-A protobuf compiler plugin called "protoc-gen-pccx" is available to generate header-only C++ file. The generated file is short and human friendly. Howerver, there is a known flaw that type declaration order may break C++ compilation. Don't mind to edit it if nessasery.
+A protobuf compiler plugin called `protoc-gen-pccx` is available to generate header-only C++ file. The generated file is short and human friendly. Howerver, there is a known flaw that type declaration order may break C++ compilation. Don't mind to edit it if nessasery.
 
+## Basic APIs
+```cpp
+auto data = protocache::Serialize(pb_message);
+ASSERT_FALSE(data.empty());
 
-## Binary Size
+test::Main root(data.data());
+ASSERT_FALSE(!root);
+```
+Serializing a protobuf message with protocache::Serialize is the only way to create protocache binary at present. It's easy to access by wrapping the data with generated code.
 
-Following work in [paper](https://arxiv.org/pdf/2201.02089.pdf), we can find that protocache has smaller binary size than [FlatBuffers](https://flatbuffers.dev/) and [Cap'n Proto](https://capnproto.org/), in most cases.
+## Reflection
+```cpp
+std::string err;
+google::protobuf::FileDescriptorProto file;
+ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
+
+protocache::reflection::DescriptorPool pool;
+ASSERT_TRUE(pool.Register(file));
+
+auto descriptor = pool.Find("test.Main");
+ASSERT_NE(descriptor, nullptr);
+```
+The peflection apis are simliar to protobuf's. An example can be found in the [test](test/protocache.cc).
+
+## Data Size Evaluation
+Following work in [paper](https://arxiv.org/pdf/2201.02089.pdf), we can find that protocache has smaller data size than [FlatBuffers](https://flatbuffers.dev/) and [Cap'n Proto](https://capnproto.org/), in most cases.
 
 |  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto | Protobuf-ZSTD1 | ProtoCache-ZSTD1 | Cap'n Proto (Packed) |
 |:-------|----:|----:|----:|----:|----:|----:|----:|
