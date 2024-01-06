@@ -1,0 +1,83 @@
+namespace test;
+
+enum Mode : byte {
+	MODE_A = 0,
+	MODE_B = 1,
+	MODE_C = 2
+}
+
+table Small {
+	i32:int32;
+	flag:bool;
+	str:string;
+}
+
+table Vec1D {
+	_:[float];
+}
+
+table Vec2D {
+	_:[Vec1D];
+}
+
+table Array {
+	_:[float];
+}
+
+table ArrMapEntry {
+	key:string(key);
+	value:Array;
+}
+
+table ArrMap {
+	_:[ArrMapEntry];
+}
+
+table Map1Entry {
+	key:string(key);
+	value:int32;
+}
+
+table Map2Entry {
+	key:int32(key);
+	value:Small;
+}
+
+table Bytes {
+	_:[byte];
+}
+
+table Main {
+	i32:int32;
+	u32:uint32;
+	i64:int64;
+	u64:uint64;
+	flag:bool;
+	mode:Mode;
+	str:string;
+	data:[byte];
+	f32:float;
+	f64:double;
+	object:Small;
+	i32v:[int32];
+	u64v:[uint64];
+	strv:[string];
+	datav:[Bytes];
+	f32v:[float];
+	f64v:[double];
+	flags:[bool];
+	objectv:[Small];
+	t_u32:uint32;
+	t_i32:int32;
+	t_s32:int32;
+	t_u64:uint64;
+	t_i64:int64;
+	t_s64:int64;
+	index:[Map1Entry];
+	objects:[Map2Entry];
+	matrix:Vec2D;
+	vector:[ArrMap];
+	arrays:ArrMap;
+}
+
+root_type Main;

@@ -1,6 +1,12 @@
 # ProtoCache
 
-Alternative flat binary format for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means [no deserialization overhead](https://flatbuffers.dev/flatbuffers_benchmarks.html).
+Alternative flat binary format for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead and FlatBuffers has considerable data size overhead. ProtoCache takes balance of size and read speed, so it's useful in data caching.
+
+|  | Protobuf | ProtoCache | FlatBuffers |
+|:-------|----:|----:|----:|
+| Wire format size (plain / ZSTD-1 compressed, bytes) | **574 / 470**| 780 / 555 | 1296 / 682 |
+| Decode + Traverse + Dealloc (1 million times) | 3513ms | 318ms | **175ms** |
+| Decode + Traverse + Dealloc (1 million times, reflection) | 13083ms | **531ms** | 864ms |
 
 ## Difference to Protobuf
 Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named "_", message with only one such field will be considered as an alias. Alias for array or map is useful. We can declare a 2D array like this.

@@ -1,0 +1,88 @@
+{
+  "i32": -999,
+  "u32": 1234,
+  "i64": "-9876543210",
+  "u64": "98765432123456789",
+  "flag": true,
+  "mode": 2,
+  "str": "Hello World!",
+  "data": [97,98,99,49,50,51,33,63,36,42,38,40,41,39,45,61,64,126],
+  "f32": -2.1,
+  "f64": 1.0,
+  "object": {
+    "i32": 88,
+    "str": "tmp"
+  },
+  "i32v": [1,2],
+  "u64v": ["12345678987654321"],
+  "strv": [
+    "abc",
+    "apple",
+    "banana",
+    "orange",
+    "pear",
+    "grape",
+    "strawberry",
+    "cherry",
+    "mango",
+    "watermelon"
+  ],
+  "f32v": [1.1,2.2],
+  "f64v": [9.9,8.8,7.7,6.6,5.5],
+  "flags": [true,true,false,true,false,false,false],
+  "objectv": [
+    {
+      "i32": 1
+    },
+    {
+      "flag": true
+    },
+    {
+      "str": "good luck!"
+    }
+  ],
+   "index": [
+    {"key":"abc-1","value":1},
+    {"key":"abc-2","value":2},
+    {"key":"x-1","value":1},
+    {"key":"x-2","value":2},
+    {"key":"x-3","value":3},
+    {"key":"x-4","value":4}
+  ],
+  "objects": [
+    {"key":"1","value":{
+      "i32": 1,
+      "str": "aaaaaaaaaaa"
+    }},
+    {"key":"2","value":{
+      "i32": 2,
+      "str": "b"
+    }},
+    {"key":"3","value":{
+      "i32": 3,
+      "str": "ccccccccccccccc"
+    }},
+    {"key":"4","value":{
+      "i32": 4,
+      "str": "ddddd"
+    }}
+  ],
+  "matrix": {"_": [
+    {"_": [1,2,3]},
+    {"_": [4,5,6]},
+    {"_": [7,8,9]}
+  ]},
+  "vector": [
+    {"_": [
+      {"key":"lv1","value":{"_": [11,12]}},
+      {"key":"lv2","value":{"_": [21,22]}}
+    ]},
+    {"_": [
+      {"key":"lv3","value":{"_": [31,32]}}
+    ]}
+  ],
+  "arrays": {"_": [
+      {"key":"lv4","value":{"_": [41,42]}},
+      {"key":"lv5","value":{"_": [51,52]}}
+   ]}
+}
