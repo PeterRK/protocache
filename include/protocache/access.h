@@ -39,12 +39,12 @@ public:
 	}
 
 	Slice<uint8_t> Get(const uint32_t* end=nullptr) const noexcept  {
-		auto send = reinterpret_cast<const uint8_t*>(end);
+		auto se = reinterpret_cast<const uint8_t*>(end);
 		auto ptr = ptr_;
 
 		size_t mark = 0;
-		for (unsigned sft = 0; sft < 5; sft += 7U) {
-			if (send != nullptr && ptr >= send) {
+		for (unsigned sft = 0; sft < 32U; sft += 7U) {
+			if (se != nullptr && ptr >= se) {
 				return {};
 			}
 			uint8_t b = *ptr++;
@@ -52,7 +52,7 @@ public:
 				mark |= static_cast<size_t>(b & 0x7fU) << sft;
 			} else {
 				mark |= static_cast<size_t>(b) << sft;
-				if (send != nullptr && ptr+(mark>>2U) > send) {
+				if (se != nullptr && ptr+(mark>>2U) > se) {
 					return {};
 				}
 				return {ptr, mark>>2U};
