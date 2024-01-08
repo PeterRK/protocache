@@ -75,9 +75,6 @@ PerfectHash::PerfectHash(const uint8_t* data, uint32_t size) noexcept {
 	}
 	auto header = reinterpret_cast<const Header*>(data);
 	if (RealSize(header->size) > 1) {
-		if (size != 0 && size < sizeof(Header)) {
-			return;
-		}
 		auto section = Section(RealSize(header->size));
 		auto bytes = BitmapSize(section);
 		if (RealSize(header->size) > UINT16_MAX) {
@@ -106,7 +103,7 @@ uint32_t PerfectHash::Locate(const uint8_t* key, unsigned key_len) const noexcep
 	}
 	auto header = reinterpret_cast<const Header*>(data_);
 	if (RealSize(header->size) < 2) {
-		return RealSize(header->size) == 0? UINT32_MAX : 0;
+		return 0;
 	}
 	auto code = Hash128(key, key_len, header->seed);
 	uint32_t slots[3] = {
