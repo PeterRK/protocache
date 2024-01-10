@@ -185,7 +185,7 @@ void Junk2::Traverse(const protocache::reflection::Field& descriptor, protocache
 						Traverse(descriptor.value_descriptor->alias, v);
 					}
 				} else {
-					for (auto v : protocache::ArrayT<protocache::Message>(protocache::Array(field.GetObject()))) {
+					for (auto v : protocache::ArrayT<protocache::Message>(field.GetObject())) {
 						Traverse(*descriptor.value_descriptor, v);
 					}
 				}

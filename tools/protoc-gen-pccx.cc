@@ -287,7 +287,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 
 	oss << "\texplicit " << proto.name() << "(const protocache::Message& message) : core_(message) {}\n"
-		<< "\texplicit " << proto.name() << "(const uint32_t* ptr) : core_(ptr) {}\n"
+		<< "\texplicit " << proto.name() << "(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}\n"
 		<< "\tbool operator!() const noexcept { return !core_; }\n"
 		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n";
 
@@ -324,17 +324,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 					}
 				} else {
 					auto name = TypeName(one.type(), one.type_name());
-					auto it = g_alias_book.find(one.type_name());
-					if (it == g_alias_book.end()) {
-						oss << '\t' << name << ' ' << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-							<< "\t\treturn " << name << "(protocache::GetMessage(core_, _::" << one.name() << ", end));\n"
-							<< "\t}\n";
-					} else {
-						oss << '\t' << name << ' ' << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-							<< "\t\treturn " << name << "(protocache::" << (it->second.key_type != TYPE_NONE? "Map" : "Array")
-								<< "(core_.GetField(_::" << one.name() << ", end).GetObject(end), end));\n"
-							<< "\t}\n";
-					}
+					oss << '\t' << name << ' ' << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn " << name << "(core_.GetField(_::" << one.name() << ", end).GetObject(end), end);\n"
+						<< "\t}\n";
 				}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
@@ -565,7 +557,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 			<< "#define PROTOCACHE_ALIAS_" << mark << '\n'
 			<< "template<>\n"
 			<< "inline " << fullname << " protocache::FieldT<" << fullname << ">::Get(const uint32_t *end) const noexcept {\n"
-			<< "\treturn " << fullname << "(protocache::" << (mark.front() == 'M'? "Map": "Array") << "(core_.GetObject(end)));\n"
+			<< "\treturn " << fullname <<  "(core_.GetObject(end));\n"
 			<< "}\n"
 			<< "#endif // PROTOCACHE_ALIAS_" << mark << "\n\n";
 	}

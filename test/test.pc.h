@@ -23,7 +23,7 @@ public:
 	};
 
 	explicit Small(const protocache::Message& message) : core_(message) {}
-	explicit Small(const uint32_t* ptr) : core_(ptr) {}
+	explicit Small(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
@@ -92,7 +92,7 @@ public:
 	};
 
 	explicit Main(const protocache::Message& message) : core_(message) {}
-	explicit Main(const uint32_t* ptr) : core_(ptr) {}
+	explicit Main(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
@@ -127,7 +127,7 @@ public:
 		return protocache::GetDouble(core_, _::f64, end);
 	}
 	::test::Small object(const uint32_t* end=nullptr) const noexcept {
-		return ::test::Small(protocache::GetMessage(core_, _::object, end));
+		return ::test::Small(core_.GetField(_::object, end).GetObject(end), end);
 	}
 	protocache::Slice<int32_t> i32v(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetInt32Array(core_, _::i32v, end);
@@ -178,13 +178,13 @@ public:
 		return protocache::GetMap<int32_t,::test::Small>(core_, _::objects, end);
 	}
 	::test::Vec2D::_ matrix(const uint32_t* end=nullptr) const noexcept {
-		return ::test::Vec2D::_(protocache::Array(core_.GetField(_::matrix, end).GetObject(end), end));
+		return ::test::Vec2D::_(core_.GetField(_::matrix, end).GetObject(end), end);
 	}
 	protocache::ArrayT<::test::ArrMap::_> vector(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetArray<::test::ArrMap::_>(core_, _::vector, end);
 	}
 	::test::ArrMap::_ arrays(const uint32_t* end=nullptr) const noexcept {
-		return ::test::ArrMap::_(protocache::Map(core_.GetField(_::arrays, end).GetObject(end), end));
+		return ::test::ArrMap::_(core_.GetField(_::arrays, end).GetObject(end), end);
 	}
 };
 
@@ -199,7 +199,7 @@ inline ::test::Small protocache::FieldT<::test::Small>::Get(const uint32_t *end)
 #define PROTOCACHE_ALIAS_VVf32
 template<>
 inline ::test::Vec2D::_ protocache::FieldT<::test::Vec2D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::_(protocache::Array(core_.GetObject(end)));
+	return ::test::Vec2D::_(core_.GetObject(end));
 }
 #endif // PROTOCACHE_ALIAS_VVf32
 
@@ -207,7 +207,7 @@ inline ::test::Vec2D::_ protocache::FieldT<::test::Vec2D::_>::Get(const uint32_t
 #define PROTOCACHE_ALIAS_Vf32
 template<>
 inline ::test::Vec2D::Vec1D::_ protocache::FieldT<::test::Vec2D::Vec1D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::Vec1D::_(protocache::Array(core_.GetObject(end)));
+	return ::test::Vec2D::Vec1D::_(core_.GetObject(end));
 }
 #endif // PROTOCACHE_ALIAS_Vf32
 
@@ -215,7 +215,7 @@ inline ::test::Vec2D::Vec1D::_ protocache::FieldT<::test::Vec2D::Vec1D::_>::Get(
 #define PROTOCACHE_ALIAS_MstrVf32
 template<>
 inline ::test::ArrMap::_ protocache::FieldT<::test::ArrMap::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::_(protocache::Map(core_.GetObject(end)));
+	return ::test::ArrMap::_(core_.GetObject(end));
 }
 #endif // PROTOCACHE_ALIAS_MstrVf32
 
@@ -223,7 +223,7 @@ inline ::test::ArrMap::_ protocache::FieldT<::test::ArrMap::_>::Get(const uint32
 #define PROTOCACHE_ALIAS_Vf32
 template<>
 inline ::test::ArrMap::Array::_ protocache::FieldT<::test::ArrMap::Array::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::Array::_(protocache::Array(core_.GetObject(end)));
+	return ::test::ArrMap::Array::_(core_.GetObject(end));
 }
 #endif // PROTOCACHE_ALIAS_Vf32
 

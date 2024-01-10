@@ -26,43 +26,40 @@ using EnumValue = int32_t;
 class String final {
 public:
 	String() noexcept = default;
-	explicit String(const uint32_t* ptr) noexcept : ptr_(reinterpret_cast<const uint8_t*>(ptr)) {
-		if (ptr_ == nullptr) {
+	explicit String(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		auto p = reinterpret_cast<const uint8_t*>(ptr);
+		auto e = reinterpret_cast<const uint8_t*>(end);
+		if (p == nullptr || (*p & 3) != 0) {
 			return;
 		}
-		if ((*ptr_ & 3) != 0) {
-			ptr_ = nullptr;
-		}
-	};
-	bool operator!() const noexcept {
-		return ptr_ == nullptr;
-	}
-
-	Slice<uint8_t> Get(const uint32_t* end=nullptr) const noexcept  {
-		auto se = reinterpret_cast<const uint8_t*>(end);
-		auto ptr = ptr_;
-
 		size_t mark = 0;
 		for (unsigned sft = 0; sft < 32U; sft += 7U) {
-			if (se != nullptr && ptr >= se) {
-				return {};
+			if (e != nullptr && p >= e) {
+				return;
 			}
-			uint8_t b = *ptr++;
+			uint8_t b = *p++;
 			if (b & 0x80U) {
 				mark |= static_cast<size_t>(b & 0x7fU) << sft;
 			} else {
 				mark |= static_cast<size_t>(b) << sft;
-				if (se != nullptr && ptr+(mark>>2U) > se) {
-					return {};
+				if (e != nullptr && p+(mark>>2U) > e) {
+					return;
 				}
-				return {ptr, mark>>2U};
+				data_ = Slice<uint8_t>(p, mark>>2U);
+				return;
 			}
 		}
-		return {};
+	}
+	bool operator!() const noexcept {
+		return !data_;
+	}
+
+	Slice<uint8_t> Get() const noexcept  {
+		return data_;
 	}
 
 private:
-	const uint8_t* ptr_ = nullptr;
+	Slice<uint8_t> data_;
 };
 
 class Field final {
@@ -104,18 +101,24 @@ private:
 
 class Message final {
 public:
-	Message() noexcept = default;
-	explicit Message(const uint32_t* ptr) noexcept : ptr_(ptr) {};
+	Message() noexcept : ptr_(&s_empty) {};
+	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(&s_empty) {
+		if (ptr == nullptr) {
+			return;
+		}
+		uint32_t section = *ptr & 0xff;
+		auto body = ptr + 1 + section*2;
+		if (end != nullptr && body >= end) {
+			return;
+		}
+		ptr_ = ptr;
+	};
 	bool operator!() const noexcept {
-		return ptr_ == nullptr;
+		return ptr_ == &s_empty;
 	}
 
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
 		uint32_t section = *ptr_ & 0xff;
-		auto body = ptr_ + 1 + section*2;
-		if (end != nullptr && body >= end) {
-			return false;
-		}
 		if (id < 12) {
 			uint32_t v = *ptr_ >> 8U;
 			auto width = (v >> id * 2) & 3;
@@ -134,9 +137,6 @@ public:
 	Field GetField(unsigned id, const uint32_t* end=nullptr) const noexcept {
 		uint32_t section = *ptr_ & 0xff;
 		auto body = ptr_ + 1 + section*2;
-		if (end != nullptr && body >= end) {
-			return {};
-		}
 		unsigned off = 0;
 		unsigned width = 0;
 		if (id < 12) {
@@ -177,26 +177,27 @@ public:
 		return Field(body + off, width);
 	}
 
-
 private:
-	const uint32_t* ptr_ = nullptr;
+	const uint32_t* ptr_;
+	static const uint32_t s_empty;
 };
 
 class Array final {
 public:
 	Array() noexcept = default;
-	explicit Array(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(ptr) {
-		if (ptr_ == nullptr) {
+	explicit Array(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		if (ptr == nullptr) {
 			return;
 		}
-		size_ = *ptr_ >> 2U;
-		width_ = *ptr_ & 3U;
-		if (width_ == 0 || (end != nullptr && ptr_ + 1 + width_ * size_ > end)) {
-			ptr_ = nullptr;
+		body_ = ptr + 1;
+		size_ = *ptr >> 2U;
+		width_ = *ptr & 3U;
+		if (width_ == 0 || (end != nullptr && body_ + width_ * size_ > end)) {
+			body_ = nullptr;
 		}
 	}
 	bool operator!() const noexcept {
-		return ptr_ == nullptr;
+		return body_ == nullptr;
 	}
 
 	uint32_t Size() const noexcept {
@@ -257,27 +258,27 @@ public:
 	};
 
 	Iterator begin() const noexcept {
-		return {ptr_ + 1, width_};
+		return {body_, width_};
 	}
 	Iterator end() const noexcept {
-		return {ptr_ + 1 + width_ * size_, width_};
+		return {body_ + width_ * size_, width_};
 	}
 
 	Field operator[](unsigned pos) const noexcept {
-		return Field(ptr_ + 1 + width_ * pos, width_);
+		return Field(body_ + width_ * pos, width_);
 	}
 
 	template<typename T>
-	Slice<T> AsScalarV() const noexcept {
-		static_assert(std::is_scalar<T>::value, "");
-		if (ptr_ == nullptr || width_ != WordSize(sizeof(T))) {
+	Slice<T> Numbers() const noexcept {
+		static_assert(std::is_scalar<T>::value && sizeof(T) % 4 == 0, "");
+		if (width_ != WordSize(sizeof(T))) {
 			return {};
 		}
-		return {reinterpret_cast<const T*>(ptr_+1), size_};
+		return {reinterpret_cast<const T*>(body_), size_};
 	}
 
 private:
-	const uint32_t* ptr_ = nullptr;
+	const uint32_t* body_ = nullptr;
 	uint32_t size_ = 0;
 	unsigned width_ = 0;
 };
@@ -410,11 +411,11 @@ public:
 			return this->end();
 		}
 		Iterator it(body_ + (key_width_ + value_width_) * pos, key_width_, value_width_);
-		String key((*it).Key().GetObject(end));
+		String key((*it).Key().GetObject(end), end);
 		if (!key) {
 			return this->end();
 		}
-		auto view = key.Get(end);
+		auto view = key.Get();
 		if (!view || view.cast<char>() != Slice<char>(str, len)) {
 			return this->end();
 		}
@@ -493,11 +494,11 @@ private:
 	}
 
 	Slice<uint8_t> GetBytes(const uint32_t* end=nullptr) const noexcept {
-		String view(core_.GetObject(end));
+		String view(core_.GetObject(end), end);
 		if (!view) {
 			return {};
 		}
-		return view.Get(end);
+		return view.Get();
 	}
 };
 
@@ -553,7 +554,7 @@ inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const noexcept 
 
 template <>
 inline Message FieldT<Message>::Get(const uint32_t* end) const noexcept {
-	return Message(core_.GetObject(end));
+	return Message(core_.GetObject(end), end);
 }
 
 template <>
@@ -569,7 +570,7 @@ inline Map FieldT<Map>::Get(const uint32_t* end) const noexcept {
 template <typename T>
 class ArrayT final {
 public:
-	explicit ArrayT(const Array& array) : core_(array) {}
+	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept {
 		return !core_;
 	}
@@ -645,6 +646,36 @@ private:
 	Array core_;
 };
 
+template <>
+class ArrayT<bool> final {
+public:
+	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(String(ptr, end).Get().cast<bool>()) {}
+	bool operator!() const noexcept {
+		return !core_;
+	}
+
+	uint32_t Size() const noexcept {
+		return core_.size();
+	}
+
+	const bool* begin() const noexcept {
+		return core_.begin();
+	}
+	const bool*  end() const noexcept {
+		return core_.end();
+	}
+
+	bool At(unsigned pos, const uint32_t* end=nullptr) const noexcept {
+		return core_[pos];
+	}
+	bool operator[](unsigned pos) const noexcept {
+		return core_[pos];
+	}
+
+private:
+	Slice<bool> core_;
+};
+
 template <typename K, typename V>
 class PairT final {
 public:
@@ -668,7 +699,7 @@ private:
 template <typename K, typename V>
 class MapT final {
 public:
-	explicit MapT(const Map& map) : core_(map) {}
+	explicit MapT(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept {
 		return !core_;
 	}
@@ -783,45 +814,41 @@ static inline Slice<bool> GetBoolArray(const Message& message, unsigned id, cons
 }
 
 static inline Slice<EnumValue> GetEnumValueArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<EnumValue>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<EnumValue>();
 }
 
 static inline Slice<int32_t> GetInt32Array(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<int32_t>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<int32_t>();
 }
 
 static inline Slice<uint32_t> GetUInt32Array(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<uint32_t>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<uint32_t>();
 }
 
 static inline Slice<int64_t> GetInt64Array(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<int64_t>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<int64_t>();
 }
 
 static inline Slice<uint64_t> GetUInt64Array(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<uint64_t>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<uint64_t>();
 }
 
 static inline Slice<float> GetFloatArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<float>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<float>();
 }
 
 static inline Slice<double> GetDoubleArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Array(message.GetField(id, end).GetObject(end), end).AsScalarV<double>();
+	return Array(message.GetField(id, end).GetObject(end), end).Numbers<double>();
 }
 
 template <typename T>
 static inline ArrayT<T> GetArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return ArrayT<T>(Array(message.GetField(id, end).GetObject(end), end));
+	return ArrayT<T>(message.GetField(id, end).GetObject(end), end);
 }
 
 template <typename K, typename V>
 static inline MapT<K,V> GetMap(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return MapT<K,V>(Map(message.GetField(id, end).GetObject(end), end));
-}
-
-static inline Message GetMessage(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return Message(message.GetField(id, end).GetObject(end));
+	return MapT<K,V>(message.GetField(id, end).GetObject(end), end);
 }
 
 } // protocache

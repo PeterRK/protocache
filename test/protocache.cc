@@ -15,6 +15,33 @@
 #include <protocache/utils.h>
 #include "test.pc.h"
 
+TEST(Proto, Empty) {
+	// no crash
+	protocache::String str;
+	ASSERT_TRUE(!str);
+	auto t0 = str.Get();
+	ASSERT_EQ(t0.size(), 0);
+	protocache::Message obj;
+	ASSERT_TRUE(!obj);
+	ASSERT_TRUE(!obj.GetField(0));
+	protocache::Array arr;
+	ASSERT_TRUE(!arr);
+	ASSERT_EQ(arr.Size(), 0);
+	ASSERT_EQ(arr.begin(), arr.end());
+	protocache::Map map;
+	ASSERT_TRUE(!map);
+	ASSERT_EQ(map.Size(), 0);
+	ASSERT_EQ(map.begin(), map.end());
+	ASSERT_EQ(map.Find(0), map.end());
+	protocache::Field field;
+	ASSERT_TRUE(!field);
+	ASSERT_EQ(protocache::FieldT<int32_t>(field).Get(), 0);
+	ASSERT_EQ(protocache::FieldT<bool>(field).Get(), false);
+	ASSERT_EQ(protocache::FieldT<protocache::Slice<bool>>(field).Get().size(), 0);
+	ASSERT_EQ(protocache::FieldT<protocache::Slice<char>>(field).Get().size(), 0);
+	ASSERT_TRUE(!protocache::FieldT<protocache::Array>(field).Get());
+	ASSERT_TRUE(!protocache::FieldT<protocache::Message>(field).Get());
+}
 
 TEST(Proto, Basic) {
 	std::string err;
@@ -261,7 +288,7 @@ TEST(Proto, Reflection) {
 	auto data = protocache::Serialize(*message);
 	ASSERT_FALSE(data.empty());
 	auto end = data.data() + data.size();
-	protocache::Message unit(data.data());
+	protocache::Message unit(data.data(), end);
 
 	it = root->fields.find("f32");
 	ASSERT_NE(it, root->fields.end());
