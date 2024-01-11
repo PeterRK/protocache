@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+message Main {
+	float x1 = 1;
+	float y1 = 2;
+	float z1 = 3;
+	float x2 = 4;
+	float y2 = 5;
+	float z2 = 6;
+	float x3 = 7;
+	float y3 = 8;
+	float z3 = 9;
+	float x4 = 10;
+	float y4 = 11;
+	float z4 = 12;
+}

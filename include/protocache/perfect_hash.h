@@ -42,12 +42,6 @@ public:
 		return len_;
 	}
 
-	template<typename T2>
-	Slice<T2> cast() const noexcept {
-		static_assert(std::is_scalar<T>::value && std::is_scalar<T2>::value && sizeof(T) == sizeof(T2), "");
-		return {reinterpret_cast<const T2*>(ptr_), len_};
-	}
-
 private:
 	const T* ptr_ = nullptr;
 	size_t len_ = 0;

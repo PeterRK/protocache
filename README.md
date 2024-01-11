@@ -5,16 +5,16 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 |  | Protobuf | ProtoCache | FlatBuffers |
 |:-------|----:|----:|----:|
 | Wire format size (plain / ZSTD1 compressed, bytes) | **574 / 461**| 780 / 548 | 1296 / 672 |
-| Decode + Traverse + Dealloc (1 million times) | 3513ms | 318ms | **175ms** |
-| Decode + Traverse + Dealloc (1 million times, reflection) | 13083ms | **531ms** | 864ms |
+| Decode + Traverse + Dealloc (1 million times) | 3237ms | 251ms | **153ms** |
+| Decode + Traverse + Dealloc (1 million times, reflection) | 11497ms | **502ms** | 728ms |
 
 By the way, another benchmark with ZSTD-1.5.5 shows that  combining ProtoCache with ZSTD level 1 compression can product smaller data than plain Protobuf, with 15% more access time.
 | Level | -1 | 1 | 3 | 11 | 22 |
 |:-------|----:|----:|----:|----:|----:|
 | Compressed ProtoCache data size | 642 | 548 | 557 | 521 | 512 |
-| Decompress (ProtoCache, 1 million times) | 1596ms | 3722ms | 3845ms | 3871ms | 3957ms |
+| Decompress (ProtoCache, 1 million times) | 1464ms | 3453ms | 3589ms | 3717ms | 3758ms |
 | Compressed FlatBuffers data size | 822 | 672 | 675 | 631 | 622 |
-| Decompress (FlatBuffers, 1 million times) | 2642ms | 4556ms | 4863ms | 4346ms | 4598ms |
+| Decompress (FlatBuffers, 1 million times) | 2313ms | 4207ms | 4583ms | 4216ms | 4377ms |
 
 ## Difference to Protobuf
 Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named `_`, message with only one such field will be considered as an alias. Alias to array or map is useful. We can declare a 2D array like this.

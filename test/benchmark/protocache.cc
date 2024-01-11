@@ -202,42 +202,42 @@ void Junk2::Traverse(const protocache::reflection::Field& descriptor, protocache
 				}
 				break;
 			case protocache::reflection::Field::TYPE_DOUBLE:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<double>()) {
+				for (auto v : protocache::ArrayT<double>(field.GetObject())) {
 					f64 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_FLOAT:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<float>()) {
+				for (auto v : protocache::ArrayT<float>(field.GetObject())) {
 					f32 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_UINT64:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<uint64_t>()) {
+				for (auto v : protocache::ArrayT<uint64_t>(field.GetObject())) {
 					u64 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_UINT32:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<uint32_t>()) {
+				for (auto v : protocache::ArrayT<uint32_t>(field.GetObject())) {
 					u32 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_INT64:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<int64_t>()) {
+				for (auto v : protocache::ArrayT<int64_t>(field.GetObject())) {
 					u64 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_INT32:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<int32_t>()) {
+				for (auto v : protocache::ArrayT<int32_t>(field.GetObject())) {
 					u32 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_BOOL:
-				for (auto v : protocache::FieldT<protocache::Slice<bool>>(field).Get()) {
+				for (auto v : protocache::ArrayT<bool>(field.GetObject())) {
 					u32 += v;
 				}
 				break;
 			case protocache::reflection::Field::TYPE_ENUM:
-				for (auto v : protocache::Array(field.GetObject()).AsScalarV<protocache::EnumValue>()) {
+				for (auto v : protocache::ArrayT<protocache::EnumValue>(field.GetObject())) {
 					u32 += v;
 				}
 				break;

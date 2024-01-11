@@ -17,10 +17,10 @@ static inline uint32_t JunkHash(const void* data, size_t len) {
 }
 
 struct Junk {
-	uint64_t u64 = 0;
 	uint32_t u32 = 0;
-	double f64 = 0;
 	float f32 = 0;
+	uint64_t u64 = 0;
+	double f64 = 0;
 
 	uint64_t Fuse() {
 		union {

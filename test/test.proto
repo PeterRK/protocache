@@ -5,15 +5,15 @@ option cc_enable_arenas = true;
 package test;
 
 enum Mode {
-    MODE_A = 0;
-    MODE_B = 1;
-    MODE_C = 2;
+	MODE_A = 0;
+	MODE_B = 1;
+	MODE_C = 2;
 }
 
 message Small {
-    int32 i32 = 1;
-    bool flag = 2;
-    string str = 3;
+	int32 i32 = 1;
+	bool flag = 2;
+	string str = 3;
 }
 
 message Vec2D {
@@ -31,34 +31,34 @@ message ArrMap {
 }
 
 message Main {
-    int32 i32 = 1;
-    uint32 u32 = 2;
-    int64 i64 = 3;
-    uint64 u64 = 4;
-    bool flag = 5;
-    Mode mode = 6;
-    string str = 7;
-    bytes data = 8;
-    float f32 = 9;
-    double f64 = 10;
-    Small object = 11;
-    repeated int32 i32v = 12;
-    repeated uint64 u64v = 13;
-    repeated string strv = 14;
-    repeated bytes datav = 15;
-    repeated float f32v = 16;
-    repeated double f64v = 17;
-    repeated bool flags = 18;
-    repeated Small objectv = 19;
-    fixed32 t_u32 = 20;
-    sfixed32 t_i32 = 21;
-    sint32 t_s32 = 22;
-    fixed64 t_u64 = 23;
-    sfixed64 t_i64 = 24;
-    sint64 t_s64 = 25;
-    map<string,int32> index = 26;
-    map<int32,Small> objects = 27;
-    Vec2D matrix = 28;
-    repeated ArrMap vector = 29;
-    ArrMap arrays = 30;
+	int32 i32 = 1;
+	uint32 u32 = 2;
+	int64 i64 = 3;
+	uint64 u64 = 4;
+	bool flag = 5;
+	Mode mode = 6;
+	string str = 7;
+	bytes data = 8;
+	float f32 = 9;
+	double f64 = 10;
+	Small object = 11;
+	repeated int32 i32v = 12;
+	repeated uint64 u64v = 13;
+	repeated string strv = 14;
+	repeated bytes datav = 15;
+	repeated float f32v = 16;
+	repeated double f64v = 17;
+	repeated bool flags = 18;
+	repeated Small objectv = 19;
+	fixed32 t_u32 = 20;
+	sfixed32 t_i32 = 21;
+	sint32 t_s32 = 22;
+	fixed64 t_u64 = 23;
+	sfixed64 t_i64 = 24;
+	sint64 t_s64 = 25;
+	map<string,int32> index = 26;
+	map<int32,Small> objects = 27;
+	Vec2D matrix = 28;
+	repeated ArrMap vector = 29;
+	ArrMap arrays = 30;
 }

@@ -77,7 +77,7 @@ TEST(Proto, Basic) {
 	ASSERT_EQ(root.str(end), expected_str);
 	expected_str = "abc123!?$*&()'-=@~";
 	auto bytes = root.data(end);
-	ASSERT_EQ(bytes.cast<char>(), expected_str);
+	ASSERT_EQ(protocache::SliceCast<char>(bytes), expected_str);
 	ASSERT_EQ(-2.1f, root.f32(end));
 	ASSERT_EQ(1.0, root.f64(end));
 
@@ -90,13 +90,13 @@ TEST(Proto, Basic) {
 
 	auto i32v = root.i32v(end);
 	ASSERT_FALSE(!i32v);
-	ASSERT_EQ(i32v.size(), 2);
+	ASSERT_EQ(i32v.Size(), 2);
 	ASSERT_EQ(i32v[0], 1);
 	ASSERT_EQ(i32v[1], 2);
 
 	auto u64v = root.u64v(end);
 	ASSERT_FALSE(!u64v);
-	ASSERT_EQ(u64v.size(), 1);
+	ASSERT_EQ(u64v.Size(), 1);
 	ASSERT_EQ(u64v[0], 12345678987654321ULL);
 
 	std::vector<std::string> expected_strv = {"abc","apple","banana","orange","pear","grape",
@@ -111,23 +111,23 @@ TEST(Proto, Basic) {
 
 	auto f32v = root.f32v(end);
 	ASSERT_FALSE(!f32v);
-	ASSERT_EQ(f32v.size(), 2);
+	ASSERT_EQ(f32v.Size(), 2);
 	ASSERT_EQ(f32v[0], 1.1f);
 	ASSERT_EQ(f32v[1], 2.2f);
 
 	std::vector<double> expected_f64v = {9.9,8.8,7.7,6.6,5.5};
 	auto f64v = root.f64v(end);
 	ASSERT_FALSE(!f64v);
-	ASSERT_EQ(f64v.size(), expected_f64v.size());
-	for (unsigned i = 0; i < f64v.size(); i++) {
+	ASSERT_EQ(f64v.Size(), expected_f64v.size());
+	for (unsigned i = 0; i < f64v.Size(); i++) {
 		ASSERT_EQ(f64v[i], expected_f64v[i]);
 	}
 
 	std::vector<double> expected_flags = {true,true,false,true,false,false,false};
 	auto flags = root.flags(end);
 	ASSERT_FALSE(!flags);
-	ASSERT_EQ(flags.size(), expected_flags.size());
-	for (unsigned i = 0; i < flags.size(); i++) {
+	ASSERT_EQ(flags.Size(), expected_flags.size());
+	for (unsigned i = 0; i < flags.Size(); i++) {
 		ASSERT_EQ(flags[i], expected_flags[i]);
 	}
 

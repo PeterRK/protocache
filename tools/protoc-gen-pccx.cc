@@ -353,8 +353,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 				if (repeated) {
-					oss << "\tprotocache::Slice<double> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetDoubleArray(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<double> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<double>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tdouble " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -364,8 +364,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
 				if (repeated) {
-					oss << "\tprotocache::Slice<float> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetFloatArray(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<float> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<float>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tfloat " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -376,8 +376,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 				if (repeated) {
-					oss << "\tprotocache::Slice<uint64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetUInt64Array(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<uint64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<uint64_t>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tuint64_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -388,8 +388,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
 				if (repeated) {
-					oss << "\tprotocache::Slice<uint32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetUInt32Array(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<uint32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<uint32_t>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tuint32_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -401,8 +401,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
 				if (repeated) {
-					oss << "\tprotocache::Slice<int64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetInt64Array(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<int64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<int64_t>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tint64_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -414,8 +414,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 				if (repeated) {
-					oss << "\tprotocache::Slice<int32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetInt32Array(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<int32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<int32_t>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tint32_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -425,8 +425,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
 				if (repeated) {
-					oss << "\tprotocache::Slice<bool> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetBoolArray(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<bool> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+						<< "\t\treturn protocache::GetArray<bool>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tbool " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -436,8 +436,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 				if (repeated) {
-					oss << "\tprotocache::Slice<protocache::EnumValue> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetEnumValueArray(core_, _::" << one.name() << ", end);\n"
+					oss << "\tprotocache::ArrayT<protocache::EnumValue> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
+							<< "\t\treturn protocache::GetArray<protocache::EnumValue>(core_, _::" << one.name() << ", end);\n"
 						<< "\t}\n";
 				} else {
 					oss << "\tprotocache::EnumValue " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
@@ -557,7 +557,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 			<< "#define PROTOCACHE_ALIAS_" << mark << '\n'
 			<< "template<>\n"
 			<< "inline " << fullname << " protocache::FieldT<" << fullname << ">::Get(const uint32_t *end) const noexcept {\n"
-			<< "\treturn " << fullname <<  "(core_.GetObject(end));\n"
+			<< "\treturn " << fullname << "(core_.GetObject(end), end);\n"
 			<< "}\n"
 			<< "#endif // PROTOCACHE_ALIAS_" << mark << "\n\n";
 	}

@@ -88,7 +88,7 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 		return false;
 	};
 
-	auto check_type = [this, &fullname, &bind_type](Field& field)->bool {
+	auto check_type = [&fullname, &bind_type](Field& field)->bool {
 		if (field.value != Field::TYPE_UNKNOWN) {
 			return true;
 		}

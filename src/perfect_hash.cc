@@ -20,15 +20,14 @@ static inline void SetBit2on11(uint8_t* vec, size_t pos, uint8_t val) noexcept {
 	vec[pos>>2] ^= ((~val & 3) << ((pos&3)<<1));
 }
 
-static inline unsigned CountValidSlot(uint64_t block) noexcept {
-	block &= (block>>1);
-	auto v = ~block;
-	v = (v & 0x1111111111111111ULL) + ((v>>2U) & 0x1111111111111111ULL);
-	v = (v & 0xf0f0f0f0f0f0f0fULL) + ((v>>4U) & 0xf0f0f0f0f0f0f0fULL);
-	v = (v&0xff00ff00ff00ffULL) + ((v>>8U)&0xff00ff00ff00ffULL);
-	v = (v&0xffff0000ffffULL) + ((v>>16U)&0xffff0000ffffULL);
-	v = (v&0xffffffffULL) + ((v>>32U)&0xffffffffULL);
-	return v;
+static inline unsigned CountValidSlot(uint64_t v) noexcept {
+	v &= (v >> 1);
+	v = (v & 0x1111111111111111ULL) + ((v >> 2U) & 0x1111111111111111ULL);
+	v = v + (v >> 4U);
+	v = v + (v >> 8U);
+	v = (v & 0xf0f0f0f0f0f0f0fULL) + ((v >> 16U) & 0xf0f0f0f0f0f0f0fULL);
+	v = v + (v >> 32);
+	return 32U - (v & 0xffU);
 }
 
 static inline void SetBit(uint8_t bitmap[], size_t pos) noexcept {

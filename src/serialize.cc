@@ -276,7 +276,7 @@ struct StringReader : public ScalarReader {
 			return {};
 		}
 		auto& key = keys_[idx_++];
-		return String(key.data()).Get();
+		return String(key.data()).GetBytes();
 	}
 };
 

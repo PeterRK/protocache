@@ -129,11 +129,11 @@ public:
 	::test::Small object(const uint32_t* end=nullptr) const noexcept {
 		return ::test::Small(core_.GetField(_::object, end).GetObject(end), end);
 	}
-	protocache::Slice<int32_t> i32v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt32Array(core_, _::i32v, end);
+	protocache::ArrayT<int32_t> i32v(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<int32_t>(core_, _::i32v, end);
 	}
-	protocache::Slice<uint64_t> u64v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetUInt64Array(core_, _::u64v, end);
+	protocache::ArrayT<uint64_t> u64v(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<uint64_t>(core_, _::u64v, end);
 	}
 	protocache::ArrayT<protocache::Slice<char>> strv(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetArray<protocache::Slice<char>>(core_, _::strv, end);
@@ -141,14 +141,14 @@ public:
 	protocache::ArrayT<protocache::Slice<uint8_t>> datav(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetArray<protocache::Slice<uint8_t>>(core_, _::datav, end);
 	}
-	protocache::Slice<float> f32v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetFloatArray(core_, _::f32v, end);
+	protocache::ArrayT<float> f32v(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<float>(core_, _::f32v, end);
 	}
-	protocache::Slice<double> f64v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetDoubleArray(core_, _::f64v, end);
+	protocache::ArrayT<double> f64v(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<double>(core_, _::f64v, end);
 	}
-	protocache::Slice<bool> flags(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetBoolArray(core_, _::flags, end);
+	protocache::ArrayT<bool> flags(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<bool>(core_, _::flags, end);
 	}
 	protocache::ArrayT<::test::Small> objectv(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetArray<::test::Small>(core_, _::objectv, end);
@@ -199,7 +199,7 @@ inline ::test::Small protocache::FieldT<::test::Small>::Get(const uint32_t *end)
 #define PROTOCACHE_ALIAS_VVf32
 template<>
 inline ::test::Vec2D::_ protocache::FieldT<::test::Vec2D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::_(core_.GetObject(end));
+	return ::test::Vec2D::_(core_.GetObject(end), end);
 }
 #endif // PROTOCACHE_ALIAS_VVf32
 
@@ -207,7 +207,7 @@ inline ::test::Vec2D::_ protocache::FieldT<::test::Vec2D::_>::Get(const uint32_t
 #define PROTOCACHE_ALIAS_Vf32
 template<>
 inline ::test::Vec2D::Vec1D::_ protocache::FieldT<::test::Vec2D::Vec1D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::Vec1D::_(core_.GetObject(end));
+	return ::test::Vec2D::Vec1D::_(core_.GetObject(end), end);
 }
 #endif // PROTOCACHE_ALIAS_Vf32
 
@@ -215,7 +215,7 @@ inline ::test::Vec2D::Vec1D::_ protocache::FieldT<::test::Vec2D::Vec1D::_>::Get(
 #define PROTOCACHE_ALIAS_MstrVf32
 template<>
 inline ::test::ArrMap::_ protocache::FieldT<::test::ArrMap::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::_(core_.GetObject(end));
+	return ::test::ArrMap::_(core_.GetObject(end), end);
 }
 #endif // PROTOCACHE_ALIAS_MstrVf32
 
@@ -223,7 +223,7 @@ inline ::test::ArrMap::_ protocache::FieldT<::test::ArrMap::_>::Get(const uint32
 #define PROTOCACHE_ALIAS_Vf32
 template<>
 inline ::test::ArrMap::Array::_ protocache::FieldT<::test::ArrMap::Array::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::Array::_(core_.GetObject(end));
+	return ::test::ArrMap::Array::_(core_.GetObject(end), end);
 }
 #endif // PROTOCACHE_ALIAS_Vf32
 
