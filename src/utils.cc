@@ -33,7 +33,24 @@ private:
 	std::ostringstream core_;
 };
 
-bool ParseProtoFile(std::string filename, google::protobuf::FileDescriptorProto* result, std::string* err) {
+static bool ParseProto(google::protobuf::io::ZeroCopyInputStream& input,
+					   google::protobuf::FileDescriptorProto* result, std::string* err) {
+	ErrorCollector collector;
+	google::protobuf::io::Tokenizer tokenizer(&input, &collector);
+	google::protobuf::compiler::Parser parser;
+	auto done = parser.Parse(&tokenizer, result);
+	if (!done && err != nullptr) {
+		*err = collector.String();
+	}
+	return done;
+}
+
+bool ParseProto(const std::string& data, google::protobuf::FileDescriptorProto* result, std::string* err) {
+	google::protobuf::io::ArrayInputStream stream(data.data(), data.size());
+	return ParseProto(stream, result, err);
+}
+
+bool ParseProtoFile(const std::string& filename, google::protobuf::FileDescriptorProto* result, std::string* err) {
 	std::ifstream input(filename);
 	if (!input) {
 		if (err != nullptr) {
@@ -41,17 +58,9 @@ bool ParseProtoFile(std::string filename, google::protobuf::FileDescriptorProto*
 		}
 		return false;
 	}
-	google::protobuf::io::IstreamInputStream stream(&input);
-
-	ErrorCollector collector;
-	google::protobuf::io::Tokenizer tokenizer(&stream, &collector);
-	google::protobuf::compiler::Parser parser;
 	result->set_name(filename);
-	auto done = parser.Parse(&tokenizer, result);
-	if (!done && err != nullptr) {
-		*err = collector.String();
-	}
-	return done;
+	google::protobuf::io::IstreamInputStream stream(&input);
+	return ParseProto(stream, result, err);
 }
 
 bool LoadFile(const std::string& path, std::string* out) {

@@ -12,7 +12,8 @@
 
 namespace protocache {
 
-extern bool ParseProtoFile(std::string filename, google::protobuf::FileDescriptorProto* result, std::string* err=nullptr);
+extern bool ParseProto(const std::string& data, google::protobuf::FileDescriptorProto* result, std::string* err=nullptr);
+extern bool ParseProtoFile(const std::string& filename, google::protobuf::FileDescriptorProto* result, std::string* err=nullptr);
 
 extern bool LoadFile(const std::string& path, std::string* out);
 

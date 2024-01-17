@@ -197,7 +197,9 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 	Descriptor descriptor;
 	descriptor.alias.id = UINT_MAX;
 	if (proto.field_size() == 1 && proto.field(0).name() == "_") {
-		convert_field(proto.field(0), descriptor.alias);
+		if (!convert_field(proto.field(0), descriptor.alias)) {
+			return false;
+		}
 	} else {
 		descriptor.fields.reserve(proto.field_size());
 		for (auto& one : proto.field()) {
@@ -209,7 +211,9 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 				return false;
 			}
 			field.id = one.number() - 1;
-			convert_field(one, field);
+			if (!convert_field(one, field)) {
+				return false;
+			}
 		}
 	}
 	return pool_.emplace(std::move(fullname), std::move(descriptor)).second;
