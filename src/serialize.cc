@@ -138,6 +138,9 @@ static Data SerializeScalarArray(const google::protobuf::RepeatedFieldRef<T>& ar
 	static_assert(std::is_scalar<T>::value, "");
 	auto m = WordSize(sizeof(T));
 	Data out(1 + m*array.size(), 0);
+	if (out.size() >= (1U << 30U)) {
+		return {};
+	}
 	out[0] = (array.size() << 2U) | m;
 	auto p = out.data() + 1;
 	for (auto v : array) {
@@ -478,7 +481,7 @@ Data Serialize(const google::protobuf::Message& message) {
 
 	Data out;
 	if (parts.empty()) {
-		out.push_back(0xffU);
+		out.push_back(0);
 		return out;
 	}
 	if (fields.size() == 1 && fields[0]->name() == "_") {
