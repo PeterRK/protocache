@@ -430,6 +430,9 @@ Data Serialize(const google::protobuf::Message& message) {
 	if (max_id - field_count > 6 && max_id > field_count*2) {
 		return {};
 	}
+	if (max_id > (12 + 25*255)) {
+		return {};
+	}
 	fields.resize(max_id, nullptr);
 	for (int i = field_count-1; i >= 0; i--) {
 		auto j = fields[i]->number() - 1;
@@ -521,6 +524,9 @@ Data Serialize(const google::protobuf::Message& message) {
 		auto next = i + 25;
 		if (next > parts.size()) {
 			next = parts.size();
+		}
+		if (cnt >= (1U<<14U)) {
+			return {};
 		}
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
 		for (unsigned j = 0; i < next; i++, j+=2) {

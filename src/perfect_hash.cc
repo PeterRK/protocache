@@ -319,8 +319,6 @@ static bool Check(KeyReader& source, uint32_t n, uint32_t seed, V128* space) {
 	return true;
 }
 
-
-
 template <typename Word>
 static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, bool no_check) {
 	auto total = source.Total();
