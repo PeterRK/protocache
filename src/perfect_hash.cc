@@ -150,13 +150,6 @@ struct Graph {
 };
 
 template <typename Word>
-struct Queue {
-	Word* data = nullptr;
-	unsigned head = 0;
-	unsigned tail = 0;
-};
-
-template <typename Word>
 static int CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32_t n) noexcept {
 	auto m = Section(n);
 	auto slot_cnt = m * 3;
@@ -190,23 +183,22 @@ static int CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32_
 }
 
 template <typename Word>
-static void TearGraph(Graph<Word>& g, uint32_t n, Queue<Word>& q, uint8_t* book) noexcept {
+static bool TearGraph(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book) noexcept {
 	constexpr Word END = ~0;
 	memset(book, 0, (n+7)/8);
-	q.head = 0;
-	q.tail = 0;
+	uint32_t tail = 0;
 	for (uint32_t i = n; i > 0;) {
 		auto &edge = g.edges[--i];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
 			if (g.sizes[v.slot] == 1 && TestAndSetBit(book, i)) {
 				assert(g.nodes[v.slot] == i);
-				q.data[q.tail++] = i;
+				free[tail++] = i;
 			}
 		}
 	}
-	while (q.head < q.tail) {
-		auto curr = q.data[q.head++];
+	for (uint32_t head = 0; head < tail; head++) {
+		auto curr = free[head];
 		auto& edge = g.edges[curr];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
@@ -220,20 +212,21 @@ static void TearGraph(Graph<Word>& g, uint32_t n, Queue<Word>& q, uint8_t* book)
 			auto i = g.nodes[v.slot];
 			auto& size = g.sizes[v.slot];
 			if (--size == 1 && TestAndSetBit(book, i)) {
-				q.data[q.tail++] = i;
+				free[tail++] = i;
 			}
 		}
 	}
+	return tail == n;
 }
 
 template <typename Word>
-static void Mapping(Graph<Word>& g, uint32_t n, Queue<Word>& q, uint8_t* book, uint8_t* bitmap) noexcept {
+static void Mapping(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book, uint8_t* bitmap) noexcept {
 	auto m = Section(n);
 	memset(bitmap, ~0, BitmapSize(m));
 	m *= 3;
 	memset(book, 0, (m+7)/8);
-	for (unsigned i = q.tail; i > 0; ) {
-		auto idx = q.data[--i];
+	for (unsigned i = n; i > 0; ) {
+		auto idx = free[--i];
 		auto& edge = g.edges[idx];
 		auto a = edge[0].slot;
 		auto b = edge[1].slot;
@@ -258,7 +251,7 @@ static void Mapping(Graph<Word>& g, uint32_t n, Queue<Word>& q, uint8_t* book, u
 
 template <typename Word>
 static int Build(KeyReader& source, uint32_t n, uint32_t seed,
-				  Graph<Word>& g, Queue<Word>& q, uint8_t* book, uint8_t* bitmap) noexcept {
+				  Graph<Word>& g, Word free[], uint8_t* book, uint8_t* bitmap) noexcept {
 #ifndef NDEBUG
 	printf("try with seed %08x\n", seed);
 #endif
@@ -266,11 +259,10 @@ static int Build(KeyReader& source, uint32_t n, uint32_t seed,
 	if (ret != 0) {
 		return ret;
 	}
-	TearGraph(g, n,q, book);
-	if (q.tail != n) {
-		return 2;
+	if (!TearGraph(g, n,free, book)) {
+		return 1;
 	}
-	Mapping(g, n,q, book, bitmap);
+	Mapping(g, n,free, book, bitmap);
 	return 0;
 }
 
@@ -343,11 +335,10 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	std::unique_ptr<uint8_t[]> temp(new uint8_t[tmp_sz]);
 
 	Graph<Word> graph;
-	Queue<Word> queue;
 	auto pt = temp.get();
 	graph.edges = reinterpret_cast<Edge<Word>*>(pt);
 	pt += sizeof(Edge<Word>)*total;
-	queue.data = reinterpret_cast<Word*>(pt);
+	auto free = reinterpret_cast<Word*>(pt);
 	pt += sizeof(Word)*total;
 	graph.nodes = reinterpret_cast<Word*>(pt);
 	pt += sizeof(Word)*slot_cnt;
@@ -361,7 +352,7 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	XorShift rand32;
 	for (unsigned i = 0; i < FIRST_TRIES; i++) {
 		header->seed = rand32.Next();
-		auto ret = Build(source, header->size, header->seed, graph, queue, book, bitmap);
+		auto ret = Build(source, header->size, header->seed, graph, free, book, bitmap);
 		if (ret == 0) {
 			goto L_done;
 		} else if (ret < 0) {
@@ -381,7 +372,7 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 
 	for (unsigned i = 0; i < SECOND_TRIES; i++) {
 		header->seed = rand32.Next();
-		auto ret = Build(source, header->size, header->seed, graph, queue, book, bitmap);
+		auto ret = Build(source, header->size, header->seed, graph, free, book, bitmap);
 		if (ret == 0) {
 			goto L_done;
 		} else if (ret < 0) {
