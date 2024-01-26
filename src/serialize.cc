@@ -453,16 +453,15 @@ Data Serialize(const google::protobuf::Message& message) {
 		if (field->options().deprecated()) {
 			continue;
 		}
-		if (field->is_map()) {
+		if (field->is_repeated()) {
 			if (reflection->FieldSize(message, field) == 0) {
 				continue;
 			}
-			unit = SerializeMapField(message, field);
-		} else if (field->is_repeated()) {
-			if (reflection->FieldSize(message, field) == 0) {
-				continue;
+			if (field->is_map()) {
+				unit = SerializeMapField(message, field);
+			} else {
+				unit = SerializeArrayField(message, field);
 			}
-			unit = SerializeArrayField(message, field);
 		} else {
 			if (!reflection->HasField(message, field)) {
 				continue;
@@ -532,8 +531,8 @@ Data Serialize(const google::protobuf::Message& message) {
 			return {};
 		}
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
-		for (unsigned j = 0; i < next; i++, j+=2) {
-			auto& one = parts[i];
+		for (unsigned j = 0; i < next; j+=2) {
+			auto& one = parts[i++];
 			if (one.size() < 4) {
 				mark |= static_cast<uint64_t>(one.size()) << j;
 				cnt += one.size();
