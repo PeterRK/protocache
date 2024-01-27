@@ -10,26 +10,16 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <unistd.h>
-#include <google/protobuf/compiler/plugin.pb.h>
-
-static constexpr ::google::protobuf::FieldDescriptorProto::Type TYPE_NONE = static_cast<::google::protobuf::FieldDescriptorProto::Type>(0);
-
-struct AliasUnit {
-	::google::protobuf::FieldDescriptorProto::Type key_type = TYPE_NONE;
-	::google::protobuf::FieldDescriptorProto::Type value_type = TYPE_NONE;
-	std::string value_class;
-};
+#include "proto-gen-utils.h"
 
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
 
 static bool CollectAlias(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
-	std::string fullname = ns;
-	fullname += '.';
-	fullname += proto.name();
+	auto fullname = NaiveJoinName(ns, proto.name());
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 	for (auto& one : proto.nested_type()) {
 		if (one.options().map_entry()) {
-			map_entries.emplace(fullname + '.' + one.name(), &one);
+			map_entries.emplace(NaiveJoinName(fullname, one.name()), &one);
 			continue;
 		}
 		if (!CollectAlias(fullname, one)) {
@@ -67,32 +57,6 @@ static std::string ConvertFilename(const std::string& name) {
 		return name + ".pc.h";
 	}
 	return name.substr(0, pos+1) + "pc.h";
-}
-
-static void Split(const std::string& raw, char delim, std::vector<std::string>* out) {
-	unsigned begin = 0;
-	for (unsigned i = 0; i < raw.size(); i++) {
-		if (raw[i] == delim) {
-			out->push_back(raw.substr(begin, i-begin));
-			begin = i+1;
-		}
-	}
-	out->push_back(raw.substr(begin));
-}
-
-static std::string AddIndent(const std::string& raw) {
-	std::string out;
-	out.reserve(raw.size()+raw.size()/8);
-	if (!raw.empty() && raw.front() != '\n') {
-		out.push_back('\t');
-	}
-	for (auto str = raw.c_str(); *str; str++) {
-		out += *str;
-		if (*str == '\n' && (str[1] != '\n' && str[1] != '\0')) {
-			out += '\t';
-		}
-	}
-	return out;
 }
 
 static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type, const std::string& clazz) {
@@ -215,9 +179,7 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto)
 }
 
 static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto, std::vector<std::string>& book) {
-	std::string fullname = ns;
-	fullname += '.';
-	fullname += proto.name();
+	auto fullname = NaiveJoinName(ns, proto.name());
 	book.push_back(fullname);
 
 	std::ostringstream oss;
@@ -234,6 +196,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			<< "public:\n"
 			<< "\tstruct _ {\n";
 		for (auto& one : proto.field()) {
+			if (one.options().deprecated()) {
+				continue;
+			}
 			if (one.name() == "_") {
 				std::cerr << "found illegal field in message " << fullname << std::endl;
 				return {};
@@ -254,7 +219,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			continue;
 		}
 		if (one.options().map_entry()) {
-			map_entries.emplace(fullname + '.' + one.name(), &one);
+			map_entries.emplace(NaiveJoinName(fullname, one.name()), &one);
 			continue;
 		}
 		auto piece = GenMessage(fullname, one, book);
@@ -295,6 +260,19 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		<< "\tbool operator!() const noexcept { return !core_; }\n"
 		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n";
 
+	auto handle_simple_field = [&oss](bool repeated,
+									  const std::string& field_name, const char* out_type, const char* get_type) {
+		if (repeated) {
+			oss << "\tprotocache::ArrayT<" << out_type << "> " << field_name << "(const uint32_t* end=nullptr) const noexcept {\n"
+				<< "\t\treturn protocache::GetArray<" << out_type << ">(core_, _::" << field_name << ", end);\n"
+				<< "\t}\n";
+		} else {
+			oss << '\t' << out_type << ' ' << field_name << "(const uint32_t* end=nullptr) const noexcept {\n"
+				<< "\t\treturn protocache::Get" << get_type << "(core_, _::" << field_name << ", end);\n"
+				<< "\t}\n";
+		}
+	};
+
 	for (auto& one : proto.field()) {
 		if (one.options().deprecated()) {
 			continue;
@@ -334,120 +312,40 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<protocache::Slice<uint8_t>> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<protocache::Slice<uint8_t>>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tprotocache::Slice<uint8_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetBytes(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "protocache::Slice<uint8_t>", "Bytes");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<protocache::Slice<char>> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<protocache::Slice<char>>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tprotocache::Slice<char> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetString(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "protocache::Slice<char>", "String");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<double> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<double>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tdouble " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetDouble(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "double", "Double");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<float> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<float>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tfloat " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetFloat(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "float", "Float");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<uint64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<uint64_t>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tuint64_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetUInt64(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "uint64_t", "UInt64");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<uint32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<uint32_t>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tuint32_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetUInt32(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "uint32_t", "UInt32");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<int64_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<int64_t>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tint64_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetInt64(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "int64_t", "Int64");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<int32_t> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<int32_t>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tint32_t " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetInt32(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "int32_t", "Int32");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<bool> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetArray<bool>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tbool " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetBool(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "bool", "Bool");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				if (repeated) {
-					oss << "\tprotocache::ArrayT<protocache::EnumValue> " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-							<< "\t\treturn protocache::GetArray<protocache::EnumValue>(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				} else {
-					oss << "\tprotocache::EnumValue " << one.name() << "(const uint32_t* end=nullptr) const noexcept {\n"
-						<< "\t\treturn protocache::GetEnumValue(core_, _::" << one.name() << ", end);\n"
-						<< "\t}\n";
-				}
+				handle_simple_field(repeated, one.name(), "protocache::EnumValue", "EnumValue");
 				break;
 			default:
 				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;

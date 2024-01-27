@@ -35,6 +35,9 @@ target_link_libraries(json-to-binary protocache protobuf gflags pthread)
 add_executable(protoc-gen-pccx tools/protoc-gen-pccx.cc)
 target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
 
+add_executable(protoc-gen-pcjv tools/protoc-gen-pcjv.cc)
+target_link_libraries(protoc-gen-pcjv protoc protobuf pthread)
+
 #file(GLOB bench_src
 #    test/benchmark/*.cc
 #)
