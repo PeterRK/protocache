@@ -4,7 +4,7 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 
 |  | Protobuf | ProtoCache | FlatBuffers |
 |:-------|----:|----:|----:|
-| Wire format size (plain / ZSTD1 compressed, bytes) | **574 / 461**| 780 / 548 | 1296 / 672 |
+| Wire format size (plain / ZSTD1 compressed, bytes) | **574 / 461** | 780 / 548 | 1296 / 672 |
 | Decode + Traverse + Dealloc (1 million times) | 3237ms | 251ms | **153ms** |
 | Decode + Traverse + Dealloc (1 million times, reflection) | 11497ms | **502ms** | 728ms |
 
