@@ -189,47 +189,4 @@ public:
 };
 
 } // test
-
-template<>
-inline ::test::Small protocache::FieldT<::test::Small>::Get(const uint32_t *end) const noexcept {
-	return ::test::Small(core_.GetObject(end));
-}
-
-#ifndef PROTOCACHE_ALIAS_VVf32
-#define PROTOCACHE_ALIAS_VVf32
-template<>
-inline ::test::Vec2D::_ protocache::FieldT<::test::Vec2D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::_(core_.GetObject(end), end);
-}
-#endif // PROTOCACHE_ALIAS_VVf32
-
-#ifndef PROTOCACHE_ALIAS_Vf32
-#define PROTOCACHE_ALIAS_Vf32
-template<>
-inline ::test::Vec2D::Vec1D::_ protocache::FieldT<::test::Vec2D::Vec1D::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::Vec2D::Vec1D::_(core_.GetObject(end), end);
-}
-#endif // PROTOCACHE_ALIAS_Vf32
-
-#ifndef PROTOCACHE_ALIAS_MstrVf32
-#define PROTOCACHE_ALIAS_MstrVf32
-template<>
-inline ::test::ArrMap::_ protocache::FieldT<::test::ArrMap::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::_(core_.GetObject(end), end);
-}
-#endif // PROTOCACHE_ALIAS_MstrVf32
-
-#ifndef PROTOCACHE_ALIAS_Vf32
-#define PROTOCACHE_ALIAS_Vf32
-template<>
-inline ::test::ArrMap::Array::_ protocache::FieldT<::test::ArrMap::Array::_>::Get(const uint32_t *end) const noexcept {
-	return ::test::ArrMap::Array::_(core_.GetObject(end), end);
-}
-#endif // PROTOCACHE_ALIAS_Vf32
-
-template<>
-inline ::test::Main protocache::FieldT<::test::Main>::Get(const uint32_t *end) const noexcept {
-	return ::test::Main(core_.GetObject(end));
-}
-
 #endif // PROTOCACHE_INCLUDED_test_proto

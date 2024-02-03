@@ -551,19 +551,9 @@ inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const noexcept 
 	return String(core_.GetObject(end), end).GetBoolArray();
 }
 
-template <>
-inline Message FieldT<Message>::Get(const uint32_t* end) const noexcept {
-	return Message(core_.GetObject(end), end);
-}
-
-template <>
-inline Array FieldT<Array>::Get(const uint32_t* end) const noexcept {
-	return Array(core_.GetObject(end), end);
-}
-
-template <>
-inline Map FieldT<Map>::Get(const uint32_t* end) const noexcept {
-	return Map(core_.GetObject(end), end);
+template <typename T>
+inline T FieldT<T>::Get(const uint32_t* end) const noexcept {
+	return T(core_.GetObject(end), end);
 }
 
 template <typename T>

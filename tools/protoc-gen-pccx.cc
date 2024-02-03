@@ -178,10 +178,8 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto)
 	return oss.str();
 }
 
-static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto, std::vector<std::string>& book) {
+static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
-	book.push_back(fullname);
-
 	std::ostringstream oss;
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 
@@ -222,7 +220,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			map_entries.emplace(NaiveJoinName(fullname, one.name()), &one);
 			continue;
 		}
-		auto piece = GenMessage(fullname, one, book);
+		auto piece = GenMessage(fullname, one);
 		if (piece.empty()) {
 			std::cerr << "fail to gen code for message: " << one.name() << std::endl;
 			return {};
@@ -386,8 +384,6 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	}
 	oss << '\n';
 
-	std::vector<std::string> book;
-
 	for (auto& one : proto.enum_type()) {
 		if (one.options().deprecated()) {
 			continue;
@@ -398,7 +394,7 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 		if (one.options().deprecated()) {
 			continue;
 		}
-		auto piece = GenMessage(ns, one, book);
+		auto piece = GenMessage(ns, one);
 		if (piece.empty()) {
 			std::cerr << "fail to gen code for message: " << one.name() << std::endl;
 			return {};
@@ -407,61 +403,6 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	}
 	for (auto it = ns_parts.rbegin(); it != ns_parts.rend(); ++it) {
 		oss << "} // " << *it << '\n';
-	}
-
-	oss << '\n';
-
-	for (auto& one : book) {
-		auto fullname = TypeName(::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE, one);
-		auto it = g_alias_book.find(one);
-		if (it == g_alias_book.end()) {
-			oss << "template<>\n"
-				<< "inline " << fullname << " protocache::FieldT<" << fullname << ">::Get(const uint32_t *end) const noexcept {\n"
-				<< "\treturn " << fullname << "(core_.GetObject(end));\n"
-				<< "}\n\n";
-			continue;
-		}
-		std::string mark;
-		while (true) {
-			if (it->second.key_type == TYPE_NONE) {
-				mark += 'V';
-			} else {
-				mark += 'M';
-				auto tm = TypeMark(it->second.key_type);
-				if (tm == nullptr) {
-					return {};
-				}
-				mark += tm;
-			}
-			if (it->second.value_type != ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE) {
-				auto tm = TypeMark(it->second.value_type);
-				if (tm == nullptr) {
-					return {};
-				}
-				mark += tm;
-				break;
-			}
-			auto& value_class = it->second.value_class;
-			it = g_alias_book.find(value_class);
-			if (it == g_alias_book.end()) {
-				auto tmp = value_class;
-				tmp[0] = 'X';
-				for (auto& ch : tmp) {
-					if (ch == '.') {
-						ch = '_';
-					}
-				}
-				mark += tmp;
-				break;
-			}
-		}
-		oss << "#ifndef PROTOCACHE_ALIAS_" << mark << '\n'
-			<< "#define PROTOCACHE_ALIAS_" << mark << '\n'
-			<< "template<>\n"
-			<< "inline " << fullname << " protocache::FieldT<" << fullname << ">::Get(const uint32_t *end) const noexcept {\n"
-			<< "\treturn " << fullname << "(core_.GetObject(end), end);\n"
-			<< "}\n"
-			<< "#endif // PROTOCACHE_ALIAS_" << mark << "\n\n";
 	}
 
 	oss << "#endif // PROTOCACHE_INCLUDED_" << header_name << '\n';
