@@ -40,18 +40,18 @@ public:
 
 struct Vec2D {
 	struct Vec1D {
-		using _ = protocache::ArrayT<float>;
+		using ALIAS = protocache::ArrayT<float>;
 	};
 
-	using _ = protocache::ArrayT<::test::Vec2D::Vec1D::_>;
+	using ALIAS = protocache::ArrayT<::test::Vec2D::Vec1D::ALIAS>;
 };
 
 struct ArrMap {
 	struct Array {
-		using _ = protocache::ArrayT<float>;
+		using ALIAS = protocache::ArrayT<float>;
 	};
 
-	using _ = protocache::MapT<protocache::Slice<char>,::test::ArrMap::Array::_>;
+	using ALIAS = protocache::MapT<protocache::Slice<char>,::test::ArrMap::Array::ALIAS>;
 };
 
 class Main final {
@@ -177,14 +177,14 @@ public:
 	protocache::MapT<int32_t,::test::Small> objects(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetMap<int32_t,::test::Small>(core_, _::objects, end);
 	}
-	::test::Vec2D::_ matrix(const uint32_t* end=nullptr) const noexcept {
-		return ::test::Vec2D::_(core_.GetField(_::matrix, end).GetObject(end), end);
+	::test::Vec2D::ALIAS matrix(const uint32_t* end=nullptr) const noexcept {
+		return ::test::Vec2D::ALIAS(core_.GetField(_::matrix, end).GetObject(end), end);
 	}
-	protocache::ArrayT<::test::ArrMap::_> vector(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<::test::ArrMap::_>(core_, _::vector, end);
+	protocache::ArrayT<::test::ArrMap::ALIAS> vector(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetArray<::test::ArrMap::ALIAS>(core_, _::vector, end);
 	}
-	::test::ArrMap::_ arrays(const uint32_t* end=nullptr) const noexcept {
-		return ::test::ArrMap::_(core_.GetField(_::arrays, end).GetObject(end), end);
+	::test::ArrMap::ALIAS arrays(const uint32_t* end=nullptr) const noexcept {
+		return ::test::ArrMap::ALIAS(core_.GetField(_::arrays, end).GetObject(end), end);
 	}
 };
 

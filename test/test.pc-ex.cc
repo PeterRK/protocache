@@ -258,34 +258,34 @@ protocache::MapEX<int32_t,::test::Small_EX>* Main_EX::get_objects() {
 	return &fields_->objects;
 }
 
-::test::Vec2D_EX::_* Main_EX::get_matrix() {
+::test::Vec2D_EX::ALIAS* Main_EX::get_matrix() {
 	if (!mask_[_::matrix]) {
 		touch(_::matrix);
 		auto ptr = view_.GetField(_::matrix, data_->data() + data_->size()).GetObject();
 		if (ptr != nullptr) {
-			fields_->matrix = ::test::Vec2D_EX::_(data_, ptr - data_->data());
+			fields_->matrix = ::test::Vec2D_EX::ALIAS(data_, ptr - data_->data());
 		}
 	}
 	return &fields_->matrix;
 }
 
-protocache::ArrayEX<::test::ArrMap_EX::_>* Main_EX::get_vector() {
+protocache::ArrayEX<::test::ArrMap_EX::ALIAS>* Main_EX::get_vector() {
 	if (!mask_[_::vector]) {
 		touch(_::vector);
 		auto ptr = view_.GetField(_::vector, data_->data() + data_->size()).GetObject();
 		if (ptr != nullptr) {
-			fields_->vector = protocache::ArrayEX<::test::ArrMap_EX::_>(data_, ptr - data_->data());
+			fields_->vector = protocache::ArrayEX<::test::ArrMap_EX::ALIAS>(data_, ptr - data_->data());
 		}
 	}
 	return &fields_->vector;
 }
 
-::test::ArrMap_EX::_* Main_EX::get_arrays() {
+::test::ArrMap_EX::ALIAS* Main_EX::get_arrays() {
 	if (!mask_[_::arrays]) {
 		touch(_::arrays);
 		auto ptr = view_.GetField(_::arrays, data_->data() + data_->size()).GetObject();
 		if (ptr != nullptr) {
-			fields_->arrays = ::test::ArrMap_EX::_(data_, ptr - data_->data());
+			fields_->arrays = ::test::ArrMap_EX::ALIAS(data_, ptr - data_->data());
 		}
 	}
 	return &fields_->arrays;

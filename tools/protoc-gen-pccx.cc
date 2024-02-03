@@ -72,7 +72,7 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type,
 				}
 			}
 			if (g_alias_book.find(clazz) != g_alias_book.end()) {
-				name += "::_";
+				name += "::ALIAS";
 			}
 			return name;
 		}
@@ -240,14 +240,14 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			return {};
 		}
 		if (it->second.key_type == TYPE_NONE) {
-			oss << "\tusing _ = protocache::ArrayT<" << value << ">;\n";
+			oss << "\tusing ALIAS = protocache::ArrayT<" << value << ">;\n";
 		} else {
 			if (!CanBeKey(it->second.key_type)) {
 				std::cerr << "illegal key type: " << it->second.key_type << std::endl;
 				return {};
 			}
 			auto key = TypeName(it->second.key_type, {});
-			oss << "\tusing _ = protocache::MapT<" << key << ',' << value << ">;\n";
+			oss << "\tusing ALIAS = protocache::MapT<" << key << ',' << value << ">;\n";
 		}
 		oss << "};\n\n";
 		return oss.str();

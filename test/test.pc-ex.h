@@ -39,18 +39,18 @@ public:
 
 struct Vec2D_EX {
 	struct Vec1D_EX {
-		using _ = protocache::ArrayEX<float>;
+		using ALIAS = protocache::ArrayEX<float>;
 	};
 
-	using _ = protocache::ArrayEX<::test::Vec2D_EX::Vec1D_EX::_>;
+	using ALIAS = protocache::ArrayEX<::test::Vec2D_EX::Vec1D_EX::ALIAS>;
 };
 
 struct ArrMap_EX {
 	struct Array_EX {
-		using _ = protocache::ArrayEX<float>;
+		using ALIAS = protocache::ArrayEX<float>;
 	};
 
-	using _ = protocache::MapEX<protocache::Slice<char>,::test::ArrMap_EX::Array_EX::_>;
+	using ALIAS = protocache::MapEX<protocache::Slice<char>,::test::ArrMap_EX::Array_EX::ALIAS>;
 };
 
 class Main_EX final : public protocache::MessageEX<30> {
@@ -84,9 +84,9 @@ private:
 		int64_t t_s64 = 0;
 		protocache::MapEX<protocache::Slice<char>,int32_t> index;
 		protocache::MapEX<int32_t,::test::Small_EX> objects;
-		Vec2D_EX::_ matrix;
-		protocache::ArrayEX<::test::ArrMap_EX::_> vector;
-		ArrMap_EX::_ arrays;
+		Vec2D_EX::ALIAS matrix;
+		protocache::ArrayEX<::test::ArrMap_EX::ALIAS> vector;
+		ArrMap_EX::ALIAS arrays;
 	};
 	std::unique_ptr<_Fields> fields_;
 	void touch(unsigned id);
@@ -126,9 +126,9 @@ public:
 	protocache::ArrayEX<::test::Small_EX>* get_objectv();
 	protocache::MapEX<protocache::Slice<char>,int32_t>* get_index();
 	protocache::MapEX<int32_t,::test::Small_EX>* get_objects();
-	::test::Vec2D_EX::_* get_matrix();
-	protocache::ArrayEX<::test::ArrMap_EX::_>* get_vector();
-	::test::ArrMap_EX::_* get_arrays();
+	::test::Vec2D_EX::ALIAS* get_matrix();
+	protocache::ArrayEX<::test::ArrMap_EX::ALIAS>* get_vector();
+	::test::ArrMap_EX::ALIAS* get_arrays();
 };
 
 } // test
