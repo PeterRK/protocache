@@ -10,31 +10,21 @@
 #include <vector>
 #include <unordered_map>
 #include <protocache/access-ex.h>
-#include "test.pc.h"
 
 
 namespace test {
 
-class Small_EX final : public protocache::MessageEX<3> {
-private:
-	using _ = ::test::Small::_;
-	struct _Fields {
-		int32_t i32 = 0;
-		bool flag = false;
-		std::string str;
-	};
-	std::unique_ptr<_Fields> fields_;
-	void touch(unsigned id);
-
-public:
+struct Small_EX final {
 	Small_EX() = default;
-	explicit Small_EX(const protocache::SharedData& src, size_t offset=0);
-	int32_t get_i32() const;
-	void set_i32(int32_t val);
-	bool get_flag() const;
-	void set_flag(bool val);
-	protocache::Slice<char> get_str() const;
-	void set_str(const protocache::Slice<char>& val);
+	Small_EX(const uint32_t* data, const uint32_t* end);
+	explicit Small_EX(const protocache::Slice<uint32_t>& data) : Small_EX(data.begin(), data.end()) {};
+	explicit Small_EX(const protocache::Data& data) : Small_EX(protocache::Slice<uint32_t>(data)) {};
+
+	protocache::Data Serialize() const;
+
+	int32_t i32 = 0;
+	bool flag = false;
+	std::string str;
 };
 
 struct Vec2D_EX {
@@ -53,82 +43,44 @@ struct ArrMap_EX {
 	using ALIAS = protocache::MapEX<protocache::Slice<char>,::test::ArrMap_EX::Array_EX::ALIAS>;
 };
 
-class Main_EX final : public protocache::MessageEX<30> {
-private:
-	using _ = ::test::Main::_;
-	struct _Fields {
-		int32_t i32 = 0;
-		uint32_t u32 = 0;
-		int64_t i64 = 0;
-		uint64_t u64 = 0;
-		bool flag = false;
-		protocache::EnumValue mode = 0;
-		std::string str;
-		std::basic_string<uint8_t> data;
-		float f32 = 0;
-		double f64 = 0;
-		std::unique_ptr<Small_EX> object;
-		protocache::ArrayEX<int32_t> i32v;
-		protocache::ArrayEX<uint64_t> u64v;
-		protocache::ArrayEX<protocache::Slice<char>> strv;
-		protocache::ArrayEX<protocache::Slice<uint8_t>> datav;
-		protocache::ArrayEX<float> f32v;
-		protocache::ArrayEX<double> f64v;
-		protocache::ArrayEX<bool> flags;
-		protocache::ArrayEX<::test::Small_EX> objectv;
-		uint32_t t_u32 = 0;
-		int32_t t_i32 = 0;
-		int32_t t_s32 = 0;
-		uint64_t t_u64 = 0;
-		int64_t t_i64 = 0;
-		int64_t t_s64 = 0;
-		protocache::MapEX<protocache::Slice<char>,int32_t> index;
-		protocache::MapEX<int32_t,::test::Small_EX> objects;
-		Vec2D_EX::ALIAS matrix;
-		protocache::ArrayEX<::test::ArrMap_EX::ALIAS> vector;
-		ArrMap_EX::ALIAS arrays;
-	};
-	std::unique_ptr<_Fields> fields_;
-	void touch(unsigned id);
-
-public:
+struct Main_EX final {
 	Main_EX() = default;
-	explicit Main_EX(const protocache::SharedData& src, size_t offset=0);
+	Main_EX(const uint32_t* data, const uint32_t* end);
+	explicit Main_EX(const protocache::Slice<uint32_t>& data) : Main_EX(data.begin(), data.end()) {};
+	explicit Main_EX(const protocache::Data& data) : Main_EX(protocache::Slice<uint32_t>(data)) {};
 
-	int32_t get_i32() const;
-	void set_i32(int32_t val);
-	uint32_t get_u32() const;
-	void set_u32(uint32_t val);
-	int64_t get_i64() const;
-	void set_i64(int64_t val);
-	uint64_t get_u64() const;
-	void set_u64(uint64_t val);
-	bool get_flag() const;
-	void set_flag(bool val);
-	protocache::EnumValue get_mode() const;
-	void set_mode(protocache::EnumValue val);
-	protocache::Slice<char> get_str() const;
-	void set_str(const protocache::Slice<char>& val);
-	protocache::Slice<uint8_t> get_data() const;
-	void set_data(const protocache::Slice<uint8_t>& val);
-	float get_f32() const;
-	void set_f32(float val);
-	double get_f64() const;
-	void set_f64(double val);
-	::test::Small_EX* get_object();
-	protocache::ArrayEX<int32_t>* get_i32v();
-	protocache::ArrayEX<uint64_t>* get_u64v();
-	protocache::ArrayEX<protocache::Slice<char>>* get_strv();
-	protocache::ArrayEX<protocache::Slice<uint8_t>>* get_datav();
-	protocache::ArrayEX<float>* get_f32v();
-	protocache::ArrayEX<double>* get_f64v();
-	protocache::ArrayEX<bool>* get_flags();
-	protocache::ArrayEX<::test::Small_EX>* get_objectv();
-	protocache::MapEX<protocache::Slice<char>,int32_t>* get_index();
-	protocache::MapEX<int32_t,::test::Small_EX>* get_objects();
-	::test::Vec2D_EX::ALIAS* get_matrix();
-	protocache::ArrayEX<::test::ArrMap_EX::ALIAS>* get_vector();
-	::test::ArrMap_EX::ALIAS* get_arrays();
+	protocache::Data Serialize() const; //TODO
+
+	int32_t i32 = 0;
+	uint32_t u32 = 0;
+	int64_t i64 = 0;
+	uint64_t u64 = 0;
+	bool flag = false;
+	protocache::EnumValue mode = 0;
+	std::string str;
+	std::string data;
+	float f32 = 0;
+	double f64 = 0;
+	Small_EX object;
+	protocache::ArrayEX<int32_t> i32v;
+	protocache::ArrayEX<uint64_t> u64v;
+	protocache::ArrayEX<protocache::Slice<char>> strv;
+	protocache::ArrayEX<protocache::Slice<uint8_t>> datav;
+	protocache::ArrayEX<float> f32v;
+	protocache::ArrayEX<double> f64v;
+	protocache::ArrayEX<bool> flags;
+	protocache::ArrayEX<::test::Small_EX> objectv;
+	uint32_t t_u32 = 0;
+	int32_t t_i32 = 0;
+	int32_t t_s32 = 0;
+	uint64_t t_u64 = 0;
+	int64_t t_i64 = 0;
+	int64_t t_s64 = 0;
+	protocache::MapEX<protocache::Slice<char>,int32_t> index;
+	protocache::MapEX<int32_t,::test::Small_EX> objects;
+	Vec2D_EX::ALIAS matrix;
+	protocache::ArrayEX<::test::ArrMap_EX::ALIAS> vector;
+	ArrMap_EX::ALIAS arrays;
 };
 
 } // test

@@ -17,10 +17,14 @@ file(GLOB source
     src/*.cc
 )
 
-add_library(protocache ${source})
-target_link_libraries(protocache protobuf pthread)
+add_library(protocache-lite ${source})
 
-add_library(protocache-lite src/perfect_hash.cc src/hash.cc)
+file(GLOB extension
+    src/extension/*.cc
+)
+
+add_library(protocache ${source} ${extension})
+target_link_libraries(protocache protobuf pthread)
 
 file(GLOB test_src
     test/*.cc

@@ -3,8 +3,8 @@
 // license that can be found in the LICENSE file.
 
 #include <cstdio>
-#include <protocache/utils.h>
-#include <protocache/reflection.h>
+#include "protocache/extension/utils.h"
+#include "protocache/extension/reflection.h"
 #include "test.pc.h"
 #include "common.h"
 

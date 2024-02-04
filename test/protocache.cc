@@ -10,9 +10,9 @@
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/util/json_util.h>
-#include <protocache/serialize.h>
-#include <protocache/reflection.h>
-#include <protocache/utils.h>
+#include "protocache/extension/reflection.h"
+#include "protocache/extension/utils.h"
+#include "test.pc.h"
 #include "test.pc-ex.h"
 
 TEST(PtotoCache, Empty) {
@@ -80,7 +80,7 @@ static protocache::Data SerializeByProtobuf() {
 
 TEST(PtotoCache, Basic) {
 	auto data = SerializeByProtobuf();
-	ASSERT_FALSE(data.empty());
+	ASSERT_EQ(195, data.size());
 
 	auto end = data.data() + data.size();
 	test::Main root(data.data());
@@ -197,7 +197,7 @@ TEST(PtotoCache, Basic) {
 	ASSERT_EQ(vector.Size(), 2);
 	auto map3 = vector[0];
 	ASSERT_EQ(map3.Size(), 2);
-	auto mit3 = vector[0].Find(protocache::Slice<char>("lv2"));
+	auto mit3 = map3.Find(protocache::Slice<char>("lv2"));
 	ASSERT_NE(mit3, map3.end());
 	auto vec = (*mit3).Value();
 	ASSERT_EQ(vec.Size(), 2);
@@ -207,7 +207,7 @@ TEST(PtotoCache, Basic) {
 	auto map4 = root.arrays(end);
 	ASSERT_FALSE(!map4);
 	auto mit4 = map4.Find(protocache::Slice<char>("lv5"));
-	ASSERT_NE(mit4, map3.end());
+	ASSERT_NE(mit4, map4.end());
 	vec = (*mit4).Value();
 	ASSERT_EQ(vec.Size(), 2);
 	ASSERT_EQ(vec[0], 51);
@@ -320,148 +320,94 @@ TEST(PtotoCacheEX, Basic) {
 	auto data = SerializeByProtobuf();
 	ASSERT_FALSE(data.empty());
 
-	test::Main_EX root(protocache::SharedData::New(std::move(data)));
-	ASSERT_FALSE(!root);
+	test::Main_EX root(data);
 
-	ASSERT_EQ(-999, root.get_i32());
-	root.set_i32(999);
-	ASSERT_EQ(999, root.get_i32());
+	ASSERT_EQ(-999, root.i32);
+	ASSERT_EQ(1234, root.u32);
+	ASSERT_EQ(-9876543210LL, root.i64);
+	ASSERT_EQ(98765432123456789ULL, root.u64);
+	ASSERT_TRUE(root.flag);
+	ASSERT_EQ(test::Mode::MODE_C, root.mode);
+	ASSERT_EQ(root.str, "Hello World!");
+	ASSERT_EQ(root.data, "abc123!?$*&()'-=@~");
+	ASSERT_EQ(-2.1f, root.f32);
+	ASSERT_EQ(1.0, root.f64);
 
-	ASSERT_EQ(1234, root.get_u32());
-	root.set_u32(4321);
-	ASSERT_EQ(4321, root.get_u32());
+	ASSERT_EQ(88, root.object.i32);
+	ASSERT_FALSE(root.object.flag);
+	ASSERT_EQ(root.object.str, "tmp");
 
-	ASSERT_EQ(-9876543210LL, root.get_i64());
-	root.set_i64(9876543210LL);
-	ASSERT_EQ(9876543210LL, root.get_i64());
+	ASSERT_EQ(root.i32v.size(), 2);
+	ASSERT_EQ(root.i32v[0], 1);
+	ASSERT_EQ(root.i32v[1], 2);
 
-	ASSERT_EQ(98765432123456789ULL, root.get_u64());
-	root.set_u64(101);
-	ASSERT_EQ(101, root.get_u64());
-
-	ASSERT_TRUE(root.get_flag());
-	root.set_flag(false);
-	ASSERT_FALSE(root.get_flag());
-
-	ASSERT_EQ(test::Mode::MODE_C, root.get_mode());
-	root.set_mode(test::Mode::MODE_B);
-	ASSERT_EQ(test::Mode::MODE_B, root.get_mode());
-
-	std::string expected_str = "Hello World!";
-	ASSERT_EQ(root.get_str(), expected_str);
-	expected_str = "abcd";
-	root.set_str(protocache::Slice<char>(expected_str));
-	ASSERT_EQ(root.get_str(), expected_str);
-
-	expected_str = "abc123!?$*&()'-=@~";
-	ASSERT_EQ(protocache::SliceCast<char>(root.get_data()), expected_str);
-	root.set_data({});
-	ASSERT_EQ(protocache::SliceCast<char>(root.get_data()), "");
-
-	ASSERT_EQ(-2.1f, root.get_f32());
-	root.set_f32(1.2f);
-	ASSERT_EQ(1.2f, root.get_f32());
-
-	ASSERT_EQ(1.0, root.get_f64());
-	root.set_f64(0.1);
-	ASSERT_EQ(0.1, root.get_f64());
-
-	auto& leaf = *root.get_object();
-	ASSERT_EQ(88, leaf.get_i32());
-	leaf.set_i32(99);
-	ASSERT_EQ(99, leaf.get_i32());
-	ASSERT_FALSE(leaf.get_flag());
-	leaf.set_flag(true);
-	ASSERT_TRUE(leaf.get_flag());
-	expected_str = "tmp";
-	ASSERT_EQ(leaf.get_str(), expected_str);
-	expected_str = "xyz";
-	leaf.set_str(protocache::Slice<char>(expected_str));
-	ASSERT_EQ(leaf.get_str(), expected_str);
-
-	auto& i32v = *root.get_i32v();
-	ASSERT_EQ(i32v.size(), 2);
-	ASSERT_EQ(i32v[0], 1);
-	ASSERT_EQ(i32v[1], 2);
-
-	auto& u64v = *root.get_u64v();
-	ASSERT_EQ(u64v.size(), 1);
-	ASSERT_EQ(u64v[0], 12345678987654321ULL);
+	ASSERT_EQ(root.u64v.size(), 1);
+	ASSERT_EQ(root.u64v[0], 12345678987654321ULL);
 
 	std::vector<std::string> expected_strv = {"abc","apple","banana","orange","pear","grape",
 											  "strawberry","cherry","mango","watermelon"};
-	auto& strv = *root.get_strv();
-	ASSERT_EQ(strv.size(), expected_strv.size());
+
+	ASSERT_EQ(root.strv.size(), expected_strv.size());
 	auto sit = expected_strv.begin();
-	for (const auto& one : strv) {
+	for (const auto& one : root.strv) {
 		ASSERT_EQ(one, *sit++);
 	}
 
-	auto& f32v = *root.get_f32v();
-	ASSERT_EQ(f32v.size(), 2);
-	ASSERT_EQ(f32v[0], 1.1f);
-	ASSERT_EQ(f32v[1], 2.2f);
+	ASSERT_EQ(root.f32v.size(), 2);
+	ASSERT_EQ(root.f32v[0], 1.1f);
+	ASSERT_EQ(root.f32v[1], 2.2f);
 
 	std::vector<double> expected_f64v = {9.9,8.8,7.7,6.6,5.5};
-	auto& f64v = *root.get_f64v();
-	ASSERT_EQ(f64v.size(), expected_f64v.size());
-	for (unsigned i = 0; i < f64v.size(); i++) {
-		ASSERT_EQ(f64v[i], expected_f64v[i]);
+	ASSERT_EQ(root.f64v.size(), expected_f64v.size());
+	for (unsigned i = 0; i < root.f64v.size(); i++) {
+		ASSERT_EQ(root.f64v[i], expected_f64v[i]);
 	}
 
 	std::vector<double> expected_flags = {true,true,false,true,false,false,false};
-	auto& flags = *root.get_flags();
-	ASSERT_EQ(flags.size(), expected_flags.size());
-	for (unsigned i = 0; i < flags.size(); i++) {
-		ASSERT_EQ(flags[i], expected_flags[i]);
+	ASSERT_EQ(root.flags.size(), expected_flags.size());
+	for (unsigned i = 0; i < root.flags.size(); i++) {
+		ASSERT_EQ(root.flags[i], expected_flags[i]);
 	}
 
-	auto& objs = *root.get_objectv();
-	ASSERT_EQ(objs.size(), 3);
-	ASSERT_EQ(objs[0].get_i32(), 1);
-	ASSERT_TRUE(objs[1].get_flag());
-	expected_str = "good luck!";
-	ASSERT_EQ(objs[2].get_str(), expected_str);
+	ASSERT_EQ(root.objectv.size(), 3);
+	ASSERT_EQ(root.objectv[0].i32, 1);
+	ASSERT_TRUE(root.objectv[1].flag);
+	ASSERT_EQ(root.objectv[2].str, "good luck!");
 
-	auto& map1 = *root.get_index();
-	ASSERT_EQ(map1.size(), 6);
-	auto mit = map1.find("abc-1");
-	ASSERT_NE(mit, map1.end());
+	ASSERT_EQ(root.index.size(), 6);
+	auto mit = root.index.find("abc-1");
+	ASSERT_NE(mit, root.index.end());
 	ASSERT_EQ(1, mit->second);
-	mit = map1.find("abc-2");
-	ASSERT_NE(mit, map1.end());
-	ASSERT_EQ(2, mit->second);
-	mit = map1.find("abc-3");
-	ASSERT_EQ(mit, map1.end());
-	mit = map1.find("abc-4");
-	ASSERT_EQ(mit, map1.end());
+	mit  = root.index.find("abc-2");
+	ASSERT_NE(mit, root.index.end());
+	ASSERT_EQ(2,  mit->second);
+	mit = root.index.find("abc-3");
+	ASSERT_EQ(mit, root.index.end());
+	mit  = root.index.find("abc-4");
+	ASSERT_EQ(mit, root.index.end());
 
-	auto& map2 = *root.get_objects();
-	ASSERT_EQ(map2.size(), 4);
-	for (const auto& pair : map2) {
+	ASSERT_EQ(root.objects.size(), 4);
+	for (const auto& pair : root.objects) {
 		ASSERT_NE(pair.first, 0);
-		ASSERT_EQ(pair.first, pair.second.get_i32());
+		ASSERT_EQ(pair.first, pair.second.i32);
 	}
 
-	auto& matrix = *root.get_matrix();
-	ASSERT_EQ(matrix.size(), 3);
-	ASSERT_EQ(matrix[2].size(), 3);
-	ASSERT_EQ(matrix[2][2], 9);
+	ASSERT_EQ(root.matrix.size(), 3);
+	ASSERT_EQ(root.matrix[2].size(), 3);
+	ASSERT_EQ(root.matrix[2][2], 9);
 
-	auto& vector = *root.get_vector();
-	ASSERT_EQ(vector.size(), 2);
-	auto map3 = vector[0];
+	ASSERT_EQ(root.vector.size(), 2);
+	auto& map3 = root.vector[0];
 	ASSERT_EQ(map3.size(), 2);
-	auto mit3 = vector[0].find("lv2");
+	auto mit3 = map3.find("lv2");
 	ASSERT_NE(mit3, map3.end());
 	auto& vec3 = mit3->second;
 	ASSERT_EQ(vec3.size(), 2);
 	ASSERT_EQ(vec3[0], 21);
 	ASSERT_EQ(vec3[1], 22);
 
-	auto& map4 = *root.get_arrays();
-	auto mit4 = map4.find("lv5");
-	ASSERT_NE(mit4, map3.end());
+	auto mit4 = root.arrays.find("lv5");
+	ASSERT_NE(mit4, root.arrays.end());
 	auto& vec4 = mit4->second;
 	ASSERT_EQ(vec4.size(), 2);
 	ASSERT_EQ(vec4[0], 51);

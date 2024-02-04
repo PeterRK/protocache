@@ -4,7 +4,7 @@
 
 #include <cstdio>
 #include <string>
-#include <protocache/utils.h>
+#include "protocache/extension/utils.h"
 #include <google/protobuf/reflection.h>
 #include "test.pb.h"
 #include "common.h"

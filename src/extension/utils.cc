@@ -11,7 +11,7 @@
 #include <google/protobuf/util/json_util.h>
 #include <google/protobuf/compiler/parser.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
-#include "protocache/utils.h"
+#include "protocache/extension/utils.h"
 
 namespace protocache {
 

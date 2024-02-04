@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #include <cstdio>
-#include <protocache/utils.h>
+#include "protocache/extension/utils.h"
 #include <flatbuffers/idl.h>
 #include <flatbuffers/reflection.h>
 #include "test_generated.h"

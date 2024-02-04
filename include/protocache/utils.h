@@ -6,18 +6,147 @@
 #ifndef PROTOCACHE_UTILS_H_
 #define PROTOCACHE_UTILS_H_
 
+#include <cstdint>
+#include <cstring>
 #include <string>
-#include <google/protobuf/message.h>
-#include <google/protobuf/descriptor.pb.h>
+#include <vector>
+#include <atomic>
 
 namespace protocache {
 
-extern bool ParseProto(const std::string& data, google::protobuf::FileDescriptorProto* result, std::string* err=nullptr);
-extern bool ParseProtoFile(const std::string& filename, google::protobuf::FileDescriptorProto* result, std::string* err=nullptr);
+template <typename T>
+class Slice {
+public:
+	Slice() noexcept = default;
+	Slice(const T* p, size_t l) noexcept : ptr_(p), len_(l) {}
 
-extern bool LoadFile(const std::string& path, std::string* out);
+	explicit Slice(const std::basic_string<T>& v) noexcept : ptr_(v.data()), len_(v.size()) {}
+	explicit Slice(const std::vector<T>& v) noexcept : ptr_(v.data()), len_(v.size()) {}
 
-extern bool LoadJson(const std::string& path, google::protobuf::Message* message);
+	bool operator!() const noexcept {
+		return ptr_ == nullptr;
+	}
+	const T& operator[](unsigned pos) const noexcept {
+		return ptr_[pos];
+	}
+	const T* begin() const noexcept {
+		return ptr_;
+	}
+	const T* end() const noexcept {
+		return ptr_ + len_;
+	}
+	const T* data() const noexcept {
+		return ptr_;
+	}
+	size_t size() const noexcept {
+		return len_;
+	}
+
+private:
+	const T* ptr_ = nullptr;
+	size_t len_ = 0;
+};
+
+static inline bool operator==(const Slice<char>& a, const Slice<char>& b) noexcept {
+	return a.size() == b.size() && (a.data() == b.data() ||
+									memcmp(a.data(), b.data(), a.size()) == 0);
+}
+
+static inline bool operator!=(const Slice<char>& a, const Slice<char>& b) noexcept {
+	return !(a == b);
+}
+
+static inline bool operator==(const Slice<char>& a, const std::string& b) noexcept {
+	return a == Slice<char>(b);
+}
+
+static inline bool operator!=(const Slice<char>& a, const std::string& b) noexcept {
+	return a != Slice<char>(b);
+}
+
+static inline bool operator==(const std::string& a, const Slice<char>& b) noexcept {
+	return b == a;
+}
+
+static inline bool operator!=(const std::string& a, const Slice<char>& b) noexcept {
+	return b != a;
+}
+
+template <typename T>
+class Ref final {
+private:
+	struct Object {
+		std::atomic<uintptr_t> ref;
+		T obj;
+	};
+	Object* ptr_ = nullptr;
+
+public:
+	Ref() = default;
+	~Ref() noexcept {
+		if (ptr_ != nullptr && --ptr_->ref == 0) {
+			ptr_->obj.~T();
+			::operator delete(ptr_);
+		}
+	}
+	Ref(const Ref& other) noexcept : ptr_(other.ptr_) {
+		if (ptr_ != nullptr) {
+			ptr_->ref++;
+		}
+	}
+	Ref(Ref&& other) noexcept : ptr_(other.ptr_) {
+		other.ptr_ = nullptr;
+	}
+	Ref<T>& operator=(const Ref<T>& other) noexcept {
+		if (&other != this) {
+			this->~Ref<T>();
+			new(this)Ref(other);
+		}
+		return *this;
+	}
+	Ref<T>& operator=(Ref<T>&& other) noexcept {
+		if (&other != this) {
+			this->~Ref<T>();
+			new(this)Ref(std::move(other));
+		}
+		return *this;
+	}
+
+	bool operator==(std::nullptr_t) const noexcept {
+		return ptr_ == nullptr;
+	}
+	T& operator*() const noexcept {
+		return ptr_->obj;
+	}
+	T* operator->() const noexcept {
+		return &ptr_->obj;
+	}
+	T* get() const noexcept {
+		return &ptr_->obj;
+	}
+
+	template <typename... Args>
+	static Ref New(Args&&... args) {
+		Ref out;
+		out.ptr_ = reinterpret_cast<Object*>(::operator new(sizeof(Object)));
+		out.ptr_->ref = 1;
+		new(&out.ptr_->obj)T(std::forward<Args>(args)...);
+		return out;
+	}
+};
+
+using Data = std::basic_string<uint32_t>;
+using SharedData = Ref<Data>;
+
+static inline constexpr size_t WordSize(size_t sz) noexcept {
+	return (sz+3)/4;
+}
+
+template<typename D, typename S>
+static inline constexpr Slice<D> SliceCast(const Slice<S>& src) noexcept {
+	static_assert(std::is_scalar<D>::value && std::is_scalar<S>::value && sizeof(D) == sizeof(S), "");
+	return {reinterpret_cast<const D*>(src.data()), src.size()};
+}
 
 } // protocache
 #endif //PROTOCACHE_UTILS_H_

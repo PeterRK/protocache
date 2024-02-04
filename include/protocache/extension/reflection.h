@@ -3,8 +3,8 @@
 // license that can be found in the LICENSE file.
 
 #pragma once
-#ifndef PROTOCACHE_REFLECTION_H_
-#define PROTOCACHE_REFLECTION_H_
+#ifndef PROTOCACHE_EXT_REFLECTION_H_
+#define PROTOCACHE_EXT_REFLECTION_H_
 
 #include <cstdint>
 #include <string>
@@ -74,4 +74,4 @@ private:
 
 } // reflection
 } // protocache
-#endif //PROTOCACHE_REFLECTION_H_
+#endif //PROTOCACHE_EXT_REFLECTION_H_

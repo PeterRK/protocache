@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include "utils.h"
 #include "perfect_hash.h"
 
 namespace protocache {
@@ -16,16 +17,6 @@ namespace protocache {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error "little endian only"
 #endif
-
-static inline constexpr size_t WordSize(size_t sz) noexcept {
-	return (sz+3)/4;
-}
-
-template<typename D, typename S>
-static inline constexpr Slice<D> SliceCast(const Slice<S>& src) noexcept {
-	static_assert(std::is_scalar<D>::value && std::is_scalar<S>::value && sizeof(D) == sizeof(S), "");
-	return {reinterpret_cast<const D*>(src.data()), src.size()};
-}
 
 using EnumValue = int32_t;
 
@@ -228,37 +219,9 @@ public:
 		Field operator*() const noexcept {
 			return Field(ptr_, width_);
 		}
-		Iterator& operator+=(ptrdiff_t step) noexcept {
-			ptr_ += static_cast<ptrdiff_t>(width_) * step;
-			return *this;
-		}
-		Iterator& operator-=(ptrdiff_t step) noexcept {
-			ptr_ -= static_cast<ptrdiff_t>(width_) * step;
-			return *this;
-		}
-		Iterator operator+(ptrdiff_t step) noexcept {
-			return {ptr_ + static_cast<ptrdiff_t>(width_) * step, width_};
-		}
-		Iterator operator-(ptrdiff_t step) noexcept {
-			return {ptr_ - static_cast<ptrdiff_t>(width_) * step, width_};
-		}
 		Iterator& operator++() noexcept {
 			ptr_ += width_;
 			return *this;
-		}
-		Iterator& operator--() noexcept {
-			ptr_ -= width_;
-			return *this;
-		}
-		Iterator operator++(int) noexcept {
-			auto old = *this;
-			ptr_ += width_;
-			return old;
-		}
-		Iterator operator--(int) noexcept {
-			auto old = *this;
-			ptr_ -= width_;
-			return old;
 		}
 
 	private:
@@ -367,37 +330,9 @@ public:
 		Pair operator*() const noexcept {
 			return Pair(ptr_, key_width_, value_width_);
 		}
-		Iterator& operator+=(ptrdiff_t step) noexcept {
-			ptr_ += static_cast<ptrdiff_t>(key_width_ + value_width_) * step;
-			return *this;
-		}
-		Iterator& operator-=(ptrdiff_t step) noexcept {
-			ptr_ -= static_cast<ptrdiff_t>(key_width_ + value_width_) * step;
-			return *this;
-		}
-		Iterator operator+(ptrdiff_t step) noexcept {
-			return {ptr_ + static_cast<ptrdiff_t>(key_width_ + value_width_) * step, key_width_, value_width_};
-		}
-		Iterator operator-(ptrdiff_t step) noexcept {
-			return {ptr_ - static_cast<ptrdiff_t>(key_width_ + value_width_) * step, key_width_, value_width_};
-		}
 		Iterator& operator++() noexcept {
 			ptr_ += key_width_ + value_width_;
 			return *this;
-		}
-		Iterator& operator--() noexcept {
-			ptr_ -= key_width_ + value_width_;
-			return *this;
-		}
-		Iterator operator++(int) noexcept {
-			auto old = *this;
-			ptr_ += key_width_ + value_width_;
-			return old;
-		}
-		Iterator operator--(int) noexcept {
-			auto old = *this;
-			ptr_ -= key_width_ + value_width_;
-			return old;
 		}
 
 	private:
@@ -487,7 +422,7 @@ public:
 		return !core_;
 	}
 
-	T Get(const uint32_t* end=nullptr) const noexcept;
+	T Get(const uint32_t* end=nullptr) const;
 
 private:
 	Field core_;
@@ -502,57 +437,57 @@ private:
 };
 
 template <>
-inline bool FieldT<bool>::Get(const uint32_t*) const noexcept {
+inline bool FieldT<bool>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline int32_t FieldT<int32_t>::Get(const uint32_t*) const noexcept {
+inline int32_t FieldT<int32_t>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline uint32_t FieldT<uint32_t>::Get(const uint32_t*) const noexcept {
+inline uint32_t FieldT<uint32_t>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline int64_t FieldT<int64_t>::Get(const uint32_t*) const noexcept {
+inline int64_t FieldT<int64_t>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline float FieldT<float>::Get(const uint32_t*) const noexcept {
+inline float FieldT<float>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline double FieldT<double>::Get(const uint32_t*) const noexcept {
+inline double FieldT<double>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline uint64_t FieldT<uint64_t>::Get(const uint32_t*) const noexcept {
+inline uint64_t FieldT<uint64_t>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline Slice<char> FieldT<Slice<char>>::Get(const uint32_t* end) const noexcept {
+inline Slice<char> FieldT<Slice<char>>::Get(const uint32_t* end) const {
 	return String(core_.GetObject(end), end).Get();
 }
 
 template <>
-inline Slice<uint8_t> FieldT<Slice<uint8_t>>::Get(const uint32_t* end) const noexcept {
+inline Slice<uint8_t> FieldT<Slice<uint8_t>>::Get(const uint32_t* end) const {
 	return String(core_.GetObject(end), end).GetBytes();
 }
 
 template <>
-inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const noexcept {
+inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const {
 	return String(core_.GetObject(end), end).GetBoolArray();
 }
 
 template <typename T>
-inline T FieldT<T>::Get(const uint32_t* end) const noexcept {
+inline T FieldT<T>::Get(const uint32_t* end) const {
 	return T(core_.GetObject(end), end);
 }
 
@@ -578,33 +513,9 @@ public:
 		bool operator!=(const Iterator& other) const noexcept {
 			return core_ != other.core_;
 		}
-		Iterator& operator+=(ptrdiff_t step) noexcept {
-			core_ += step;
-			return *this;
-		}
-		Iterator& operator-=(ptrdiff_t step) noexcept {
-			core_ -= step;
-			return *this;
-		}
-		Iterator operator+(ptrdiff_t step) noexcept {
-			return Iterator(core_ + step);
-		}
-		Iterator operator-(ptrdiff_t step) noexcept {
-			return Iterator(core_ - step);
-		}
 		Iterator& operator++() noexcept {
 			++core_;
 			return *this;
-		}
-		Iterator& operator--() noexcept {
-			--core_;
-			return *this;
-		}
-		Iterator operator++(int) noexcept {
-			return Iterator(core_++);
-		}
-		Iterator operator--(int) noexcept {
-			return Iterator(core_--);
 		}
 
 		T Get(const uint32_t* end=nullptr) const noexcept {
@@ -744,33 +655,9 @@ public:
 		bool operator!=(const Iterator& other) const noexcept {
 			return core_ != other.core_;
 		}
-		Iterator& operator+=(ptrdiff_t step) noexcept {
-			core_ += step;
-			return *this;
-		}
-		Iterator& operator-=(ptrdiff_t step) noexcept {
-			core_ -= step;
-			return *this;
-		}
-		Iterator operator+(ptrdiff_t step) noexcept {
-			return Iterator(core_ + step);
-		}
-		Iterator operator-(ptrdiff_t step) noexcept {
-			return Iterator(core_ - step);
-		}
 		Iterator& operator++() noexcept {
 			++core_;
 			return *this;
-		}
-		Iterator& operator--() noexcept {
-			--core_;
-			return *this;
-		}
-		Iterator operator++(int) noexcept {
-			return Iterator(core_++);
-		}
-		Iterator operator--(int) noexcept {
-			return Iterator(core_--);
 		}
 
 		PairT<K,V> operator*() const noexcept {
