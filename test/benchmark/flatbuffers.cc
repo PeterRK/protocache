@@ -330,7 +330,7 @@ int BenchmarkFlatBuffersReflect() {
 	}
 	auto delta_ms = DeltaMs(start);
 
-	printf("flatbuffers: %luB %ldms %016lx\n", raw.size(), delta_ms, junk.Fuse());
+	printf("flatbuffers-reflect: %luB %ldms %016lx\n", raw.size(), delta_ms, junk.Fuse());
 	return 0;
 }
 

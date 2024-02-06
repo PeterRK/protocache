@@ -11,14 +11,13 @@
 #include <unordered_map>
 #include <protocache/access-ex.h>
 
-
+namespace ex {
 namespace test {
 
-struct Small_EX final {
-	Small_EX() = default;
-	Small_EX(const uint32_t* data, const uint32_t* end);
-	explicit Small_EX(const protocache::Slice<uint32_t>& data) : Small_EX(data.begin(), data.end()) {};
-	explicit Small_EX(const protocache::Data& data) : Small_EX(protocache::Slice<uint32_t>(data)) {};
+struct Small final {
+	Small() = default;
+	Small(const uint32_t* data, const uint32_t* end);
+	explicit Small(const protocache::Slice<uint32_t>& data) : Small(data.begin(), data.end()) {};
 
 	protocache::Data Serialize() const;
 
@@ -27,27 +26,26 @@ struct Small_EX final {
 	std::string str;
 };
 
-struct Vec2D_EX {
-	struct Vec1D_EX {
+struct Vec2D {
+	struct Vec1D {
 		using ALIAS = protocache::ArrayEX<float>;
 	};
 
-	using ALIAS = protocache::ArrayEX<::test::Vec2D_EX::Vec1D_EX::ALIAS>;
+	using ALIAS = protocache::ArrayEX<::ex::test::Vec2D::Vec1D::ALIAS>;
 };
 
-struct ArrMap_EX {
-	struct Array_EX {
+struct ArrMap {
+	struct Array {
 		using ALIAS = protocache::ArrayEX<float>;
 	};
 
-	using ALIAS = protocache::MapEX<protocache::Slice<char>,::test::ArrMap_EX::Array_EX::ALIAS>;
+	using ALIAS = protocache::MapEX<protocache::Slice<char>,::ex::test::ArrMap::Array::ALIAS>;
 };
 
-struct Main_EX final {
-	Main_EX() = default;
-	Main_EX(const uint32_t* data, const uint32_t* end);
-	explicit Main_EX(const protocache::Slice<uint32_t>& data) : Main_EX(data.begin(), data.end()) {};
-	explicit Main_EX(const protocache::Data& data) : Main_EX(protocache::Slice<uint32_t>(data)) {};
+struct Main final {
+	Main() = default;
+	Main(const uint32_t* data, const uint32_t* end);
+	explicit Main(const protocache::Slice<uint32_t>& data) : Main(data.begin(), data.end()) {};
 
 	protocache::Data Serialize() const; //TODO
 
@@ -61,7 +59,7 @@ struct Main_EX final {
 	std::string data;
 	float f32 = 0;
 	double f64 = 0;
-	Small_EX object;
+	::ex::test::Small object;
 	protocache::ArrayEX<int32_t> i32v;
 	protocache::ArrayEX<uint64_t> u64v;
 	protocache::ArrayEX<protocache::Slice<char>> strv;
@@ -69,7 +67,7 @@ struct Main_EX final {
 	protocache::ArrayEX<float> f32v;
 	protocache::ArrayEX<double> f64v;
 	protocache::ArrayEX<bool> flags;
-	protocache::ArrayEX<::test::Small_EX> objectv;
+	protocache::ArrayEX<::ex::test::Small> objectv;
 	uint32_t t_u32 = 0;
 	int32_t t_i32 = 0;
 	int32_t t_s32 = 0;
@@ -77,11 +75,12 @@ struct Main_EX final {
 	int64_t t_i64 = 0;
 	int64_t t_s64 = 0;
 	protocache::MapEX<protocache::Slice<char>,int32_t> index;
-	protocache::MapEX<int32_t,::test::Small_EX> objects;
-	Vec2D_EX::ALIAS matrix;
-	protocache::ArrayEX<::test::ArrMap_EX::ALIAS> vector;
-	ArrMap_EX::ALIAS arrays;
+	protocache::MapEX<int32_t,::ex::test::Small> objects;
+	::ex::test::Vec2D::ALIAS matrix;
+	protocache::ArrayEX<::ex::test::ArrMap::ALIAS> vector;
+	::ex::test::ArrMap::ALIAS arrays;
 };
 
 } // test
+} // ex
 #endif // PROTOCACHE_INCLUDED_EX_test_proto

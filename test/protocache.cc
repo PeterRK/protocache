@@ -78,10 +78,7 @@ static protocache::Data SerializeByProtobuf() {
 	return protocache::Serialize(*message);
 }
 
-TEST(PtotoCache, Basic) {
-	auto data = SerializeByProtobuf();
-	ASSERT_EQ(195, data.size());
-
+static void TestProtoCacheAccess(const protocache::Data& data) {
 	auto end = data.data() + data.size();
 	test::Main root(data.data());
 	ASSERT_FALSE(!root);
@@ -214,6 +211,12 @@ TEST(PtotoCache, Basic) {
 	ASSERT_EQ(vec[1], 52);
 }
 
+TEST(PtotoCache, Basic) {
+	auto data = SerializeByProtobuf();
+	ASSERT_EQ(195, data.size());
+	TestProtoCacheAccess(data);
+}
+
 TEST(PtotoCache, Reflection) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
@@ -320,7 +323,8 @@ TEST(PtotoCacheEX, Basic) {
 	auto data = SerializeByProtobuf();
 	ASSERT_FALSE(data.empty());
 
-	test::Main_EX root(data);
+	protocache::Slice<uint32_t> view(data);
+	::ex::test::Main root(view);
 
 	ASSERT_EQ(-999, root.i32);
 	ASSERT_EQ(1234, root.u32);
@@ -414,6 +418,14 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(vec4[1], 52);
 }
 
-//TEST(PtotoCacheEX, Serialize) {
-	//TODO
-//}
+TEST(PtotoCacheEX, Serialize) {
+	auto data = SerializeByProtobuf();
+	ASSERT_FALSE(data.empty());
+
+	protocache::Slice<uint32_t> view(data);
+	::ex::test::Main root(view);
+	auto mirror = root.Serialize();
+	ASSERT_EQ(data.size(), mirror.size());
+
+	TestProtoCacheAccess(mirror);
+}

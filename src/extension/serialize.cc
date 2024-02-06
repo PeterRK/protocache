@@ -139,12 +139,47 @@ static Data SerializeField(const google::protobuf::Message& message, const googl
 			return Serialize(reflection->GetBool(message, field));
 
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
-			return Serialize<int32_t>(reflection->GetEnumValue(message, field));
+			return SerializeScalar<int32_t>(reflection->GetEnumValue(message, field));
 
 		default:
 			return {};
 	}
 }
+
+class ScalarReader : public KeyReader {
+public:
+	explicit ScalarReader(const std::vector<Data>& keys) : keys_(keys) {}
+
+	void Reset() override {
+		idx_ = 0;
+	}
+	size_t Total() override {
+		return keys_.size();
+	}
+	Slice<uint8_t> Read() override {
+		if (idx_ >= keys_.size()) {
+			return {};
+		}
+		auto& key = keys_[idx_++];
+		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()*4};
+	}
+
+protected:
+	const std::vector<Data>& keys_;
+	size_t idx_ = 0;
+};
+
+struct StringReader : public ScalarReader {
+	explicit StringReader(const std::vector<Data>& keys) : ScalarReader(keys) {}
+
+	Slice<uint8_t> Read() override {
+		if (idx_ >= keys_.size()) {
+			return {};
+		}
+		auto& key = keys_[idx_++];
+		return String(key.data()).GetBytes();
+	}
+};
 
 static Data SerializeMapField(const google::protobuf::Message& message, const google::protobuf::FieldDescriptor* field) {
 	assert(field->is_map());
@@ -173,8 +208,6 @@ static Data SerializeMapField(const google::protobuf::Message& message, const go
 			return {};
 		}
 	}
-
-
 
 	PerfectHash index;
 	auto build = [&index, &keys, &values](KeyReader& reader) {
@@ -296,14 +329,6 @@ Data Serialize(const google::protobuf::Message& message) {
 		}
 	}
 
-	while (!parts.empty() && parts.back().empty()) {
-		parts.pop_back();
-	}
-
-	if (parts.empty()) {
-		Data out = {0};
-		return out;
-	}
 	if (fields.size() == 1 && fields[0]->name() == "_") {
 		return parts[0];	// trim message wrapper
 	}

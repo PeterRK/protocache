@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <chrono>
+#include <string>
 
 static inline uint32_t JunkHash(const void* data, size_t len) {
 	uint32_t out = 0;
@@ -14,6 +15,10 @@ static inline uint32_t JunkHash(const void* data, size_t len) {
 		out ^= *p++;
 	}
 	return out;
+}
+
+static inline uint32_t JunkHash(const std::string& data) {
+	return JunkHash(data.data(), data.size());
 }
 
 struct Junk {
@@ -46,5 +51,8 @@ extern int BenchmarkProtoCacheReflect();
 extern int BenchmarkFlatBuffers();
 extern int BenchmarkFlatBuffersReflect();
 
-
+extern int BenchmarkProtobufSerialize();
+extern int BenchmarkProtoCacheSerializeReflect();
+extern int BenchmarkProtoCacheEX();
+extern int BenchmarkProtoCacheSerialize();
 

@@ -15,6 +15,8 @@
 #include <vector>
 #include <unordered_map>
 #include "access.h"
+#include "serialize.h"
+#include "perfect_hash.h"
 
 namespace protocache {
 
@@ -35,25 +37,31 @@ class ArrayEX final {
 private:
 	using TypeEX = typename Adapter<T>::TypeEX;
 	using Iterator = typename std::vector<TypeEX>::iterator;
+	using ConstIterator = typename std::vector<TypeEX>::const_iterator;
 	std::vector<TypeEX> core_;
 
 public:
 	ArrayEX() = default;
 	ArrayEX(const uint32_t* data, const uint32_t* end);
 
-	Data Serialize() const; //TODO
+	Data Serialize() const;
 
 	size_t size() const noexcept { return core_.size(); }
 	bool empty() const noexcept { return core_.empty(); }
 	void clear() noexcept { core_.clear(); }
 	void reserve(size_t n) { core_.reserve(n); }
 	void resize(size_t n) { core_.resize(n); }
-	Iterator begin() { return core_.begin(); }
-	Iterator end() { return core_.end(); }
-	TypeEX& operator[](size_t pos) { return core_[pos]; }
-	TypeEX& front() { return core_.front(); }
-	TypeEX& back() { return core_.back(); }
-	void pop_back() { core_.push_back(); }
+	Iterator begin() noexcept { return core_.begin(); }
+	ConstIterator begin() const noexcept { return core_.begin(); }
+	Iterator end() noexcept { return core_.end(); }
+	ConstIterator end() const noexcept { return core_.end(); }
+	TypeEX& operator[](size_t pos) noexcept { return core_[pos]; }
+	const TypeEX& operator[](size_t pos) const noexcept { return core_[pos]; }
+	TypeEX& front() noexcept { return core_.front(); }
+	const TypeEX& front() const noexcept { return core_.front(); }
+	TypeEX& back() noexcept { return core_.back(); }
+	const TypeEX& back() const noexcept { return core_.back(); }
+	void pop_back() noexcept { core_.push_back(); }
 
 	template< class... Args >
 	void emplace_back(Args&&... args) {
@@ -66,6 +74,57 @@ template <> inline ArrayEX<bool>::ArrayEX(const uint32_t* data, const uint32_t* 
 	core_.resize(view.size());
 	memcpy(core_.data(), view.data(), view.size());
 }
+template <> inline Data ArrayEX<bool>::Serialize() const {
+	return ::protocache::Serialize(Slice<uint8_t>(core_));
+}
+
+template <> inline ArrayEX<int32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<int32_t>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<int32_t>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
+
+template <> inline ArrayEX<uint32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<uint32_t>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<uint32_t>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
+
+template <> inline ArrayEX<int64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<int64_t>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<int64_t>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
+
+template <> inline ArrayEX<uint64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<uint64_t>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<uint64_t>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
+
+template <> inline ArrayEX<float>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<float>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<float>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
+
+template <> inline ArrayEX<double>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = Array(data, end).Numbers<double>();
+	core_.assign(view.begin(), view.end());
+}
+template <> inline Data ArrayEX<double>::Serialize() const {
+	return ::protocache::SerializeScalarArray(core_);
+}
 
 template <> inline ArrayEX<protocache::Slice<char>>::ArrayEX(const uint32_t* data, const uint32_t* end) {
 	auto view = ArrayT<protocache::Slice<char>>(data, end);
@@ -75,37 +134,31 @@ template <> inline ArrayEX<protocache::Slice<char>>::ArrayEX(const uint32_t* dat
 	}
 }
 
-template <> inline ArrayEX<int32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<int32_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline ArrayEX<uint32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<uint32_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline ArrayEX<int64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<int64_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline ArrayEX<uint64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<uint64_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline ArrayEX<float>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<float>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline ArrayEX<double>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<double>();
-	core_.assign(view.begin(), view.end());
-}
-
-template <typename T> inline ArrayEX<T>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+template <typename T>
+inline ArrayEX<T>::ArrayEX(const uint32_t* data, const uint32_t* end) {
 	auto view = Array(data, end);
 	core_.reserve(view.Size());
 	for (auto field : view) {
 		core_.emplace_back(field.GetObject(), end);
 	}
+}
+
+template <typename T>
+static inline Data Serialize(const T& obj) {
+	return obj.Serialize();
+}
+
+template <typename T>
+inline Data ArrayEX<T>::Serialize() const {
+	std::vector<Data> elements;
+	elements.reserve(core_.size());
+	for (auto& one : core_) {
+		elements.push_back(::protocache::Serialize(one));
+		if (elements.back().empty()) {
+			return {};
+		}
+	}
+	return ::protocache::SerializeArray(elements);
 }
 
 template <typename T>
@@ -129,12 +182,66 @@ static inline void ExtractField(const Message& message, unsigned id, const uint3
 	out->assign(view.data(), view.size());
 }
 
+template <typename K, typename V>
+class _MapKeyReader : public KeyReader {
+public:
+	static_assert(sizeof(K) >= 4, "");
+	explicit _MapKeyReader(const std::unordered_map<K,V>& core)
+		: core_(core), it_(core.begin()) {}
+
+	void Reset() override {
+		it_ = core_.begin();
+	}
+	size_t Total() override {
+		return core_.size();
+	}
+	Slice<uint8_t> Read() override {
+		if (it_ == core_.end()) {
+			return {};
+		}
+		auto& key = it_->first;
+		++it_;
+		return {reinterpret_cast<const uint8_t*>(&key), sizeof(K)};
+	}
+
+private:
+	const std::unordered_map<K,V>& core_;
+	typename std::unordered_map<K,V>::const_iterator it_;
+};
+
+template <typename V>
+class _MapKeyReader<std::string, V> : public KeyReader {
+public:
+	explicit _MapKeyReader(const std::unordered_map<std::string,V>& core)
+			: core_(core), it_(core.begin()) {}
+
+	void Reset() override {
+		it_ = core_.begin();
+	}
+	size_t Total() override {
+		return core_.size();
+	}
+	Slice<uint8_t> Read() override {
+		if (it_ == core_.end()) {
+			return {};
+		}
+		auto& key = it_->first;
+		++it_;
+		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
+	}
+
+private:
+	const std::unordered_map<std::string,V>& core_;
+	typename std::unordered_map<std::string,V>::const_iterator it_;
+};
+
 template <typename Key, typename Val>
 class MapEX final {
 private:
 	using KeyEX = typename Adapter<Key>::TypeEX;
 	using ValEX = typename Adapter<Val>::TypeEX;
 	using Iterator = typename std::unordered_map<KeyEX,ValEX>::iterator;
+	using ConstIterator = typename std::unordered_map<KeyEX,ValEX>::const_iterator;
 	std::unordered_map<KeyEX,ValEX> core_;
 
 public:
@@ -149,15 +256,40 @@ public:
 		}
 	}
 
-	Data Serialize() const; //TODO
+	Data Serialize() const {
+		_MapKeyReader<KeyEX,ValEX> reader(core_);
+		auto index = PerfectHash::Build(reader, true);
+		if (!index) {
+			return {};
+		}
+		std::vector<Data> keys(core_.size());
+		std::vector<Data> values(core_.size());
+		reader.Reset();
+		for (auto& pair : core_) {
+			auto key = reader.Read();
+			auto pos = index.Locate(key.data(), key.size());
+			keys[pos] = ::protocache::Serialize(pair.first);
+			if (keys[pos].empty()) {
+				return {};
+			}
+			values[pos] = ::protocache::Serialize(pair.second);
+			if (values[pos].empty()) {
+				return {};
+			}
+		}
+		return ::protocache::SerializeMap(index.Data(), keys, values);
+	}
 
 	size_t size() const noexcept { return core_.size(); }
 	bool empty() const noexcept { return core_.empty(); }
 	void clear() noexcept { core_.clear(); }
 	void reserve(size_t n) { core_.reserve(n); }
 	Iterator find(const KeyEX& key) { return core_.find(key); }
-	Iterator begin() { return core_.begin(); }
-	Iterator end() { return core_.end(); }
+	ConstIterator find(const KeyEX& key) const { return core_.find(key); }
+	Iterator begin() noexcept { return core_.begin(); }
+	ConstIterator begin() const noexcept { return core_.begin(); }
+	Iterator end() noexcept { return core_.end(); }
+	ConstIterator end() const noexcept { return core_.end(); }
 	Iterator erase(Iterator pos) { return core_.erase(pos); }
 	bool erase(const KeyEX& key) { return core_.erase(key) != 0; }
 

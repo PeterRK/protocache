@@ -72,71 +72,7 @@ static inline bool operator!=(const std::string& a, const Slice<char>& b) noexce
 	return b != a;
 }
 
-template <typename T>
-class Ref final {
-private:
-	struct Object {
-		std::atomic<uintptr_t> ref;
-		T obj;
-	};
-	Object* ptr_ = nullptr;
-
-public:
-	Ref() = default;
-	~Ref() noexcept {
-		if (ptr_ != nullptr && --ptr_->ref == 0) {
-			ptr_->obj.~T();
-			::operator delete(ptr_);
-		}
-	}
-	Ref(const Ref& other) noexcept : ptr_(other.ptr_) {
-		if (ptr_ != nullptr) {
-			ptr_->ref++;
-		}
-	}
-	Ref(Ref&& other) noexcept : ptr_(other.ptr_) {
-		other.ptr_ = nullptr;
-	}
-	Ref<T>& operator=(const Ref<T>& other) noexcept {
-		if (&other != this) {
-			this->~Ref<T>();
-			new(this)Ref(other);
-		}
-		return *this;
-	}
-	Ref<T>& operator=(Ref<T>&& other) noexcept {
-		if (&other != this) {
-			this->~Ref<T>();
-			new(this)Ref(std::move(other));
-		}
-		return *this;
-	}
-
-	bool operator==(std::nullptr_t) const noexcept {
-		return ptr_ == nullptr;
-	}
-	T& operator*() const noexcept {
-		return ptr_->obj;
-	}
-	T* operator->() const noexcept {
-		return &ptr_->obj;
-	}
-	T* get() const noexcept {
-		return &ptr_->obj;
-	}
-
-	template <typename... Args>
-	static Ref New(Args&&... args) {
-		Ref out;
-		out.ptr_ = reinterpret_cast<Object*>(::operator new(sizeof(Object)));
-		out.ptr_->ref = 1;
-		new(&out.ptr_->obj)T(std::forward<Args>(args)...);
-		return out;
-	}
-};
-
 using Data = std::basic_string<uint32_t>;
-using SharedData = Ref<Data>;
 
 static inline constexpr size_t WordSize(size_t sz) noexcept {
 	return (sz+3)/4;

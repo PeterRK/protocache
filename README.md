@@ -34,15 +34,28 @@ protoc --pccx_out=. test.proto
 ```
 A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-gen-pccx.cc) to generate header-only C++ file. The generated file is short and human friendly. Howerver, there is a known flaw that type declaration order may break C++ compilation. Don't mind to edit it if nessasery.
 
-## Basic APIs
+## APIs
 ```cpp
-auto data = protocache::Serialize(pb_message);
+auto data = protocache::SerializeScalar(pb_message);
 ASSERT_FALSE(data.empty());
 
+// =========basic api=========
 test::Main root(data.data());
 ASSERT_FALSE(!root);
+
+// =========extra api=========
+protocache::Slice<uint32_t> view(data);
+::ex::test::Main root(view);
+
+auto copy = root.Serialize();
+ASSERT_EQ(data.size(), copy.size());
 ```
-Serializing a protobuf message with protocache::Serialize is the only way to create protocache binary at present. It's easy to access by wrapping the data with generated code.
+You can create protocache binary by serializing a protobuf message with protocache::Serialize. The Basic API offers fast read-only access with zero-copy technique. Extra APIs provide a mutable object and another serialization method.
+
+| | Protobuf | ProtoCacheEX | ProtoCache |
+|:-------|----:|----:|----:|
+| Serialize (1 million times) | 984ms | 3898ms | 13816ms |
+| Decode + Traverse + Dealloc (1 million times) | 3237ms | 2398ms | 251ms |
 
 ## Reflection
 ```cpp

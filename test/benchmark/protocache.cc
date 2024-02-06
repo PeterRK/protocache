@@ -6,6 +6,7 @@
 #include "protocache/extension/utils.h"
 #include "protocache/extension/reflection.h"
 #include "test.pc.h"
+#include "test.pc-ex.h"
 #include "common.h"
 
 static inline uint32_t JunkHash(const protocache::Slice<char>& data) {
@@ -23,6 +24,9 @@ struct Junk2 : public Junk {
 	void Access(const protocache::reflection::Field& descriptor, protocache::Field field);
 	void Traverse(const protocache::reflection::Field& descriptor, protocache::Field field);
 	void Traverse(const protocache::reflection::Descriptor& descriptor, protocache::Message root);
+
+	void Traverse(const ::ex::test::Small& root);
+	void Traverse(const ::ex::test::Main& root);
 };
 
 inline void Junk2::Traverse(const ::test::Small& root) {
@@ -260,6 +264,80 @@ void Junk2::Traverse(const protocache::reflection::Descriptor& descriptor, proto
 	}
 }
 
+void Junk2::Traverse(const ::ex::test::Small& root) {
+	u32 += root.i32 + root.flag;
+	u32 += JunkHash(root.str);
+}
+
+void Junk2::Traverse(const ::ex::test::Main& root) {
+	u32 += root.i32 + root.u32 + root.flag + root.mode;
+	u32 += root.t_i32 + root.t_s32 + root.t_u32;
+	for (auto v : root.i32v) {
+		u32 += v;
+	}
+	for (auto v : root.flags) {
+		u32 += v;
+	}
+	u32 += JunkHash(root.str);
+	u32 += JunkHash(root.data);
+	for (auto& v : root.strv) {
+		u32 += JunkHash(v);
+	}
+	for (auto& v : root.datav) {
+		u32 += JunkHash(v);
+	}
+
+	u64 += root.i64 + root.u64;
+	u64 += root.t_i64 + root.t_s64 + root.t_u64;
+	for (auto v : root.u64v) {
+		u64 += v;
+	}
+
+	f32 += root.f32;
+	for (auto v : root.f32v) {
+		f32 += v;
+	}
+
+	f64 += root.f64;
+	for (auto v : root.f64v) {
+		f64 += v;
+	}
+
+	Traverse(root.object);
+	for (auto& v : root.objectv) {
+		Traverse(v);
+	}
+
+	for (auto& p : root.index) {
+		u32 += JunkHash(p.first) + p.second;
+	}
+
+	for (auto p : root.objects) {
+		u32 += p.first;
+		Traverse(p.second);
+	}
+
+	for (auto& u : root.matrix) {
+		for (auto v : u) {
+			f32 += v;
+		}
+	}
+	for (auto& u : root.vector) {
+		for (auto& p : u) {
+			u32 += JunkHash(p.first);
+			for (auto v : p.second) {
+				f32 += v;
+			}
+		}
+	}
+	for (auto& p : root.arrays) {
+		u32 += JunkHash(p.first);
+		for (auto v : p.second) {
+			f32 += v;
+		}
+	}
+}
+
 int BenchmarkProtoCache() {
 	std::string raw;
 	if (!protocache::LoadFile("test.pc", &raw)) {
@@ -312,5 +390,47 @@ int BenchmarkProtoCacheReflect() {
 	auto delta_ms = DeltaMs(start);
 
 	printf("protocache-reflect: %ldms %016lx\n", delta_ms, junk.Fuse());
+	return 0;
+}
+
+int BenchmarkProtoCacheEX() {
+	std::string raw;
+	if (!protocache::LoadFile("test.pc", &raw)) {
+		puts("fail to load test.pc");
+		return -1;
+	}
+	Junk2 junk;
+
+	protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t*>(raw.data()), raw.size()/4);
+
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		::ex::test::Main root(view);
+		junk.Traverse(root);
+	}
+	auto delta_ms = DeltaMs(start);
+
+	printf("protocache-ex: %luB %ldms %016lx\n", raw.size(), delta_ms, junk.Fuse());
+	return 0;
+}
+
+int BenchmarkProtoCacheSerialize() {
+	std::string raw;
+	if (!protocache::LoadFile("test.pc", &raw)) {
+		puts("fail to load test.pc");
+		return -1;
+	}
+
+	protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t*>(raw.data()), raw.size()/4);
+	::ex::test::Main root(view);
+
+	unsigned cnt = 0;
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		cnt += root.Serialize().size();
+	}
+	auto delta_ms = DeltaMs(start);
+
+	printf("protocache: %ldms %x\n", delta_ms, cnt);
 	return 0;
 }

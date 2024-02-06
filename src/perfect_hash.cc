@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <memory>
 #include <algorithm>
 #include "protocache/perfect_hash.h"
@@ -311,6 +312,13 @@ static bool Check(KeyReader& source, uint32_t n, uint32_t seed, V128* space) {
 	return true;
 }
 
+static const auto g_time_base = std::chrono::steady_clock::now();
+
+static inline uint32_t GetSeed() {
+	return std::chrono::duration_cast<std::chrono::nanoseconds>(
+			std::chrono::steady_clock::now() - g_time_base).count();
+}
+
 template <typename Word>
 static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, bool no_check) {
 	auto total = source.Total();
@@ -349,7 +357,7 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	constexpr unsigned FIRST_TRIES = sizeof(Word) == 1? 8U : 4U;
 	constexpr unsigned SECOND_TRIES = sizeof(Word) == 1? 32U : 12U;
 
-	XorShift rand32;
+	XorShift rand32(GetSeed());
 	for (unsigned i = 0; i < FIRST_TRIES; i++) {
 		header->seed = rand32.Next();
 		auto ret = Build(source, header->size, header->seed, graph, free, book, bitmap);

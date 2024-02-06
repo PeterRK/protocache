@@ -9,10 +9,6 @@
 #include "test.pb.h"
 #include "common.h"
 
-static inline uint32_t JunkHash(const std::string& data) {
-	return JunkHash(data.data(), data.size());
-}
-
 struct Junk1 : public Junk {
 	void Traverse(const ::test::Small& root);
 	void Traverse(const ::test::Vec2D& root);
@@ -267,6 +263,54 @@ int BenchmarkProtobufReflect() {
 	}
 	auto delta_ms = DeltaMs(start);
 
-	printf("protobuf: %luB %ldms %016lx\n", raw.size(), delta_ms, junk.Fuse());
+	printf("protobuf-reflect: %luB %ldms %016lx\n", raw.size(), delta_ms, junk.Fuse());
+	return 0;
+}
+
+int BenchmarkProtobufSerialize() {
+	std::string raw;
+	if (!protocache::LoadFile("test.pb", &raw)) {
+		puts("fail to load test.pb");
+		return -1;
+	}
+	google::protobuf::Arena arena;
+	google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+	if (!root->ParseFromString(raw)) {
+		puts("fail to deserialize");
+		return -2;
+	}
+
+	unsigned cnt = 0;
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		cnt += root->SerializeAsString().size();
+	}
+	auto delta_ms = DeltaMs(start);
+
+	printf("protobuf: %ldms %x\n", delta_ms, cnt);
+	return 0;
+}
+
+int BenchmarkProtoCacheSerializeReflect() {
+	std::string raw;
+	if (!protocache::LoadFile("test.pb", &raw)) {
+		puts("fail to load test.pb");
+		return -1;
+	}
+	google::protobuf::Arena arena;
+	google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+	if (!root->ParseFromString(raw)) {
+		puts("fail to deserialize");
+		return -2;
+	}
+
+	unsigned cnt = 0;
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		cnt += protocache::Serialize(*root).size();
+	}
+	auto delta_ms = DeltaMs(start);
+
+	printf("protocache-reflect: %ldms %x\n", delta_ms, cnt);
 	return 0;
 }

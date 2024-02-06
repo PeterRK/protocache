@@ -24,6 +24,18 @@ static inline uint32_t Offset(uint32_t off) noexcept {
 	return (off<<2U) | 3U;
 }
 
+Data Serialize(const std::vector<std::string>& array) {
+	std::vector<Data> elements;
+	elements.reserve(array.size());
+	for (auto& one : array) {
+		elements.push_back(Serialize(one));
+		if (elements.back().empty()) {
+			return {};
+		}
+	}
+	return SerializeArray(elements);
+}
+
 Data Serialize(const Slice<char>& str) {
 	if (str.size() >= (1U << 30U)) {
 		return {};
@@ -40,8 +52,15 @@ Data Serialize(const Slice<char>& str) {
 	return out;
 }
 
-Data SerializeMessage(const std::vector<Data>& parts) {
+Data SerializeMessage(std::vector<Data>& parts) {
+	while (!parts.empty() && parts.back().empty()) {
+		parts.pop_back();
+	}
 	Data out;
+	if (parts.empty()) {
+		Data out = {0};
+		return out;
+	}
 	auto section = (parts.size() + 12) / 25;
 	if (section > 0xff) {
 		return {};
