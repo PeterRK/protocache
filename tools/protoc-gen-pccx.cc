@@ -59,11 +59,14 @@ static std::string ConvertFilename(const std::string& name) {
 	return name.substr(0, pos+1) + "pc.h";
 }
 
-static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type, const std::string& clazz) {
+static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type, const std::string& clazz, bool extra=false) {
 	switch (type) {
 		case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 		{
 			std::string name;
+			if (extra) {
+				name += "::ex";
+			}
 			for (auto ch : clazz) {
 				if (ch == '.') {
 					name += "::";
@@ -186,7 +189,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
 
 	if (alias_mode) {
-		oss << "struct " << proto.name() << " {\n";
+		oss << "struct " << proto.name() << " final {\n";
 	} else {
 		oss << "class " << proto.name() << " final {\n"
 			<< "private:\n"
@@ -355,19 +358,24 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	return oss.str();
 }
 
-static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto) {
-	std::ostringstream oss;
-	std::string header_name = proto.name();
-	for (auto& ch : header_name) {
+static std::string HeaderName(const std::string& proto_name) {
+	auto out = proto_name;
+	for (auto& ch : out) {
 		if (!std::isalnum(ch)) {
 			ch = '_';
 		}
 	}
+	return out;
+}
+
+static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto) {
+	std::ostringstream oss;
+	auto header_name = HeaderName(proto.name());
 	oss << "#pragma once\n"
 		<< "#ifndef PROTOCACHE_INCLUDED_" << header_name << '\n'
 		<< "#define PROTOCACHE_INCLUDED_" << header_name << '\n';
 
-	oss << '\n' << "#include <protocache/access.h>\n";
+	oss << "\n#include <protocache/access.h>\n";
 	for (auto& one : proto.dependency()) {
 		oss << "#include \"" << ConvertFilename(one) << "\"\n";
 	}
@@ -379,8 +387,8 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 		ns = '.' + proto.package();
 		Split(proto.package(), '.', &ns_parts);
 	}
-	for (auto& ns : ns_parts) {
-		oss << "namespace " << ns << " {\n";
+	for (auto& part : ns_parts) {
+		oss << "namespace " << part << " {\n";
 	}
 	oss << '\n';
 
@@ -409,6 +417,289 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	return oss.str();
 }
 
+struct CodePair {
+	std::string header;
+	std::string source;
+};
+
+static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
+	auto fullname = NaiveJoinName(ns, proto.name());
+	std::ostringstream oss_h, oss_s;
+	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
+
+	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
+
+	oss_h << "struct " << proto.name() << " final {\n";
+
+	for (auto& one : proto.nested_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		if (one.options().map_entry()) {
+			map_entries.emplace(NaiveJoinName(fullname, one.name()), &one);
+			continue;
+		}
+		auto piece = GenMessageEX(fullname, one);
+		oss_h << AddIndent(piece.header);
+		oss_s << piece.source;
+	}
+
+	if (alias_mode) {
+		auto it = g_alias_book.find(fullname);
+		if (it == g_alias_book.end()) {
+			std::cerr << "alias lost: " << fullname << std::endl;
+			return {};
+		}
+		auto value = TypeName(it->second.value_type, it->second.value_class, true);
+		if (value.empty()) {
+			std::cerr << "illegal value type: " << it->second.value_type << std::endl;
+			return {};
+		}
+		if (it->second.key_type == TYPE_NONE) {
+			oss_h << "\tusing ALIAS = protocache::ArrayEX<" << value << ">;\n";
+		} else {
+			if (!CanBeKey(it->second.key_type)) {
+				std::cerr << "illegal key type: " << it->second.key_type << std::endl;
+				return {};
+			}
+			auto key = TypeName(it->second.key_type, {}, true);
+			oss_h << "\tusing ALIAS = protocache::MapEX<" << key << ',' << value << ">;\n";
+		}
+		oss_h << "};\n\n";
+		return {oss_h.str(), oss_s.str()};
+	}
+
+	oss_h << '\t' << proto.name() << "() = default;\n"
+		  << '\t' << proto.name() << "(const uint32_t* data, const uint32_t* end);\n"
+		  << "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
+		  << proto.name() << "(data.begin(), data.end()) {}\n"
+		  << "\tprotocache::Data Serialize() const;\n\n";
+
+	auto define_simple_field = [&oss_h](bool repeated, const std::string& field_name,
+			const char* out_type, const char* get_type=nullptr) {
+		if (repeated) {
+			oss_h << "\tprotocache::ArrayEX<" << (get_type != nullptr? get_type : out_type) << "> " << field_name << ";\n";
+		} else {
+			oss_h << '\t' << out_type << ' ' << field_name << ";\n";
+		}
+	};
+
+	for (auto& one : proto.field()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		if (one.name() == "_") {
+			std::cerr << "found illegal field in message " << fullname << std::endl;
+			return {};
+		}
+		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
+		switch (one.type()) {
+			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
+				if (repeated) { // array or map
+					auto it = map_entries.find(one.type_name());
+					if (it != map_entries.end()) {
+						auto& key_field = it->second->field(0);
+						auto& value_field = it->second->field(1);
+						if (!CanBeKey(key_field.type())) {
+							std::cerr << "illegal key type: " << key_field.type() << std::endl;
+							return {};
+						}
+						auto key = TypeName(key_field.type(), {});
+						auto value = TypeName(value_field.type(), value_field.type_name(), true);
+						if (value.empty()) {
+							std::cerr << "illegal value type: " << value_field.type() << std::endl;
+							return {};
+						}
+						oss_h << "\tprotocache::MapEX<" << key << ',' << value << "> " << one.name() << ";\n";
+					} else {
+						auto value = TypeName(one.type(), one.type_name(), true);
+						oss_h << "\tprotocache::ArrayEX<" << value << "> " << one.name() << ";\n";
+					}
+				} else {
+					auto name = TypeName(one.type(), one.type_name(), true);
+					oss_h << '\t' << name << ' ' << one.name() << ";\n";
+				}
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
+				define_simple_field(repeated, one.name(), "std::string", "protocache::Slice<uint8_t>");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
+				define_simple_field(repeated, one.name(), "std::string", "protocache::Slice<char>");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
+				define_simple_field(repeated, one.name(), "double");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
+				define_simple_field(repeated, one.name(), "float");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
+				define_simple_field(repeated, one.name(), "uint64_t");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
+				define_simple_field(repeated, one.name(), "uint32_t");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
+				define_simple_field(repeated, one.name(), "int64_t");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
+				define_simple_field(repeated, one.name(), "int32_t");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
+				define_simple_field(repeated, one.name(), "bool");
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
+				define_simple_field(repeated, one.name(), "protocache::EnumValue");
+				break;
+			default:
+				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
+				return {};
+		}
+	}
+	oss_h << "};\n\n";
+
+	std::string cxx_ns;
+	for (auto ch : ns) {
+		if (ch == '.') {
+			cxx_ns += "::";
+		} else {
+			cxx_ns += ch;
+		}
+	}
+	cxx_ns += "::";
+	cxx_ns += proto.name();
+	cxx_ns += "::";
+
+	oss_s << "ex" << cxx_ns << proto.name() << "(const uint32_t* _data, const uint32_t* _end) {\n"
+		  << "\tusing _ = " << cxx_ns << "_;\n"
+		  << "\tprotocache::Message _view(_data, _end);\n";
+	for (auto& one : proto.field()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		oss_s << "\tprotocache::ExtractField(_view, _::" << one.name() << ", _end, &" << one.name() << ");\n";
+	}
+	oss_s << "};\n\n"
+		  << "protocache::Data ex" << cxx_ns << "Serialize() const {\n"
+		  << "\tusing _ = " << cxx_ns << "_;\n"
+		  << "\tstd::vector<protocache::Data> parts(" << proto.field_size() << ");\n";
+	for (auto& one : proto.field()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		if (one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+			oss_s << "\tif (!" << one.name() << ".empty()) {\n"
+				<< "\t\tparts[_::" << one.name() << "] = protocache::Serialize("  << one.name() <<  ");\n"
+				<< "\t\tif (parts[_::" << one.name() << "].empty()) return {};\n"
+				<< "\t}\n";
+			continue;
+		}
+		switch (one.type()) {
+			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
+				oss_s << "\tparts[_::" << one.name() << "] = protocache::Serialize(" << one.name() << ");\n"
+					<< "\tif (parts[_::" << one.name() << "].empty()) return {};\n"
+					<< "\tif (parts[_::" << one.name() << "].size() == 1) { parts[_::" << one.name() << "].clear(); }\n";
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
+				oss_s << "\tif (!" << one.name() << ".empty()) {\n"
+					  << "\t\tparts[_::" << one.name() << "] = protocache::Serialize("  << one.name() <<  ");\n"
+					  << "\t\tif (parts[_::" << one.name() << "].empty()) return {};\n"
+					  << "\t}\n";
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
+			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
+				oss_s << "\tif (" << one.name() << " != 0) { parts[_::" << one.name() << "] = protocache::Serialize(" << one.name() <<  "); }\n";
+				break;
+			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
+				oss_s << "\tif (" << one.name() << ") { parts[_::" << one.name() << "] = protocache::Serialize(" << one.name() <<  "); }\n";
+				break;
+			default:
+				return {};
+		}
+	}
+	oss_s << "\treturn protocache::SerializeMessage(parts);\n}\n\n";
+
+	return {oss_h.str(), oss_s.str()};
+}
+
+static std::string ConvertExHeaderFilename(const std::string& name) {
+	auto pos = name.rfind('.');
+	if (pos == std::string::npos) {
+		return name + ".pc-ex.h";
+	}
+	return name.substr(0, pos+1) + "pc-ex.h";
+}
+
+static std::string ConvertExSourceFilename(const std::string& name) {
+	auto pos = name.rfind('.');
+	if (pos == std::string::npos) {
+		return name + ".pc-ex.cc";
+	}
+	return name.substr(0, pos+1) + "pc-ex.cc";
+}
+
+static CodePair GenFileEX(const ::google::protobuf::FileDescriptorProto& proto) {
+	std::ostringstream oss_h, oss_s;
+	auto header_name = HeaderName(proto.name());
+	oss_h << "#pragma once\n"
+		<< "#ifndef PROTOCACHE_INCLUDED_EX_" << header_name << '\n'
+		<< "#define PROTOCACHE_INCLUDED_EX_" << header_name << '\n';
+
+	oss_h << "\n#include <protocache/access-ex.h>\n";
+	for (auto& one : proto.dependency()) {
+		oss_h << "#include \"" << ConvertExHeaderFilename(one) << "\"\n";
+	}
+	oss_h << '\n';
+
+	oss_s << "\n#include \"" << ConvertFilename(proto.name())  << "\"\n"
+		 << "#include \"" << ConvertExHeaderFilename(proto.name())  << "\"\n\n";
+
+	std::string ns;
+	std::vector<std::string> ns_parts;
+	if (!proto.package().empty()) {
+		ns = '.' + proto.package();
+		Split(proto.package(), '.', &ns_parts);
+	}
+	oss_h << "namespace ex {\n";
+	for (auto& part : ns_parts) {
+		oss_h << "namespace " << part << " {\n";
+	}
+	oss_h << '\n';
+
+	for (auto& one : proto.message_type()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		auto piece = GenMessageEX(ns, one);
+		oss_h << piece.header;
+		oss_s << piece.source;
+	}
+
+	for (auto it = ns_parts.rbegin(); it != ns_parts.rend(); ++it) {
+		oss_h << "} // " << *it << '\n';
+	}
+	oss_h << "} //ex\n";
+	oss_h << "#endif // PROTOCACHE_INCLUDED_" << header_name << '\n';
+	return {oss_h.str(), oss_s.str()};
+}
+
 int main() {
 	::google::protobuf::compiler::CodeGeneratorRequest request;
 	::google::protobuf::compiler::CodeGeneratorResponse response;
@@ -417,6 +708,8 @@ int main() {
 		std::cerr << "fail to get request" << std::endl;
 		return 1;
 	}
+
+	bool extra = request.parameter() == "extra";
 
 	for (auto& proto : request.proto_file()) {
 		std::string ns;
@@ -447,6 +740,15 @@ int main() {
 		if (one->content().empty()) {
 			std::cerr << "fail to generate code for file: " << proto.name() << std::endl;
 			return -2;
+		}
+		if (extra) {
+			auto extra_code = GenFileEX(proto);
+			auto header = response.add_file();
+			header->set_name(ConvertExHeaderFilename(proto.name()));
+			header->set_content(extra_code.header);
+			auto source = response.add_file();
+			source->set_name(ConvertExSourceFilename(proto.name()));
+			source->set_content(extra_code.source);
 		}
 	}
 

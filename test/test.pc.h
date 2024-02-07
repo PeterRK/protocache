@@ -38,16 +38,16 @@ public:
 	}
 };
 
-struct Vec2D {
-	struct Vec1D {
+struct Vec2D final {
+	struct Vec1D final {
 		using ALIAS = protocache::ArrayT<float>;
 	};
 
 	using ALIAS = protocache::ArrayT<::test::Vec2D::Vec1D::ALIAS>;
 };
 
-struct ArrMap {
-	struct Array {
+struct ArrMap final {
+	struct Array final {
 		using ALIAS = protocache::ArrayT<float>;
 	};
 
