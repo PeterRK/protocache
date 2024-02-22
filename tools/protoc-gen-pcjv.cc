@@ -149,10 +149,9 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 				return {};
 			}
 		}
-		out.reserve(200);
-		out += "com.github.peterrk.protocache.Dictionary<";
+		out.reserve(160);
 		out += key_type;
-		out += ',';
+		out += "Dict<";
 		out += value_type;
 		out += '>';
 	}
@@ -252,21 +251,37 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		oss << "\tpublic static final int FIELD_" << one.name() << " = " << (one.number()-1) << ";\n";
 	}
 	oss << "\n\tpublic " << proto.name() << "(){}\n"
-		<< "\tpublic " << proto.name() << "(com.github.peterrk.protocache.DataView data){ super(data); }\n\n";
+		<< "\tpublic " << proto.name() << "(byte[] data){ this(data, 0); }\n"
+		<< "\tpublic " << proto.name() << "(byte[] data, int offset){ super(data, offset); }\n\n";
 
-	auto handle_simple_field = [&oss](bool repeated,
-									  const std::string& field_name, const char* raw_type, const char* boxed_type) {
-		oss << "\tpublic ";
+	std::vector<std::string> to_clean;
+	to_clean.reserve(proto.field_size());
+
+	auto handle_simple_field = [&oss, &to_clean](bool repeated, const std::string& field_name,
+								const char* raw_type, const char* boxed_type, bool primary=true) {
 		if (repeated) {
-			oss << "com.github.peterrk.protocache." << boxed_type << "Array";
+			oss << "\tprivate com.github.peterrk.protocache." << boxed_type << "Array _" << field_name << " = null;\n"
+				<< "\tpublic com.github.peterrk.protocache." << boxed_type << "Array"
+				<< " get" << JavaFieldName(field_name) << "() {\n"
+				<< "\t\tif (_" << field_name << " == null) {\n"
+				<< "\t\t\t_" << field_name << " = get" << boxed_type << "Array(FIELD_" << field_name << ");\n"
+				<< "\t\t}\n"
+				<< "\t\treturn _" << field_name << ";\n"
+				<< "\t}\n";
+			to_clean.push_back(field_name);
+		} else if (primary) {
+			oss << "\tpublic " << raw_type << " get" << JavaFieldName(field_name)
+				<< "() { return get" << boxed_type << "(FIELD_" << field_name << "); }\n";
 		} else {
-			oss << raw_type;
+			oss << "\tprivate " << raw_type << " _" << field_name << " = null;\n"
+				<< "\tpublic " << raw_type << " get" << JavaFieldName(field_name) << "() {\n"
+				<< "\t\tif (_" << field_name << " == null) {\n"
+				<< "\t\t\t_" << field_name << " = get" << boxed_type << "(FIELD_" << field_name << ");\n"
+				<< "\t\t}\n"
+				<< "\t\treturn _" << field_name << ";\n"
+				<< "\t}\n";
+			to_clean.push_back(field_name);
 		}
-		oss << " get" << JavaFieldName(field_name) << "() { return get" << boxed_type;
-		if (repeated) {
-			oss << "Array";
-		}
-		oss << "(FIELD_" << field_name << "); }\n";
 	};
 
 	for (auto& one : proto.field()) {
@@ -299,16 +314,21 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				if (java_type.empty()) {
 					return {};
 				}
-				oss << "\tpublic " << java_type << " get" << JavaFieldName(one.name()) << "() {\n"
-					<< "\t\treturn getField(FIELD_" << one.name() << ", " << java_type << "::new);\n"
+				oss << "\tprivate " << java_type << " _" << one.name() << " = null;\n"
+					<< "\tpublic " << java_type << " get" << JavaFieldName(one.name()) << "() {\n"
+					<< "\t\tif (_" << one.name() << " == null) {\n"
+					<< "\t\t\t_" << one.name() << " = getField(FIELD_" << one.name() << ", " << java_type << "::new);\n"
+					<< "\t\t}\n"
+					<< "\t\treturn _" << one.name() << ";\n"
 					<< "\t}\n";
+				to_clean.push_back(one.name());
 			}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				handle_simple_field(repeated, one.name(), "byte[]", "Bytes");
+				handle_simple_field(repeated, one.name(), "byte[]", "Bytes", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				handle_simple_field(repeated, one.name(), "String", "Str");
+				handle_simple_field(repeated, one.name(), "String", "Str", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 				handle_simple_field(repeated, one.name(), "double", "Float64");
@@ -338,6 +358,15 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
 				return {};
 		}
+	}
+
+	if (!to_clean.empty()) {
+		oss << "\n\t@Override\n"
+			<< "\tpublic void init(byte[] data, int offset) {\n";
+		for (auto& field_name : to_clean) {
+			oss << "\t\t_" << field_name << " = null;\n";
+		}
+		oss << "\t\tsuper.init(data, offset);\n\t}";
 	}
 	oss << "}\n";
 	return oss.str();
