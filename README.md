@@ -71,7 +71,7 @@ ASSERT_NE(descriptor, nullptr);
 ```
 The reflection apis are simliar to protobuf's. An example can be found in the [test](test/protocache.cc).
 
-## Other Inmplements
+## Other Implements
 | Language | Source |
 |:----|:----|
 | Go | https://github.com/peterrk/protocache-go |
