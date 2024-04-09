@@ -19,6 +19,18 @@ static inline std::string Fullname(const std::string& ns, const std::string& nam
 	return fullname;
 }
 
+// collect custom options with simple name and string value
+static std::unordered_map<std::string, std::string> CollectTags(
+		const google::protobuf::RepeatedPtrField<google::protobuf::UninterpretedOption>& options) {
+	std::unordered_map<std::string, std::string> tags;
+	for (const auto& one : options) {
+		if (one.name_size() == 1 && one.has_string_value()) {
+			tags.emplace(one.name(0).name_part(), one.string_value());
+		}
+	}
+	return tags;
+}
+
 static inline Field::Type ConvertType(const google::protobuf::FieldDescriptorProto& field) noexcept {
 	if (!field.has_type()) {
 		return Field::TYPE_UNKNOWN;
@@ -191,6 +203,7 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 				out.value_type = src.type_name();
 			}
 		}
+		out.tags = CollectTags(src.options().uninterpreted_option());
 		return true;
 	};
 
@@ -216,6 +229,7 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 			}
 		}
 	}
+	descriptor.tags = CollectTags(proto.options().uninterpreted_option());
 	return pool_.emplace(std::move(fullname), std::move(descriptor)).second;
 }
 

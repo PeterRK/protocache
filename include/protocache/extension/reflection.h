@@ -39,7 +39,7 @@ struct Field final {
 	Type value = TYPE_NONE;
 	std::string value_type;
 	const Descriptor* value_descriptor = nullptr;
-	//std::string default_value;
+	std::unordered_map<std::string, std::string> tags;
 
 	bool operator!() const noexcept {
 		return value == TYPE_NONE;
@@ -52,6 +52,7 @@ struct Field final {
 struct Descriptor final {
 	Field alias;
 	std::unordered_map<std::string, Field> fields;
+	std::unordered_map<std::string, std::string> tags;
 
 	bool IsAlias() const noexcept {
 		return alias.value != Field::TYPE_NONE;

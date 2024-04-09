@@ -220,18 +220,25 @@ TEST(PtotoCache, Basic) {
 TEST(PtotoCache, Reflection) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
-	ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
+	ASSERT_TRUE(protocache::ParseProtoFile("reflect-test.proto", &file, &err));
 
 	protocache::reflection::DescriptorPool pool;
 	ASSERT_TRUE(pool.Register(file));
 
 	auto root = pool.Find("test.Main");
 	ASSERT_NE(root, nullptr);
+	ASSERT_EQ(root->tags.size(), 1);
+	ASSERT_NE(root->tags.find("test_b"), root->tags.end());
+
+	file = google::protobuf::FileDescriptorProto(); // fail without rese
+	ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
 
 	auto it = root->fields.find("f64");
 	ASSERT_NE(it, root->fields.end());
 	ASSERT_FALSE(it->second.repeated);
 	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_DOUBLE);
+	ASSERT_EQ(it->second.tags.size(), 1);
+	ASSERT_NE(it->second.tags.find("mark"), it->second.tags.end());
 
 	it = root->fields.find("strv");
 	ASSERT_NE(it, root->fields.end());
