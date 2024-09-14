@@ -7,7 +7,6 @@
 #include <memory>
 #include <gflags/gflags.h>
 #include <google/protobuf/dynamic_message.h>
-#include "protocache/extension/serialize.h"
 #include "protocache/extension/utils.h"
 
 DEFINE_string(input, "data.json", "input file");

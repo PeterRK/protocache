@@ -7,9 +7,10 @@ project(protocache)
 
 set(CMAKE_CXX_STANDARD 11)
 
+option(WITH_TEST "enable test" ON)
+
 find_package(Protobuf REQUIRED)
 find_package(gflags REQUIRED)
-find_package(GTest REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -26,12 +27,16 @@ file(GLOB extension
 add_library(protocache ${source} ${extension})
 target_link_libraries(protocache protobuf pthread)
 
-file(GLOB test_src
-    test/*.cc
-)
+if(WITH_TEST)
+    find_package(GTest REQUIRED)
 
-add_executable(test ${test_src})
-target_link_libraries(test protocache protobuf gtest pthread)
+    file(GLOB test_src
+        test/*.cc
+    )
+
+    add_executable(test ${test_src})
+    target_link_libraries(test protocache protobuf gtest pthread)
+endif()
 
 add_executable(json-to-binary tools/json-to-binary.cc)
 target_link_libraries(json-to-binary protocache protobuf gflags pthread)
@@ -41,6 +46,18 @@ target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
 
 add_executable(protoc-gen-pcjv tools/protoc-gen-pcjv.cc)
 target_link_libraries(protoc-gen-pcjv protoc protobuf pthread)
+
+install(
+    DIRECTORY "${CMAKE_SOURCE_DIR}/include/protocache"
+    DESTINATION include
+)
+
+install(
+    TARGETS protocache protoc-gen-pccx protoc-gen-pcjv
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
 
 #file(GLOB bench_src
 #    test/benchmark/*.cc
