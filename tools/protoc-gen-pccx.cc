@@ -368,6 +368,15 @@ static std::string HeaderName(const std::string& proto_name) {
 	return out;
 }
 
+static bool IsIgnoredDependency(const std::string& path) {
+	static const std::string prefix = "google/protobuf/";
+	if (path.size() >= prefix.size()
+		&& memcmp(path.data(), prefix.data(), prefix.size()) == 0) {
+		return true;
+	}
+	return false;
+}
+
 static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto) {
 	std::ostringstream oss;
 	auto header_name = HeaderName(proto.name());
@@ -377,6 +386,9 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 
 	oss << "\n#include <protocache/access.h>\n";
 	for (auto& one : proto.dependency()) {
+		if (IsIgnoredDependency(one)) {
+			continue;
+		}
 		oss << "#include \"" << ConvertFilename(one) << "\"\n";
 	}
 	oss << '\n';
@@ -664,6 +676,9 @@ static CodePair GenFileEX(const ::google::protobuf::FileDescriptorProto& proto) 
 
 	oss_h << "\n#include <protocache/access-ex.h>\n";
 	for (auto& one : proto.dependency()) {
+		if (IsIgnoredDependency(one)) {
+			continue;
+		}
 		oss_h << "#include \"" << ConvertExHeaderFilename(one) << "\"\n";
 	}
 	oss_h << '\n';
