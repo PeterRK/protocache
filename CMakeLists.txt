@@ -53,7 +53,7 @@ install(
 )
 
 install(
-    TARGETS protocache protoc-gen-pccx protoc-gen-pcjv
+    TARGETS protocache protocache-lite protoc-gen-pccx protoc-gen-pcjv
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
