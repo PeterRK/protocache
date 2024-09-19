@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "fail to load schema:\n" << err << std::endl;
 		return -1;
 	}
-	google::protobuf::DescriptorPool pool;
+	google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
 	if (pool.BuildFile(file) == nullptr) {
 		std::cerr << "fail to prepare descriptor pool" << std::endl;
 		return -1;

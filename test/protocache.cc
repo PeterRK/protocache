@@ -51,7 +51,7 @@ static protocache::Data SerializeByProtobuf() {
 		return {};
 	}
 
-	google::protobuf::DescriptorPool pool;
+	google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
 	if (pool.BuildFile(file) == nullptr) {
 		std::cerr << "fail to prepare protobuf pool" << std::endl;
 		return {};
@@ -302,7 +302,7 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_FALSE(object->alias.IsMap());
 	ASSERT_EQ(object->alias.value, protocache::reflection::Field::TYPE_FLOAT);
 
-	google::protobuf::DescriptorPool pb;
+	google::protobuf::DescriptorPool pb(google::protobuf::DescriptorPool::generated_pool());
 	ASSERT_NE(pb.BuildFile(file), nullptr);
 
 	auto descriptor = pb.FindMessageTypeByName("test.Main");
