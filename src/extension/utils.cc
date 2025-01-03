@@ -88,4 +88,20 @@ bool LoadJson(const std::string& path, google::protobuf::Message* message) {
 	return status.ok();
 }
 
+bool DumpJson(const google::protobuf::Message& message, const std::string& path) {
+	std::string data;
+	google::protobuf::util::JsonPrintOptions option;
+	option.add_whitespace = true;
+	option.preserve_proto_field_names = true;
+	auto status = google::protobuf::util::MessageToJsonString(message, &data, option);
+	if (!status.ok()) {
+		return false;
+	}
+	std::ofstream ofs(path);
+	if (!ofs) {
+		return false;
+	}
+	return !!ofs.write(data.data(), data.size());
+}
+
 } // protocache

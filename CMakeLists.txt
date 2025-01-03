@@ -41,6 +41,9 @@ endif()
 add_executable(json-to-binary tools/json-to-binary.cc)
 target_link_libraries(json-to-binary protocache protobuf gflags pthread)
 
+add_executable(binary-to-json tools/binary-to-json.cc)
+target_link_libraries(binary-to-json protocache protobuf gflags pthread)
+
 add_executable(protoc-gen-pccx tools/protoc-gen-pccx.cc)
 target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
 

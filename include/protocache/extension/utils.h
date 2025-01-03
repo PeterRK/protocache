@@ -20,8 +20,10 @@ extern bool ParseProtoFile(const std::string& filename, google::protobuf::FileDe
 extern bool LoadFile(const std::string& path, std::string* out);
 
 extern bool LoadJson(const std::string& path, google::protobuf::Message* message);
+extern bool DumpJson(const google::protobuf::Message& message, const std::string& path);
 
 extern Data Serialize(const google::protobuf::Message& message);
+extern bool Deserialize(const Slice<uint32_t>& raw, google::protobuf::Message* message);
 
 } // protocache
 #endif //PROTOCACHE_EXT_UTILS_H_
