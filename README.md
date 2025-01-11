@@ -36,7 +36,7 @@ A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-
 
 ## APIs
 ```cpp
-auto data = protocache::SerializeScalar(pb_message);
+auto data = protocache::Serialize(pb_message);
 ASSERT_FALSE(data.empty());
 
 // =========basic api=========
@@ -49,6 +49,9 @@ protocache::Slice<uint32_t> view(data);
 
 auto copy = root.Serialize();
 ASSERT_EQ(data.size(), copy.size());
+
+// deserialize to pb
+protocache::Deserialize(view, &pb_mirror);
 ```
 You can create protocache binary by serializing a protobuf message with protocache::Serialize. The Basic API offers fast read-only access with zero-copy technique. Extra APIs provide a mutable object and another serialization method.
 
