@@ -172,6 +172,12 @@ static inline std::string ExtractField(const FieldT<Slice<char>>& field, const u
 	return out;
 }
 
+static inline std::string ExtractField(const FieldT<Slice<uint8_t>>& field, const uint32_t* end) {
+	auto view = SliceCast<char>(field.Get(end));
+	std::string out(view.data(), view.size());
+	return out;
+}
+
 template <typename T>
 static inline void ExtractField(const Message& message, unsigned id, const uint32_t* end, T* out) {
 	*out = FieldT<T>(message.GetField(id, end)).Get(end);
