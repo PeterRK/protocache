@@ -4,9 +4,17 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 
 |  | Protobuf | ProtoCache | FlatBuffers |
 |:-------|----:|----:|----:|
-| Wire format size (plain / ZSTD1 compressed, bytes) | **574 / 461** | 780 / 548 | 1296 / 672 |
+| Wire format size | **574B** | 780B | 1296B |
 | Decode + Traverse + Dealloc (1 million times) | 1941ms | 154ms | **83ms** |
 | Decode + Traverse + Dealloc (1 million times, reflection) | 6127ms | **323ms** | 478ms |
+
+With 2KB dictionary trained by [random small ProtoCache objects](tools/random-small.cc), ProtoCache+[Zstandard](https://github.com/facebook/zstd) can achieve faster reading and smaller data than Protobuf.
+
+| Level | -1 | 1 | 3 | 5 | 11 | 22 |
+|:-------:|:----:|:----:|:----:|:----:|:----:|:----:|
+| Compressed data size | 597 | 522 | 526 | 504 | 502 | 491 |
+| Decompress (1 million times) | 382ms | 1502ms | 1537ms | 1565ms | 1442ms | 1502ms |
+
 
 ## Difference to Protobuf
 Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named `_`, message with only one such field will be considered as an alias. Alias to array or map is useful. We can declare a 2D array like this.
