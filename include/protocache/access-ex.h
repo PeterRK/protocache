@@ -126,8 +126,16 @@ template <> inline Data ArrayEX<double>::Serialize() const {
 	return ::protocache::SerializeScalarArray(core_);
 }
 
-template <> inline ArrayEX<protocache::Slice<char>>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = ArrayT<protocache::Slice<char>>(data, end);
+template <> inline ArrayEX<Slice<char>>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = ArrayT<Slice<char>>(data, end);
+	core_.reserve(view.Size());
+	for (auto one : view) {
+		core_.emplace_back(one.data(), one.size());
+	}
+}
+
+template <> inline ArrayEX<Slice<uint8_t>>::ArrayEX(const uint32_t* data, const uint32_t* end) {
+	auto view = ArrayT<Slice<char>>(data, end);
 	core_.reserve(view.Size());
 	for (auto one : view) {
 		core_.emplace_back(one.data(), one.size());
