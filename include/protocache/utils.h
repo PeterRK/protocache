@@ -84,5 +84,7 @@ static inline constexpr Slice<D> SliceCast(const Slice<S>& src) noexcept {
 	return {reinterpret_cast<const D*>(src.data()), src.size()};
 }
 
+extern bool LoadFile(const std::string& path, std::string* out);
+
 } // protocache
 #endif //PROTOCACHE_UTILS_H_
