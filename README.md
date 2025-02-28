@@ -8,12 +8,12 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 | Decode + Traverse + Dealloc (1 million times) | 1941ms | 154ms | **83ms** |
 | Decode + Traverse + Dealloc (1 million times, reflection) | 6127ms | **323ms** | 478ms |
 
-With 2KB dictionary trained by [random small ProtoCache objects](tools/random-small.cc), ProtoCache+[Zstandard](https://github.com/facebook/zstd) can achieve faster reading and smaller data than Protobuf.
+With about 1KB dictionary trained by [random small ProtoCache objects](tools/random-small.cc), ProtoCache+[Zstandard](https://github.com/facebook/zstd) can achieve faster reading and smaller data than Protobuf.
 
 | Level | -1 | 1 | 3 | 5 | 11 | 22 |
 |:-------:|:----:|:----:|:----:|:----:|:----:|:----:|
-| Compressed data size | 597 | 522 | 526 | 504 | 502 | 491 |
-| Decompress (1 million times) | 382ms | 1502ms | 1537ms | 1565ms | 1442ms | 1502ms |
+| Compressed data size | 604 | 513 | 513 | 501 | 496 | 486 |
+| Decompress (1 million times) | 393ms | 1490ms | 1554ms | 1504ms | 1493ms | 1576ms |
 
 
 ## Difference to Protobuf
