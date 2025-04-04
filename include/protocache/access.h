@@ -102,6 +102,23 @@ private:
 	unsigned width_ = 0;
 };
 
+static inline unsigned Count32(uint32_t v) noexcept {
+	v = (v&0x33333333U) + ((v>>2U)&0x33333333U);
+	v = v + (v>>4U);
+	v = (v&0xf0f0f0fU) + ((v>>8U)&0xf0f0f0fU);
+	v = v + (v>>16U);
+	return v & 0xffU;
+}
+
+static inline unsigned Count64(uint64_t v) noexcept {
+	v = (v&0x3333333333333333ULL) + ((v>>2U)&0x3333333333333333ULL);
+	v = v + (v>>4U);
+	v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>8U)&0xf0f0f0f0f0f0f0fULL);
+	v = v + (v >> 16U);
+	v = v + (v >> 32U);
+	return v & 0xffU;
+}
+
 class Message final {
 public:
 	Message() noexcept : ptr_(&s_empty) {};
@@ -111,7 +128,7 @@ public:
 		}
 		uint32_t section = *ptr & 0xff;
 		auto body = ptr + 1 + section*2;
-		if (end != nullptr && body >= end) {
+		if (end != nullptr && body > end) {
 			return;
 		}
 		ptr_ = ptr;
@@ -149,11 +166,7 @@ public:
 				return {};
 			}
 			v &= ~(0xffffffffU << id*2);
-			v = (v&0x33333333U) + ((v>>2U)&0x33333333U);
-			v = v + (v>>4U);
-			v = (v&0xf0f0f0fU) + ((v>>8U)&0xf0f0f0fU);
-			v = v + (v>>16U);
-			off = v & 0xffU;
+			off = Count32(v);
 		} else {
 			auto vec = reinterpret_cast<const uint64_t*>(ptr_ + 1);
 			auto a = (id-12) / 25;
@@ -166,13 +179,7 @@ public:
 				return {};
 			}
 			uint64_t mask = ~(0xffffffffffffffffULL << b*2);
-			uint64_t v = vec[a] & mask;
-			v = (v&0x3333333333333333ULL) + ((v>>2U)&0x3333333333333333ULL);
-			v = v + (v>>4U);
-			v = (v&0xf0f0f0f0f0f0f0fULL) + ((v>>8U)&0xf0f0f0f0f0f0f0fULL);
-			v = v + (v>>16U);
-			v = v + (v>>32U);
-			off = (v & 0xffU) + (vec[a] >> 50U);
+			off = Count64(vec[a] & mask) + (vec[a] >> 50U);
 		}
 		if (end != nullptr && body + off + width > end) {
 			return {};
@@ -292,21 +299,17 @@ public:
 		if (key_width_ == 0 || value_width_ == 0) {
 			return;
 		}
-		if (end == nullptr) {
-			index_ = PerfectHash(reinterpret_cast<const uint8_t*>(ptr));
-			if (!index_) {
-				return;
-			}
-			body_ = ptr + WordSize(index_.Data().size());
-		} else {
-			index_ = PerfectHash(reinterpret_cast<const uint8_t*>(ptr), (end - ptr) * 4);
-			if (!index_) {
-				return;
-			}
-			body_ = ptr + WordSize(index_.Data().size());
-			if (body_ + (key_width_ + value_width_) * Size() > end) {
-				body_ = nullptr;
-			}
+		uint32_t sz = 0;
+		if (end != nullptr) {
+			sz = (end - ptr) * 4;
+		}
+		index_ = PerfectHash(reinterpret_cast<const uint8_t*>(ptr), sz);
+		if (!index_) {
+			return;
+		}
+		body_ = ptr + WordSize(index_.Data().size());
+		if (end != nullptr && body_ + (key_width_ + value_width_) * index_.Size() > end) {
+			body_ = nullptr;
 		}
 	}
 
