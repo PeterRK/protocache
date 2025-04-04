@@ -50,6 +50,15 @@ public:
 	bool operator!() const noexcept {
 		return !data_;
 	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		String str(ptr, end);
+		if (!str) {
+			return {};
+		}
+		auto off = str.data_.data() - reinterpret_cast<const uint8_t*>(ptr);
+		auto size = (off + str.data_.size() + 3) / 4;
+		return {ptr, size};
+	}
 
 	Slice<char> Get() const noexcept  {
 		return SliceCast<char>(data_);
@@ -136,6 +145,23 @@ public:
 	bool operator!() const noexcept {
 		return ptr_ == &s_empty;
 	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		if (ptr == nullptr) {
+			return {};
+		}
+		uint32_t section = *ptr & 0xff;
+		auto tail = ptr + 1 + section*2;
+		if (section == 0) {
+			tail += Count32(*ptr);
+		} else {
+			auto sec = *reinterpret_cast<const uint64_t*>(tail - 2);
+			tail += Count64(sec << 14U) + (sec >> 50U);
+		}
+		if (end != nullptr && tail > end) {
+			return {};
+		}
+		return {ptr, static_cast<size_t>(tail-ptr)};
+	}
 
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
 		uint32_t section = *ptr_ & 0xff;
@@ -209,6 +235,22 @@ public:
 	bool operator!() const noexcept {
 		return body_ == nullptr;
 	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		if (ptr == nullptr) {
+			return {};
+		}
+		auto body = ptr + 1;
+		auto size = *ptr >> 2U;
+		auto width = *ptr & 3U;
+		if (width == 0) {
+			return {};
+		}
+		auto tail = body + width * size;
+		if (end != nullptr && tail > end) {
+			return {};
+		}
+		return {ptr, static_cast<size_t>(tail-ptr)};
+	}
 
 	uint32_t Size() const noexcept {
 		return size_;
@@ -228,6 +270,10 @@ public:
 		}
 		Iterator& operator++() noexcept {
 			ptr_ += width_;
+			return *this;
+		}
+		Iterator& operator--() noexcept {
+			ptr_ -= width_;
 			return *this;
 		}
 
@@ -312,9 +358,32 @@ public:
 			body_ = nullptr;
 		}
 	}
-
 	bool operator!() const noexcept {
 		return body_ == nullptr;
+	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		if (ptr == nullptr) {
+			return {};
+		}
+		auto key_width = (*ptr >> 30U) & 3U;
+		auto value_width = (*ptr >> 28U) & 3U;
+		if (key_width == 0 || value_width == 0) {
+			return {};
+		}
+		uint32_t sz = 0;
+		if (end != nullptr) {
+			sz = (end - ptr) * 4;
+		}
+		PerfectHash index(reinterpret_cast<const uint8_t*>(ptr), sz);
+		if (!index) {
+			return {};
+		}
+		auto body = ptr + WordSize(index.Data().size());
+		auto tail = body + (key_width + value_width) * index.Size();
+		if (end != nullptr && tail > end) {
+			return {};
+		}
+		return {ptr, static_cast<size_t>(tail-ptr)};
 	}
 
 	uint32_t Size() const noexcept {
@@ -335,6 +404,10 @@ public:
 		}
 		Iterator& operator++() noexcept {
 			ptr_ += key_width_ + value_width_;
+			return *this;
+		}
+		Iterator& operator--() noexcept {
+			ptr_ -= key_width_ + value_width_;
 			return *this;
 		}
 
@@ -426,6 +499,7 @@ public:
 	}
 
 	T Get(const uint32_t* end=nullptr) const;
+	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const;
 
 private:
 	Field core_;
@@ -445,8 +519,18 @@ inline bool FieldT<bool>::Get(const uint32_t*) const {
 }
 
 template <>
+inline Slice<uint32_t> FieldT<bool>::Detect(const uint32_t*) const {
+	return core_.GetValue();
+}
+
+template <>
 inline int32_t FieldT<int32_t>::Get(const uint32_t*) const {
 	return GetScalar();
+}
+
+template <>
+inline Slice<uint32_t> FieldT<int32_t>::Detect(const uint32_t*) const {
+	return core_.GetValue();
 }
 
 template <>
@@ -455,18 +539,18 @@ inline uint32_t FieldT<uint32_t>::Get(const uint32_t*) const {
 }
 
 template <>
+inline Slice<uint32_t> FieldT<uint32_t>::Detect(const uint32_t*) const {
+	return core_.GetValue();
+}
+
+template <>
 inline int64_t FieldT<int64_t>::Get(const uint32_t*) const {
 	return GetScalar();
 }
 
 template <>
-inline float FieldT<float>::Get(const uint32_t*) const {
-	return GetScalar();
-}
-
-template <>
-inline double FieldT<double>::Get(const uint32_t*) const {
-	return GetScalar();
+inline Slice<uint32_t> FieldT<int64_t>::Detect(const uint32_t*) const {
+	return core_.GetValue();
 }
 
 template <>
@@ -475,8 +559,40 @@ inline uint64_t FieldT<uint64_t>::Get(const uint32_t*) const {
 }
 
 template <>
+inline Slice<uint32_t> FieldT<uint64_t>::Detect(const uint32_t*) const {
+	return core_.GetValue();
+}
+
+template <>
+inline float FieldT<float>::Get(const uint32_t*) const {
+	return GetScalar();
+}
+
+template <>
+inline Slice<uint32_t> FieldT<float>::Detect(const uint32_t*) const {
+	return core_.GetValue();
+}
+
+template <>
+inline double FieldT<double>::Get(const uint32_t*) const {
+	return GetScalar();
+}
+
+template <>
+inline Slice<uint32_t> FieldT<double>::Detect(const uint32_t*) const {
+	return core_.GetValue();
+}
+
+
+
+template <>
 inline Slice<char> FieldT<Slice<char>>::Get(const uint32_t* end) const {
 	return String(core_.GetObject(end), end).Get();
+}
+
+template <>
+inline Slice<uint32_t> FieldT<Slice<char>>::Detect(const uint32_t* end) const {
+	return String::Detect(core_.GetObject(end), end);
 }
 
 template <>
@@ -485,13 +601,28 @@ inline Slice<uint8_t> FieldT<Slice<uint8_t>>::Get(const uint32_t* end) const {
 }
 
 template <>
+inline Slice<uint32_t> FieldT<Slice<uint8_t>>::Detect(const uint32_t* end) const {
+	return String::Detect(core_.GetObject(end), end);
+}
+
+template <>
 inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const {
 	return String(core_.GetObject(end), end).GetBoolArray();
+}
+
+template <>
+inline Slice<uint32_t> FieldT<Slice<bool>>::Detect(const uint32_t* end) const {
+	return String::Detect(core_.GetObject(end), end);
 }
 
 template <typename T>
 inline T FieldT<T>::Get(const uint32_t* end) const {
 	return T(core_.GetObject(end), end);
+}
+
+template <typename T>
+inline Slice<uint32_t> FieldT<T>::Detect(const uint32_t* end) const {
+	return T::Detect(core_.GetObject(end), end);
 }
 
 template <typename T>
@@ -501,6 +632,22 @@ public:
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept {
 		return !core_;
+	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		auto view =  Array::Detect(ptr, end);
+		if (!view) {
+			return {};
+		}
+		static_assert(!std::is_scalar<T>::value, "");
+		Array core(ptr);
+		for (auto it = core.end(); it != core.begin();) {
+			FieldT<T> field(*--it);
+			auto t = field.Detect(end);
+			if (t.end() > view.end()) {
+				return {view.data(), static_cast<size_t>(t.end()-view.data())};
+			}
+		}
+		return view;
 	}
 
 	uint32_t Size() const noexcept {
@@ -581,42 +728,63 @@ template <>
 struct ArrayT<bool> final : public ScalarArray<bool> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<bool>(String(ptr, end).GetBoolArray()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return String::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<int32_t> final : public ScalarArray<int32_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<int32_t>(Array(ptr, end).Numbers<int32_t>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<uint32_t> final : public ScalarArray<uint32_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<uint32_t>(Array(ptr, end).Numbers<uint32_t>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<int64_t> final : public ScalarArray<int64_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<int64_t>(Array(ptr, end).Numbers<int64_t>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<uint64_t> final : public ScalarArray<uint64_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<uint64_t>(Array(ptr, end).Numbers<uint64_t>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<float> final : public ScalarArray<float> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<float>(Array(ptr, end).Numbers<float>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <>
 struct ArrayT<double> final : public ScalarArray<double> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<double>(Array(ptr, end).Numbers<double>()) {}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 };
 
 template <typename K, typename V>
@@ -643,6 +811,33 @@ public:
 	explicit MapT(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
 	bool operator!() const noexcept {
 		return !core_;
+	}
+
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		auto view =  Map::Detect(ptr, end);
+		if (!view) {
+			return {};
+		} else if (std::is_scalar<K>::value && std::is_scalar<V>::value) {
+			return view;
+		}
+		Map core(ptr);
+		for (auto it = core.end(); it != core.begin();) {
+			Pair pair(*--it);
+			Slice<uint32_t> t;
+			if (!std::is_scalar<V>::value) {
+				t = FieldT<V>(pair.Value()).Detect(end);
+				if (t.end() > view.end()) {
+					return {view.data(), static_cast<size_t>(t.end()-view.data())};
+				}
+			}
+			if (!std::is_scalar<K>::value) {
+				t = FieldT<K>(pair.Key()).Detect(end);
+				if (t.end() > view.end()) {
+					return {view.data(), static_cast<size_t>(t.end()-view.data())};
+				}
+			}
+		}
+		return view;
 	}
 
 	uint32_t Size() const noexcept {
@@ -686,54 +881,14 @@ private:
 	Map core_;
 };
 
-static inline int32_t GetInt32(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<int32_t>(message.GetField(id, end)).Get();
-}
-
-static inline uint32_t GetUInt32(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<uint32_t>(message.GetField(id, end)).Get();
-}
-
-static inline int64_t GetInt64(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<int64_t>(message.GetField(id, end)).Get();
-}
-
-static inline uint64_t GetUInt64(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<uint64_t>(message.GetField(id, end)).Get();
-}
-
-static inline bool GetBool(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<bool>(message.GetField(id, end)).Get();
-}
-
-static inline int GetEnumValue(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<int32_t>(message.GetField(id, end)).Get();
-}
-
-static inline float GetFloat(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<float>(message.GetField(id, end)).Get();
-}
-
-static inline double GetDouble(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<double>(message.GetField(id, end)).Get();
-}
-
-static inline Slice<uint8_t> GetBytes(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<Slice<uint8_t>>(message.GetField(id, end)).Get(end);
-}
-
-static inline Slice<char> GetString(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return FieldT<Slice<char>>(message.GetField(id, end)).Get(end);
+template <typename T>
+static inline T GetField(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
+	return FieldT<T>(message.GetField(id, end)).Get(end);
 }
 
 template <typename T>
-static inline ArrayT<T> GetArray(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return ArrayT<T>(message.GetField(id, end).GetObject(end), end);
-}
-
-template <typename K, typename V>
-static inline MapT<K,V> GetMap(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
-	return MapT<K,V>(message.GetField(id, end).GetObject(end), end);
+static inline Slice<uint32_t> DetectField(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
+	return FieldT<T>(message.GetField(id, end)).Detect(end);
 }
 
 } // protocache

@@ -27,14 +27,24 @@ public:
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		auto view = protocache::Message::Detect(ptr, end);
+		if (!view) return {};
+		protocache::Message core(ptr);
+		protocache::Slice<uint32_t> t;
+		t = protocache::DetectField<protocache::Slice<char>>(core, _::str, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		return view;
+	}
+
 	int32_t i32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt32(core_, _::i32, end);
+		return protocache::GetField<int32_t>(core_, _::i32, end);
 	}
 	bool flag(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetBool(core_, _::flag, end);
+		return protocache::GetField<bool>(core_, _::flag, end);
 	}
 	protocache::Slice<char> str(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetString(core_, _::str, end);
+		return protocache::GetField<protocache::Slice<char>>(core_, _::str, end);
 	}
 };
 
@@ -96,95 +106,135 @@ public:
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		auto view = protocache::Message::Detect(ptr, end);
+		if (!view) return {};
+		protocache::Message core(ptr);
+		protocache::Slice<uint32_t> t;
+		t = protocache::DetectField<::test::ArrMap::ALIAS>(core, _::arrays, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<::test::ArrMap::ALIAS>>(core, _::vector, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<::test::Vec2D::ALIAS>(core, _::matrix, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::MapT<int32_t,::test::Small>>(core, _::objects, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::MapT<protocache::Slice<char>,int32_t>>(core, _::index, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<::test::Small>>(core, _::objectv, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<bool>>(core, _::flags, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<double>>(core, _::f64v, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<float>>(core, _::f32v, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<protocache::Slice<uint8_t>>>(core, _::datav, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<protocache::Slice<char>>>(core, _::strv, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<uint64_t>>(core, _::u64v, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::ArrayT<int32_t>>(core, _::i32v, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<::test::Small>(core, _::object, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::Slice<uint8_t>>(core, _::data, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		t = protocache::DetectField<protocache::Slice<char>>(core, _::str, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		return view;
+	}
+
 	int32_t i32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt32(core_, _::i32, end);
+		return protocache::GetField<int32_t>(core_, _::i32, end);
 	}
 	uint32_t u32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetUInt32(core_, _::u32, end);
+		return protocache::GetField<uint32_t>(core_, _::u32, end);
 	}
 	int64_t i64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt64(core_, _::i64, end);
+		return protocache::GetField<int64_t>(core_, _::i64, end);
 	}
 	uint64_t u64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetUInt64(core_, _::u64, end);
+		return protocache::GetField<uint64_t>(core_, _::u64, end);
 	}
 	bool flag(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetBool(core_, _::flag, end);
+		return protocache::GetField<bool>(core_, _::flag, end);
 	}
 	protocache::EnumValue mode(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetEnumValue(core_, _::mode, end);
+		return protocache::GetField<protocache::EnumValue>(core_, _::mode, end);
 	}
 	protocache::Slice<char> str(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetString(core_, _::str, end);
+		return protocache::GetField<protocache::Slice<char>>(core_, _::str, end);
 	}
 	protocache::Slice<uint8_t> data(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetBytes(core_, _::data, end);
+		return protocache::GetField<protocache::Slice<uint8_t>>(core_, _::data, end);
 	}
 	float f32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetFloat(core_, _::f32, end);
+		return protocache::GetField<float>(core_, _::f32, end);
 	}
 	double f64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetDouble(core_, _::f64, end);
+		return protocache::GetField<double>(core_, _::f64, end);
 	}
 	::test::Small object(const uint32_t* end=nullptr) const noexcept {
-		return ::test::Small(core_.GetField(_::object, end).GetObject(end), end);
+		return protocache::GetField<::test::Small>(core_, _::object, end);
 	}
 	protocache::ArrayT<int32_t> i32v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<int32_t>(core_, _::i32v, end);
+		return protocache::GetField<protocache::ArrayT<int32_t>>(core_, _::i32v, end);
 	}
 	protocache::ArrayT<uint64_t> u64v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<uint64_t>(core_, _::u64v, end);
+		return protocache::GetField<protocache::ArrayT<uint64_t>>(core_, _::u64v, end);
 	}
 	protocache::ArrayT<protocache::Slice<char>> strv(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<protocache::Slice<char>>(core_, _::strv, end);
+		return protocache::GetField<protocache::ArrayT<protocache::Slice<char>>>(core_, _::strv, end);
 	}
 	protocache::ArrayT<protocache::Slice<uint8_t>> datav(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<protocache::Slice<uint8_t>>(core_, _::datav, end);
+		return protocache::GetField<protocache::ArrayT<protocache::Slice<uint8_t>>>(core_, _::datav, end);
 	}
 	protocache::ArrayT<float> f32v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<float>(core_, _::f32v, end);
+		return protocache::GetField<protocache::ArrayT<float>>(core_, _::f32v, end);
 	}
 	protocache::ArrayT<double> f64v(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<double>(core_, _::f64v, end);
+		return protocache::GetField<protocache::ArrayT<double>>(core_, _::f64v, end);
 	}
 	protocache::ArrayT<bool> flags(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<bool>(core_, _::flags, end);
+		return protocache::GetField<protocache::ArrayT<bool>>(core_, _::flags, end);
 	}
 	protocache::ArrayT<::test::Small> objectv(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<::test::Small>(core_, _::objectv, end);
+		return protocache::GetField<protocache::ArrayT<::test::Small>>(core_, _::objectv, end);
 	}
 	uint32_t t_u32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetUInt32(core_, _::t_u32, end);
+		return protocache::GetField<uint32_t>(core_, _::t_u32, end);
 	}
 	int32_t t_i32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt32(core_, _::t_i32, end);
+		return protocache::GetField<int32_t>(core_, _::t_i32, end);
 	}
 	int32_t t_s32(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt32(core_, _::t_s32, end);
+		return protocache::GetField<int32_t>(core_, _::t_s32, end);
 	}
 	uint64_t t_u64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetUInt64(core_, _::t_u64, end);
+		return protocache::GetField<uint64_t>(core_, _::t_u64, end);
 	}
 	int64_t t_i64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt64(core_, _::t_i64, end);
+		return protocache::GetField<int64_t>(core_, _::t_i64, end);
 	}
 	int64_t t_s64(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetInt64(core_, _::t_s64, end);
+		return protocache::GetField<int64_t>(core_, _::t_s64, end);
 	}
 	protocache::MapT<protocache::Slice<char>,int32_t> index(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetMap<protocache::Slice<char>,int32_t>(core_, _::index, end);
+		return protocache::GetField<protocache::MapT<protocache::Slice<char>,int32_t>>(core_, _::index, end);
 	}
 	protocache::MapT<int32_t,::test::Small> objects(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetMap<int32_t,::test::Small>(core_, _::objects, end);
+		return protocache::GetField<protocache::MapT<int32_t,::test::Small>>(core_, _::objects, end);
 	}
 	::test::Vec2D::ALIAS matrix(const uint32_t* end=nullptr) const noexcept {
-		return ::test::Vec2D::ALIAS(core_.GetField(_::matrix, end).GetObject(end), end);
+		return protocache::GetField<::test::Vec2D::ALIAS>(core_, _::matrix, end);
 	}
 	protocache::ArrayT<::test::ArrMap::ALIAS> vector(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetArray<::test::ArrMap::ALIAS>(core_, _::vector, end);
+		return protocache::GetField<protocache::ArrayT<::test::ArrMap::ALIAS>>(core_, _::vector, end);
 	}
 	::test::ArrMap::ALIAS arrays(const uint32_t* end=nullptr) const noexcept {
-		return ::test::ArrMap::ALIAS(core_.GetField(_::arrays, end).GetObject(end), end);
+		return protocache::GetField<::test::ArrMap::ALIAS>(core_, _::arrays, end);
 	}
 };
 

@@ -323,7 +323,7 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_NE(it, root->fields.end());
 	ASSERT_FALSE(it->second.repeated);
 	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_FLOAT);
-	ASSERT_EQ(-2.1f, protocache::GetFloat(unit, it->second.id, end));
+	ASSERT_EQ(-2.1f, protocache::GetField<float>(unit, it->second.id, end));
 }
 
 TEST(PtotoCacheEX, Basic) {
