@@ -352,6 +352,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
 					handle_detect(one.name(), "protocache::ArrayT<protocache::EnumValue>");
 					break;
+				default:
+					break;
 			}
 		} else {
 			switch (one.type()) {
@@ -363,6 +365,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 					break;
 				case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
 					handle_detect(one.name(), "protocache::Slice<char>");
+					break;
+				default:
 					break;
 			}
 		}
@@ -520,19 +524,14 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	return oss.str();
 }
 
-struct CodePair {
-	std::string header;
-	std::string source;
-};
-
-static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
+static std::string GenMessageEX(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
-	std::ostringstream oss_h, oss_s;
+	std::ostringstream oss;
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 
 	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
 
-	oss_h << "struct " << proto.name() << " final {\n";
+	oss << "struct " << proto.name() << " final {\n";
 
 	for (auto& one : proto.nested_type()) {
 		if (one.options().deprecated()) {
@@ -543,8 +542,11 @@ static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::De
 			continue;
 		}
 		auto piece = GenMessageEX(fullname, one);
-		oss_h << AddIndent(piece.header);
-		oss_s << piece.source;
+		if (piece.empty()) {
+			std::cerr << "fail to gen code for message: " << one.name() << std::endl;
+			return {};
+		}
+		oss << AddIndent(piece);
 	}
 
 	if (alias_mode) {
@@ -559,35 +561,53 @@ static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::De
 			return {};
 		}
 		if (it->second.key_type == TYPE_NONE) {
-			oss_h << "\tusing ALIAS = protocache::ArrayEX<" << value << ">;\n";
+			oss << "\tusing ALIAS = protocache::ArrayEX<" << value << ">;\n";
 		} else {
 			if (!CanBeKey(it->second.key_type)) {
 				std::cerr << "illegal key type: " << it->second.key_type << std::endl;
 				return {};
 			}
 			auto key = TypeName(it->second.key_type, {}, true);
-			oss_h << "\tusing ALIAS = protocache::MapEX<" << key << ',' << value << ">;\n";
+			oss << "\tusing ALIAS = protocache::MapEX<" << key << ',' << value << ">;\n";
 		}
-		oss_h << "};\n\n";
-		return {oss_h.str(), oss_s.str()};
+		oss << "};\n\n";
+		return oss.str();
 	}
 
-	oss_h << '\t' << proto.name() << "() = default;\n"
-		  << '\t' << proto.name() << "(const uint32_t* data, const uint32_t* end);\n"
-		  << "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
-		  << proto.name() << "(data.begin(), data.end()) {}\n"
-		  << "\tprotocache::Data Serialize() const;\n\n";
-
-	auto define_simple_field = [&oss_h](bool repeated, const std::string& field_name,
-			const char* out_type, const char* get_type=nullptr) {
-		if (repeated) {
-			oss_h << "\tprotocache::ArrayEX<" << (get_type != nullptr? get_type : out_type) << "> " << field_name << ";\n";
+	std::string cxx_ns;
+	for (auto ch : ns) {
+		if (ch == '.') {
+			cxx_ns += "::";
 		} else {
-			oss_h << '\t' << out_type << ' ' << field_name << ";\n";
+			cxx_ns += ch;
 		}
-	};
+	}
+	cxx_ns += "::";
+	cxx_ns += proto.name();
+	cxx_ns += "::";
 
+	oss << '\t' << proto.name() << "() = default;\n"
+		<< '\t' << proto.name() << "(const uint32_t* data, const uint32_t* end) : __view__(data, end) {}\n"
+		<< "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
+		<< proto.name() << "(data.begin(), data.end()) {}\n"
+		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
+		<< "\t\treturn " << cxx_ns << "Detect(ptr, end);\n"
+		<< "\t}\n"
+		<< "\tprotocache::Data Serialize(const uint32_t* end=nullptr) const {\n"
+		<< "\t\tstd::vector<protocache::Data> parts(" << proto.field_size() << ");\n";
 	for (auto& one : proto.field()) {
+		if (one.options().deprecated()) {
+			continue;
+		}
+		oss << "\t\tparts[_::" << one.name() << "] = __view__.SerializeField(_::"
+			<< one.name() << ", end, _" << one.name() << ");\n";
+	}
+	oss << "\t\treturn protocache::SerializeMessage(parts);\n"
+		<< "\t}\n\n";
+
+	std::vector<std::string> types(proto.field_size());
+	for (int i = 0; i < proto.field_size(); i++) {
+		auto& one = proto.field(i);
 		if (one.options().deprecated()) {
 			continue;
 		}
@@ -595,6 +615,7 @@ static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::De
 			std::cerr << "found illegal field in message " << fullname << std::endl;
 			return {};
 		}
+		auto& type = types[i];
 		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
 		switch (one.type()) {
 			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
@@ -613,136 +634,79 @@ static CodePair GenMessageEX(const std::string& ns, const ::google::protobuf::De
 							std::cerr << "illegal value type: " << value_field.type() << std::endl;
 							return {};
 						}
-						oss_h << "\tprotocache::MapEX<" << key << ',' << value << "> " << one.name() << ";\n";
+						type = "protocache::MapEX<";
+						type += key;
+						type += ',';
+						type += value;
+						type += '>';
 					} else {
-						auto value = TypeName(one.type(), one.type_name(), true);
-						oss_h << "\tprotocache::ArrayEX<" << value << "> " << one.name() << ";\n";
+						type = "protocache::ArrayEX<";
+						type += TypeName(one.type(), one.type_name(), true);
+						type += '>';
 					}
 				} else {
-					auto name = TypeName(one.type(), one.type_name(), true);
-					oss_h << '\t' << name << ' ' << one.name() << ";\n";
+					type = TypeName(one.type(), one.type_name(), true);
 				}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				define_simple_field(repeated, one.name(), "std::string", "protocache::Slice<uint8_t>");
+				type = repeated? "protocache::ArrayEX<protocache::Slice<uint8_t>>" : "std::string";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				define_simple_field(repeated, one.name(), "std::string", "protocache::Slice<char>");
+				type = repeated? "protocache::ArrayEX<protocache::Slice<char>>" : "std::string";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-				define_simple_field(repeated, one.name(), "double");
+				type = repeated? "protocache::ArrayEX<double>" : "double";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-				define_simple_field(repeated, one.name(), "float");
+				type = repeated? "protocache::ArrayEX<float>" : "float";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-				define_simple_field(repeated, one.name(), "uint64_t");
+				type = repeated? "protocache::ArrayEX<uint64_t>" : "uint64_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-				define_simple_field(repeated, one.name(), "uint32_t");
+				type = repeated? "protocache::ArrayEX<uint32_t>" : "uint32_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-				define_simple_field(repeated, one.name(), "int64_t");
+				type = repeated? "protocache::ArrayEX<int64_t>" : "int64_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-				define_simple_field(repeated, one.name(), "int32_t");
+				type = repeated? "protocache::ArrayEX<int32_t>" : "int32_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				define_simple_field(repeated, one.name(), "bool");
+				type = repeated? "protocache::ArrayEX<bool>" : "bool";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				define_simple_field(repeated, one.name(), "protocache::EnumValue");
+				type = repeated? "protocache::ArrayEX<protocache::EnumValue>" : "protocache::EnumValue";
 				break;
 			default:
 				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
 				return {};
 		}
+		oss << '\t' << type << "& " << one.name() << "(const uint32_t* end=nullptr) { return __view__.GetField(_::"
+			<< one.name() << ", end, _" << one.name() << "); }\n";
 	}
-	oss_h << "};\n\n";
 
-	std::string cxx_ns;
-	for (auto ch : ns) {
-		if (ch == '.') {
-			cxx_ns += "::";
-		} else {
-			cxx_ns += ch;
-		}
-	}
-	cxx_ns += "::";
-	cxx_ns += proto.name();
-	cxx_ns += "::";
-
-	oss_s << "ex" << cxx_ns << proto.name() << "(const uint32_t* _data, const uint32_t* _end) {\n"
-		  << "\tusing _ = " << cxx_ns << "_;\n"
-		  << "\tprotocache::Message _view(_data, _end);\n";
-	for (auto& one : proto.field()) {
+	oss << "\nprivate:\n"
+		<< "\tusing _ = " << cxx_ns << "_;\n"
+		<< "\tprotocache::MessageEX<" << proto.field_size() << "> __view__;\n";
+	for (int i = 0; i < proto.field_size(); i++) {
+		auto &one = proto.field(i);
 		if (one.options().deprecated()) {
 			continue;
 		}
-		oss_s << "\tprotocache::ExtractField(_view, _::" << one.name() << ", _end, &" << one.name() << ");\n";
+		oss << '\t' << types[i] << " _" << one.name() << ";\n";
 	}
-	oss_s << "};\n\n"
-		  << "protocache::Data ex" << cxx_ns << "Serialize() const {\n"
-		  << "\tusing _ = " << cxx_ns << "_;\n"
-		  << "\tstd::vector<protocache::Data> parts(" << proto.field_size() << ");\n";
-	for (auto& one : proto.field()) {
-		if (one.options().deprecated()) {
-			continue;
-		}
-		if (one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
-			oss_s << "\tif (!" << one.name() << ".empty()) {\n"
-				<< "\t\tparts[_::" << one.name() << "] = protocache::Serialize("  << one.name() <<  ");\n"
-				<< "\t\tif (parts[_::" << one.name() << "].empty()) return {};\n"
-				<< "\t}\n";
-			continue;
-		}
-		switch (one.type()) {
-			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
-				oss_s << "\tparts[_::" << one.name() << "] = protocache::Serialize(" << one.name() << ");\n"
-					<< "\tif (parts[_::" << one.name() << "].empty()) return {};\n"
-					<< "\tif (parts[_::" << one.name() << "].size() == 1) { parts[_::" << one.name() << "].clear(); }\n";
-				break;
-			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				oss_s << "\tif (!" << one.name() << ".empty()) {\n"
-					  << "\t\tparts[_::" << one.name() << "] = protocache::Serialize("  << one.name() <<  ");\n"
-					  << "\t\tif (parts[_::" << one.name() << "].empty()) return {};\n"
-					  << "\t}\n";
-				break;
-			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				oss_s << "\tif (" << one.name() << " != 0) { parts[_::" << one.name() << "] = protocache::Serialize(" << one.name() <<  "); }\n";
-				break;
-			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				oss_s << "\tif (" << one.name() << ") { parts[_::" << one.name() << "] = protocache::Serialize(" << one.name() <<  "); }\n";
-				break;
-			default:
-				return {};
-		}
-	}
-	oss_s << "\treturn protocache::SerializeMessage(parts);\n}\n\n";
-
-	return {oss_h.str(), oss_s.str()};
+	oss << "};\n\n";
+	return oss.str();
 }
 
-static std::string ConvertExHeaderFilename(const std::string& name) {
+static std::string ConvertExFilename(const std::string& name) {
 	auto pos = name.rfind('.');
 	if (pos == std::string::npos) {
 		return name + ".pc-ex.h";
@@ -750,32 +714,21 @@ static std::string ConvertExHeaderFilename(const std::string& name) {
 	return name.substr(0, pos+1) + "pc-ex.h";
 }
 
-static std::string ConvertExSourceFilename(const std::string& name) {
-	auto pos = name.rfind('.');
-	if (pos == std::string::npos) {
-		return name + ".pc-ex.cc";
-	}
-	return name.substr(0, pos+1) + "pc-ex.cc";
-}
-
-static CodePair GenFileEX(const ::google::protobuf::FileDescriptorProto& proto) {
-	std::ostringstream oss_h, oss_s;
+static std::string GenFileEX(const ::google::protobuf::FileDescriptorProto& proto) {
+	std::ostringstream oss;
 	auto header_name = HeaderName(proto.name());
-	oss_h << "#pragma once\n"
+	oss << "#pragma once\n"
 		<< "#ifndef PROTOCACHE_INCLUDED_EX_" << header_name << '\n'
 		<< "#define PROTOCACHE_INCLUDED_EX_" << header_name << '\n';
 
-	oss_h << "\n#include <protocache/access-ex.h>\n";
+	oss << "\n#include <protocache/access-ex.h>\n";
 	for (auto& one : proto.dependency()) {
 		if (IsIgnoredDependency(one)) {
 			continue;
 		}
-		oss_h << "#include \"" << ConvertExHeaderFilename(one) << "\"\n";
+		oss << "#include \"" << ConvertExFilename(one) << "\"\n";
 	}
-	oss_h << '\n';
-
-	oss_s << "\n#include \"" << ConvertFilename(proto.name())  << "\"\n"
-		 << "#include \"" << ConvertExHeaderFilename(proto.name())  << "\"\n\n";
+	oss << '\n';
 
 	std::string ns;
 	std::vector<std::string> ns_parts;
@@ -783,27 +736,25 @@ static CodePair GenFileEX(const ::google::protobuf::FileDescriptorProto& proto) 
 		ns = '.' + proto.package();
 		Split(proto.package(), '.', &ns_parts);
 	}
-	oss_h << "namespace ex {\n";
+	oss << "namespace ex {\n";
 	for (auto& part : ns_parts) {
-		oss_h << "namespace " << part << " {\n";
+		oss << "namespace " << part << " {\n";
 	}
-	oss_h << '\n';
+	oss << '\n';
 
 	for (auto& one : proto.message_type()) {
 		if (one.options().deprecated()) {
 			continue;
 		}
-		auto piece = GenMessageEX(ns, one);
-		oss_h << piece.header;
-		oss_s << piece.source;
+		oss << GenMessageEX(ns, one);
 	}
 
 	for (auto it = ns_parts.rbegin(); it != ns_parts.rend(); ++it) {
-		oss_h << "} // " << *it << '\n';
+		oss << "} // " << *it << '\n';
 	}
-	oss_h << "} //ex\n";
-	oss_h << "#endif // PROTOCACHE_INCLUDED_" << header_name << '\n';
-	return {oss_h.str(), oss_s.str()};
+	oss << "} //ex\n";
+	oss << "#endif // PROTOCACHE_INCLUDED_" << header_name << '\n';
+	return oss.str();
 }
 
 int main() {
@@ -848,13 +799,9 @@ int main() {
 			return -2;
 		}
 		if (extra) {
-			auto extra_code = GenFileEX(proto);
-			auto header = response.add_file();
-			header->set_name(ConvertExHeaderFilename(proto.name()));
-			header->set_content(extra_code.header);
-			auto source = response.add_file();
-			source->set_name(ConvertExSourceFilename(proto.name()));
-			source->set_content(extra_code.source);
+			auto ex = response.add_file();
+			ex->set_name(ConvertExFilename(proto.name()));
+			ex->set_content(GenFileEX(proto));
 		}
 	}
 

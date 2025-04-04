@@ -57,8 +57,8 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize (1 million times) | 550ms | 2416ms | 7859ms |
-| Decode + Traverse + Dealloc (1 million times) | 1941ms | 1042ms | 154ms |
+| Serialize (1 million times) | 550ms | 2618ms | 7768ms |
+| Decode + Traverse + Dealloc (1 million times) | 1941ms | 1048ms | 154ms |
 
 ## Reflection
 ```cpp

@@ -12,6 +12,7 @@
 #include <utility>
 #include <atomic>
 #include <memory>
+#include <bitset>
 #include <vector>
 #include <unordered_map>
 #include "access.h"
@@ -43,7 +44,9 @@ private:
 public:
 	ArrayEX() = default;
 	ArrayEX(const uint32_t* data, const uint32_t* end);
-
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return ArrayT<T>::Detect(ptr, end);
+	}
 	Data Serialize() const;
 
 	size_t size() const noexcept { return core_.size(); }
@@ -186,16 +189,6 @@ static inline std::string ExtractField(const FieldT<Slice<uint8_t>>& field, cons
 	return out;
 }
 
-template <typename T>
-static inline void ExtractField(const Message& message, unsigned id, const uint32_t* end, T* out) {
-	*out = FieldT<T>(message.GetField(id, end)).Get(end);
-}
-
-static inline void ExtractField(const Message& message, unsigned id, const uint32_t* end, std::string* out) {
-	auto view = FieldT<Slice<char>>(message.GetField(id, end)).Get(end);
-	out->assign(view.data(), view.size());
-}
-
 template <typename K, typename V>
 class _MapKeyReader : public KeyReader {
 public:
@@ -269,7 +262,9 @@ public:
 			core_.emplace(std::move(key), std::move(val));
 		}
 	}
-
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return MapT<Key,Val>::Detect(ptr, end);
+	}
 	Data Serialize() const {
 		_MapKeyReader<KeyEX,ValEX> reader(core_);
 		auto index = PerfectHash::Build(reader, true);
@@ -312,6 +307,98 @@ public:
 		return core_.emplace(std::forward<Args>(args)...);
 	}
 };
+
+template <size_t N>
+class MessageEX final {
+public:
+	MessageEX() = default;
+	MessageEX(const uint32_t* ptr, const uint32_t* end) : core_(ptr, end) {}
+
+	template <typename T>
+	T& GetField(unsigned id, const uint32_t* end, T& field) {
+		if (!_accessed.test(id)) {
+			_accessed.set(id);
+			ExtractField(core_, id, end, field);
+		}
+		return field;
+	}
+
+	Data SerializeField(unsigned id, const uint32_t* end, const std::string& field) const {
+		if (!_accessed.test(id)) {
+			return CopyField<Slice<char>>(id, end);
+		} else if (field.empty()) {
+			return {};
+		}
+		return Serialize(field);
+	}
+
+	template<typename T, std::enable_if_t<std::is_scalar<T>::value, bool> = true>
+	Data SerializeField(unsigned id, const uint32_t* end, const T& field) const {
+		if (!_accessed.test(id)) {
+			return CopyField<T>(id, end);
+		} else if (field == 0) {
+			return {};
+		}
+		return Serialize(field);
+	}
+
+	template <typename T, std::enable_if_t<!std::is_scalar<T>::value, bool> = true>
+	Data SerializeField(unsigned id, const uint32_t* end, const T& field) const {
+		Data out;
+		if (!_accessed.test(id)) {
+			out = CopyField<T>(id, end);
+		} else {
+			out = Serialize(field);
+		}
+		if (out.size() == 1) {
+			out.clear();
+		}
+		return out;
+	}
+
+	template <typename T>
+	Data SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field) const {
+		if (!_accessed.test(id)) {
+			return CopyField<ArrayEX<T>>(id, end);
+		} else if (field.empty()) {
+			return {};
+		}
+		return Serialize(field);
+	}
+
+	template <typename K, typename V>
+	Data SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field) const {
+		if (!_accessed.test(id)) {
+			return CopyField<MapEX<K,V>>(id, end);
+		} else if (field.empty()) {
+			return {};
+		}
+		return Serialize(field);
+	}
+
+private:
+	Message core_;
+	std::bitset<N> _accessed;
+
+	template <typename T>
+	static void ExtractField(const Message& message, unsigned id, const uint32_t* end, T& out) {
+		out = FieldT<T>(message.GetField(id, end)).Get(end);
+	}
+
+	static void ExtractField(const Message& message, unsigned id, const uint32_t* end, std::string& out) {
+		auto view = FieldT<Slice<char>>(message.GetField(id, end)).Get(end);
+		out.assign(view.data(), view.size());
+	}
+
+	template <typename T>
+	Data CopyField(unsigned id, const uint32_t* end) const {
+		auto t = DetectField<T>(core_, id, end);
+		Data out;
+		out.assign(t.data(), t.size());
+		return out;
+	}
+};
+
 
 } // protocache
 #endif // PROTOCACHE_ACCESS_EX_H_

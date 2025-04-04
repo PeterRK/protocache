@@ -78,7 +78,10 @@ static protocache::Data SerializeByProtobuf() {
 	return protocache::Serialize(*message);
 }
 
-static void TestProtoCacheAccess(const protocache::Data& data) {
+
+TEST(PtotoCache, Basic) {
+	auto data = SerializeByProtobuf();
+	ASSERT_EQ(195, data.size());
 	auto end = data.data() + data.size();
 	test::Main root(data.data());
 	ASSERT_FALSE(!root);
@@ -211,12 +214,6 @@ static void TestProtoCacheAccess(const protocache::Data& data) {
 	ASSERT_EQ(vec[1], 52);
 }
 
-TEST(PtotoCache, Basic) {
-	auto data = SerializeByProtobuf();
-	ASSERT_EQ(195, data.size());
-	TestProtoCacheAccess(data);
-}
-
 TEST(PtotoCache, Reflection) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
@@ -333,82 +330,82 @@ TEST(PtotoCacheEX, Basic) {
 	protocache::Slice<uint32_t> view(data);
 	::ex::test::Main root(view);
 
-	ASSERT_EQ(-999, root.i32);
-	ASSERT_EQ(1234, root.u32);
-	ASSERT_EQ(-9876543210LL, root.i64);
-	ASSERT_EQ(98765432123456789ULL, root.u64);
-	ASSERT_TRUE(root.flag);
-	ASSERT_EQ(test::Mode::MODE_C, root.mode);
-	ASSERT_EQ(root.str, "Hello World!");
-	ASSERT_EQ(root.data, "abc123!?$*&()'-=@~");
-	ASSERT_EQ(-2.1f, root.f32);
-	ASSERT_EQ(1.0, root.f64);
+	ASSERT_EQ(-999, root.i32());
+	ASSERT_EQ(1234, root.u32());
+	ASSERT_EQ(-9876543210LL, root.i64());
+	ASSERT_EQ(98765432123456789ULL, root.u64());
+	ASSERT_TRUE(root.flag());
+	ASSERT_EQ(test::Mode::MODE_C, root.mode());
+	ASSERT_EQ(root.str(), "Hello World!");
+	ASSERT_EQ(root.data(), "abc123!?$*&()'-=@~");
+	ASSERT_EQ(-2.1f, root.f32());
+	ASSERT_EQ(1.0, root.f64());
 
-	ASSERT_EQ(88, root.object.i32);
-	ASSERT_FALSE(root.object.flag);
-	ASSERT_EQ(root.object.str, "tmp");
+	ASSERT_EQ(88, root.object().i32());
+	ASSERT_FALSE(root.object().flag());
+	ASSERT_EQ(root.object().str(), "tmp");
 
-	ASSERT_EQ(root.i32v.size(), 2);
-	ASSERT_EQ(root.i32v[0], 1);
-	ASSERT_EQ(root.i32v[1], 2);
+	ASSERT_EQ(root.i32v().size(), 2);
+	ASSERT_EQ(root.i32v()[0], 1);
+	ASSERT_EQ(root.i32v()[1], 2);
 
-	ASSERT_EQ(root.u64v.size(), 1);
-	ASSERT_EQ(root.u64v[0], 12345678987654321ULL);
+	ASSERT_EQ(root.u64v().size(), 1);
+	ASSERT_EQ(root.u64v()[0], 12345678987654321ULL);
 
 	std::vector<std::string> expected_strv = {"abc","apple","banana","orange","pear","grape",
 											  "strawberry","cherry","mango","watermelon"};
 
-	ASSERT_EQ(root.strv.size(), expected_strv.size());
+	ASSERT_EQ(root.strv().size(), expected_strv.size());
 	auto sit = expected_strv.begin();
-	for (const auto& one : root.strv) {
+	for (const auto& one : root.strv()) {
 		ASSERT_EQ(one, *sit++);
 	}
 
-	ASSERT_EQ(root.f32v.size(), 2);
-	ASSERT_EQ(root.f32v[0], 1.1f);
-	ASSERT_EQ(root.f32v[1], 2.2f);
+	ASSERT_EQ(root.f32v().size(), 2);
+	ASSERT_EQ(root.f32v()[0], 1.1f);
+	ASSERT_EQ(root.f32v()[1], 2.2f);
 
 	std::vector<double> expected_f64v = {9.9,8.8,7.7,6.6,5.5};
-	ASSERT_EQ(root.f64v.size(), expected_f64v.size());
-	for (unsigned i = 0; i < root.f64v.size(); i++) {
-		ASSERT_EQ(root.f64v[i], expected_f64v[i]);
+	ASSERT_EQ(root.f64v().size(), expected_f64v.size());
+	for (unsigned i = 0; i < root.f64v().size(); i++) {
+		ASSERT_EQ(root.f64v()[i], expected_f64v[i]);
 	}
 
 	std::vector<double> expected_flags = {true,true,false,true,false,false,false};
-	ASSERT_EQ(root.flags.size(), expected_flags.size());
-	for (unsigned i = 0; i < root.flags.size(); i++) {
-		ASSERT_EQ(root.flags[i], expected_flags[i]);
+	ASSERT_EQ(root.flags().size(), expected_flags.size());
+	for (unsigned i = 0; i < root.flags().size(); i++) {
+		ASSERT_EQ(root.flags()[i], expected_flags[i]);
 	}
 
-	ASSERT_EQ(root.objectv.size(), 3);
-	ASSERT_EQ(root.objectv[0].i32, 1);
-	ASSERT_TRUE(root.objectv[1].flag);
-	ASSERT_EQ(root.objectv[2].str, "good luck!");
+	ASSERT_EQ(root.objectv().size(), 3);
+	ASSERT_EQ(root.objectv()[0].i32(), 1);
+	ASSERT_TRUE(root.objectv()[1].flag());
+	ASSERT_EQ(root.objectv()[2].str(), "good luck!");
 
-	ASSERT_EQ(root.index.size(), 6);
-	auto mit = root.index.find("abc-1");
-	ASSERT_NE(mit, root.index.end());
+	ASSERT_EQ(root.index().size(), 6);
+	auto mit = root.index().find("abc-1");
+	ASSERT_NE(mit, root.index().end());
 	ASSERT_EQ(1, mit->second);
-	mit  = root.index.find("abc-2");
-	ASSERT_NE(mit, root.index.end());
+	mit  = root.index().find("abc-2");
+	ASSERT_NE(mit, root.index().end());
 	ASSERT_EQ(2,  mit->second);
-	mit = root.index.find("abc-3");
-	ASSERT_EQ(mit, root.index.end());
-	mit  = root.index.find("abc-4");
-	ASSERT_EQ(mit, root.index.end());
+	mit = root.index().find("abc-3");
+	ASSERT_EQ(mit, root.index().end());
+	mit  = root.index().find("abc-4");
+	ASSERT_EQ(mit, root.index().end());
 
-	ASSERT_EQ(root.objects.size(), 4);
-	for (const auto& pair : root.objects) {
+	ASSERT_EQ(root.objects().size(), 4);
+	for (auto& pair : root.objects()) {
 		ASSERT_NE(pair.first, 0);
-		ASSERT_EQ(pair.first, pair.second.i32);
+		ASSERT_EQ(pair.first, pair.second.i32());
 	}
 
-	ASSERT_EQ(root.matrix.size(), 3);
-	ASSERT_EQ(root.matrix[2].size(), 3);
-	ASSERT_EQ(root.matrix[2][2], 9);
+	ASSERT_EQ(root.matrix().size(), 3);
+	ASSERT_EQ(root.matrix()[2].size(), 3);
+	ASSERT_EQ(root.matrix()[2][2], 9);
 
-	ASSERT_EQ(root.vector.size(), 2);
-	auto& map3 = root.vector[0];
+	ASSERT_EQ(root.vector().size(), 2);
+	auto& map3 = root.vector()[0];
 	ASSERT_EQ(map3.size(), 2);
 	auto mit3 = map3.find("lv2");
 	ASSERT_NE(mit3, map3.end());
@@ -417,8 +414,8 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(vec3[0], 21);
 	ASSERT_EQ(vec3[1], 22);
 
-	auto mit4 = root.arrays.find("lv5");
-	ASSERT_NE(mit4, root.arrays.end());
+	auto mit4 = root.arrays().find("lv5");
+	ASSERT_NE(mit4, root.arrays().end());
 	auto& vec4 = mit4->second;
 	ASSERT_EQ(vec4.size(), 2);
 	ASSERT_EQ(vec4[0], 51);
@@ -428,11 +425,53 @@ TEST(PtotoCacheEX, Basic) {
 TEST(PtotoCacheEX, Serialize) {
 	auto data = SerializeByProtobuf();
 	ASSERT_FALSE(data.empty());
+	auto end = data.data() + data.size();
 
-	protocache::Slice<uint32_t> view(data);
-	::ex::test::Main root(view);
-	auto mirror = root.Serialize();
-	ASSERT_EQ(data.size(), mirror.size());
+	protocache::Slice<uint32_t> view1(data);
+	::ex::test::Main ex(view1);
 
-	TestProtoCacheAccess(mirror);
+	ex.strv(end)[0] = "xyz";
+	ex.matrix(end)[1][1] = 999;
+
+	for (auto& pair : ex.objects(end)) {
+		pair.second.i32(end) = pair.first + 1;
+	}
+
+	auto modified = ex.Serialize();
+	ASSERT_EQ(data.size(), modified.size());
+	end = modified.data() + modified.size();
+
+	protocache::Slice<uint32_t> view2(modified);
+	::ex::test::Main root(view2);
+
+	ASSERT_EQ(root.str(end), "Hello World!");
+	ASSERT_EQ(root.data(end), "abc123!?$*&()'-=@~");
+	ASSERT_EQ(-2.1f, root.f32(end));
+	ASSERT_EQ(1.0, root.f64(end));
+
+	std::vector<std::string> expected_strv = {"xyz","apple","banana","orange","pear","grape",
+											  "strawberry","cherry","mango","watermelon"};
+
+	ASSERT_EQ(root.strv(end).size(), expected_strv.size());
+	auto sit = expected_strv.begin();
+	for (const auto& one : root.strv(end)) {
+		ASSERT_EQ(one, *sit++);
+	}
+
+	ASSERT_EQ(root.matrix(end).size(), 3);
+	ASSERT_EQ(root.matrix(end)[1][1], 999);
+	ASSERT_EQ(root.matrix(end)[2][2], 9);
+
+	ASSERT_EQ(root.objects(end).size(), 4);
+	for (auto& pair : root.objects(end)) {
+		ASSERT_EQ(pair.first+1, pair.second.i32(end));
+	}
+
+	auto mit4 = root.arrays().find("lv5");
+	ASSERT_NE(mit4, root.arrays().end());
+	auto& vec4 = mit4->second;
+	ASSERT_EQ(vec4.size(), 2);
+	ASSERT_EQ(vec4[0], 51);
+	ASSERT_EQ(vec4[1], 52);
 }
+
