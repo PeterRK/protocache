@@ -44,10 +44,10 @@ test::Main root(data.data());
 ASSERT_FALSE(!root);
 
 // =========extra api=========
-protocache::Slice<uint32_t> view(data);
-::ex::test::Main root(view);
+::ex::test::Main ex_root(data.data());
 
-auto copy = root.Serialize();
+
+auto copy = ex_root.Serialize();
 ASSERT_EQ(data.size(), copy.size());
 
 // deserialize to pb
@@ -57,7 +57,7 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize (1 million times) | 550ms | 2618ms | 7768ms |
+| Serialize (1 million times) | 550ms | 2555ms | 7768ms |
 | Decode + Traverse + Dealloc (1 million times) | 1941ms | 1048ms | 154ms |
 
 ## Reflection

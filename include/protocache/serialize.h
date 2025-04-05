@@ -74,6 +74,7 @@ static inline Data Serialize(const std::string& str) {
 	return Serialize(Slice<char>(str));
 }
 
+extern Data SerializeMessage(std::vector<Slice<uint32_t>>& parts);
 extern Data SerializeMessage(std::vector<Data>& parts);
 extern Data SerializeArray(const std::vector<Data>& elements);
 extern Data SerializeMap(const Slice<uint8_t>& index, const std::vector<Data>& keys, const std::vector<Data>& values);

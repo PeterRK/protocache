@@ -22,8 +22,8 @@ public:
 		static constexpr unsigned str = 2;
 	};
 
-	explicit Small(const protocache::Message& message) : core_(message) {}
 	explicit Small(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
+	explicit Small(const protocache::Slice<uint32_t>& data) : Small(data.begin(), data.end()) {}
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 
@@ -101,8 +101,8 @@ public:
 		static constexpr unsigned arrays = 29;
 	};
 
-	explicit Main(const protocache::Message& message) : core_(message) {}
 	explicit Main(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
+	explicit Main(const protocache::Slice<uint32_t>& data) : Main(data.begin(), data.end()) {}
 	bool operator!() const noexcept { return !core_; }
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
 

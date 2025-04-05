@@ -256,8 +256,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		return oss.str();
 	}
 
-	oss << "\texplicit " << proto.name() << "(const protocache::Message& message) : core_(message) {}\n"
-		<< "\texplicit " << proto.name() << "(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}\n"
+	oss << "\texplicit " << proto.name() << "(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}\n"
+		<< "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
+		<< proto.name() << "(data.begin(), data.end()) {}\n"
 		<< "\tbool operator!() const noexcept { return !core_; }\n"
 		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n"
 		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
@@ -587,20 +588,22 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 	cxx_ns += "::";
 
 	oss << '\t' << proto.name() << "() = default;\n"
-		<< '\t' << proto.name() << "(const uint32_t* data, const uint32_t* end) : __view__(data, end) {}\n"
+		<< "\texplicit " << proto.name() << "(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}\n"
 		<< "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
 		<< proto.name() << "(data.begin(), data.end()) {}\n"
 		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
 		<< "\t\treturn " << cxx_ns << "Detect(ptr, end);\n"
 		<< "\t}\n"
 		<< "\tprotocache::Data Serialize(const uint32_t* end=nullptr) const {\n"
-		<< "\t\tstd::vector<protocache::Data> parts(" << proto.field_size() << ");\n";
+		<< "\t\tstd::vector<protocache::Data> raw(" << proto.field_size() << ");\n"
+		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << proto.field_size() << ");\n";
+
 	for (auto& one : proto.field()) {
 		if (one.options().deprecated()) {
 			continue;
 		}
 		oss << "\t\tparts[_::" << one.name() << "] = __view__.SerializeField(_::"
-			<< one.name() << ", end, _" << one.name() << ");\n";
+			<< one.name() << ", end, _" << one.name() << ", raw[_::" << one.name() << "]);\n";
 	}
 	oss << "\t\treturn protocache::SerializeMessage(parts);\n"
 		<< "\t}\n\n";

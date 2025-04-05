@@ -52,7 +52,8 @@ Data Serialize(const Slice<char>& str) {
 	return out;
 }
 
-Data SerializeMessage(std::vector<Data>& parts) {
+template <typename T>
+Data DoSerializeMessage(std::vector<T>& parts) {
 	while (!parts.empty() && parts.back().empty()) {
 		parts.pop_back();
 	}
@@ -124,7 +125,7 @@ Data SerializeMessage(std::vector<Data>& parts) {
 			continue;
 		}
 		if (one.size() < 4) {
-			out += one;
+			out.append(one.data(), one.size());
 		} else {
 			out.push_back(0);
 		}
@@ -134,12 +135,20 @@ Data SerializeMessage(std::vector<Data>& parts) {
 			off += one.size();
 		} else {
 			out[off] = Offset(out.size()-off);
-			out += one;
+			out.append(one.data(), one.size());
 			off++;
 		}
 	}
 	assert(out.size() == size);
 	return out;
+}
+
+Data SerializeMessage(std::vector<Data>& parts) {
+	return DoSerializeMessage(parts);
+}
+
+Data SerializeMessage(std::vector<Slice<uint32_t>>& parts) {
+	return DoSerializeMessage(parts);
 }
 
 static size_t BestArraySize(const std::vector<Data>& parts, unsigned& m) {

@@ -41,6 +41,9 @@ public:
 	size_t size() const noexcept {
 		return len_;
 	}
+	bool empty() const noexcept {
+		return len_ == 0;
+	}
 
 private:
 	const T* ptr_ = nullptr;

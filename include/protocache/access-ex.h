@@ -323,57 +323,59 @@ public:
 		return field;
 	}
 
-	Data SerializeField(unsigned id, const uint32_t* end, const std::string& field) const {
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return CopyField<Slice<char>>(id, end);
+			return DetectField<Slice<char>>(core_, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
-		return Serialize(field);
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
 	}
 
 	template<typename T, std::enable_if_t<std::is_scalar<T>::value, bool> = true>
-	Data SerializeField(unsigned id, const uint32_t* end, const T& field) const {
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return CopyField<T>(id, end);
+			return DetectField<T>(core_, id, end);
 		} else if (field == 0) {
 			return {};
 		}
-		return Serialize(field);
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
 	}
 
 	template <typename T, std::enable_if_t<!std::is_scalar<T>::value, bool> = true>
-	Data SerializeField(unsigned id, const uint32_t* end, const T& field) const {
-		Data out;
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			out = CopyField<T>(id, end);
-		} else {
-			out = Serialize(field);
+			return DetectField<T>(core_, id, end);
 		}
-		if (out.size() == 1) {
-			out.clear();
+		data = Serialize(field);
+		if (data.size() == 1) {
+			data.clear();
 		}
-		return out;
+		return Slice<uint32_t>(data);
 	}
 
 	template <typename T>
-	Data SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field) const {
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return CopyField<ArrayEX<T>>(id, end);
+			return DetectField<ArrayT<T>>(core_, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
-		return Serialize(field);
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
 	}
 
 	template <typename K, typename V>
-	Data SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field) const {
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return CopyField<MapEX<K,V>>(id, end);
+			return DetectField<MapT<K,V>>(core_, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
-		return Serialize(field);
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
 	}
 
 private:
@@ -388,14 +390,6 @@ private:
 	static void ExtractField(const Message& message, unsigned id, const uint32_t* end, std::string& out) {
 		auto view = FieldT<Slice<char>>(message.GetField(id, end)).Get(end);
 		out.assign(view.data(), view.size());
-	}
-
-	template <typename T>
-	Data CopyField(unsigned id, const uint32_t* end) const {
-		auto t = DetectField<T>(core_, id, end);
-		Data out;
-		out.assign(t.data(), t.size());
-		return out;
 	}
 };
 
