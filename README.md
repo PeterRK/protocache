@@ -50,7 +50,7 @@ auto copy = ex_root.Serialize();
 ASSERT_EQ(data.size(), copy.size());
 
 // deserialize to pb
-protocache::Deserialize(view, &pb_mirror);
+protocache::Deserialize(protocache::Slice<uint32_t>(data), &pb_mirror);
 ```
 You can create protocache binary by serializing a protobuf message with protocache::Serialize. The Basic API offers fast read-only access with zero-copy technique. Extra APIs provide a mutable object and another serialization method, which only reserialize accessed parts. 
 
