@@ -16,7 +16,8 @@ int main() {
 	BenchmarkProtoCacheEX();
 	std::cout << "========serialize========" << std::endl;
 	BenchmarkProtobufSerialize();
-	BenchmarkProtoCacheSerialize();
+	BenchmarkProtoCacheSerialize(true);
+	BenchmarkProtoCacheSerialize(false);
 	BenchmarkProtoCacheSerializeReflect();
 	return 0;
 }

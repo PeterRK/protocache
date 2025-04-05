@@ -414,7 +414,7 @@ int BenchmarkProtoCacheEX() {
 	return 0;
 }
 
-int BenchmarkProtoCacheSerialize() {
+int BenchmarkProtoCacheSerialize(bool partly) {
 	std::string raw;
 	if (!protocache::LoadFile("test.pc", &raw)) {
 		puts("fail to load test.pc");
@@ -424,8 +424,24 @@ int BenchmarkProtoCacheSerialize() {
 	protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t*>(raw.data()), raw.size()/4);
 	::ex::test::Main root(view);
 
-	Junk2 junk;
-	junk.Traverse(root);
+	if (partly) {
+		root.i32();
+		root.u32();
+		root.i64();
+		root.u64();
+		root.flag();
+		root.mode();
+		root.str();
+		root.data();
+		root.f32();
+		root.f64();
+		//root.object();
+		//root.objectv();
+		//root.objects();
+	} else {
+		Junk2 junk;
+		junk.Traverse(root);
+	}
 
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
@@ -434,6 +450,10 @@ int BenchmarkProtoCacheSerialize() {
 	}
 	auto delta_ms = DeltaMs(start);
 
-	printf("protocache: %ldms %x\n", delta_ms, cnt);
+	if (partly) {
+		printf("protocache-partly: %ldms %x\n", delta_ms, cnt);
+	} else {
+		printf("protocache-fully: %ldms %x\n", delta_ms, cnt);
+	}
 	return 0;
 }

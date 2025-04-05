@@ -430,6 +430,7 @@ TEST(PtotoCacheEX, Serialize) {
 	protocache::Slice<uint32_t> view1(data);
 	::ex::test::Main ex(view1);
 
+	ex.objectv();
 	ex.strv(end)[0] = "xyz";
 	ex.matrix(end)[1][1] = 999;
 

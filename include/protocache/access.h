@@ -128,7 +128,7 @@ static inline unsigned Count64(uint64_t v) noexcept {
 	return v & 0xffU;
 }
 
-class Message final {
+class Message {
 public:
 	Message() noexcept : ptr_(&s_empty) {};
 	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(&s_empty) {
@@ -213,7 +213,7 @@ public:
 		return Field(body + off, width);
 	}
 
-private:
+protected:
 	const uint32_t* ptr_;
 	static const uint32_t s_empty;
 };

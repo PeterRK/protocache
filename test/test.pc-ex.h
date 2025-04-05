@@ -15,6 +15,11 @@ struct Small final {
 		return ::test::Small::Detect(ptr, end);
 	}
 	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+		auto clean_head = __view__.CleanHead();
+		if (clean_head != nullptr) {
+			auto view = Detect(clean_head, end);
+			return {view.data(), view.size()};
+		}
 		std::vector<protocache::Data> raw(3);
 		std::vector<protocache::Slice<uint32_t>> parts(3);
 		parts[_::i32] = __view__.SerializeField(_::i32, end, _i32, raw[_::i32]);
@@ -59,6 +64,11 @@ struct Main final {
 		return ::test::Main::Detect(ptr, end);
 	}
 	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+		auto clean_head = __view__.CleanHead();
+		if (clean_head != nullptr) {
+			auto view = Detect(clean_head, end);
+			return {view.data(), view.size()};
+		}
 		std::vector<protocache::Data> raw(30);
 		std::vector<protocache::Slice<uint32_t>> parts(30);
 		parts[_::i32] = __view__.SerializeField(_::i32, end, _i32, raw[_::i32]);

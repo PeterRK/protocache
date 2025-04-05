@@ -309,23 +309,30 @@ public:
 };
 
 template <size_t N>
-class MessageEX final {
+class MessageEX final : public Message {
 public:
 	MessageEX() = default;
-	MessageEX(const uint32_t* ptr, const uint32_t* end) : core_(ptr, end) {}
+	MessageEX(const uint32_t* ptr, const uint32_t* end) : Message(ptr, end) {}
+	const uint32_t* CleanHead() const noexcept {
+		if (_accessed.none()) {
+			return ptr_;
+		} else {
+			return nullptr;
+		}
+	}
 
 	template <typename T>
 	T& GetField(unsigned id, const uint32_t* end, T& field) {
 		if (!_accessed.test(id)) {
 			_accessed.set(id);
-			ExtractField(core_, id, end, field);
+			ExtractField(*this, id, end, field);
 		}
 		return field;
 	}
 
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<Slice<char>>(core_, id, end);
+			return DetectField<Slice<char>>(*this, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
@@ -336,7 +343,7 @@ public:
 	template<typename T, std::enable_if_t<std::is_scalar<T>::value, bool> = true>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<T>(core_, id, end);
+			return DetectField<T>(*this, id, end);
 		} else if (field == 0) {
 			return {};
 		}
@@ -347,7 +354,7 @@ public:
 	template <typename T, std::enable_if_t<!std::is_scalar<T>::value, bool> = true>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<T>(core_, id, end);
+			return DetectField<T>(*this, id, end);
 		}
 		data = Serialize(field);
 		if (data.size() == 1) {
@@ -359,7 +366,7 @@ public:
 	template <typename T>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<ArrayT<T>>(core_, id, end);
+			return DetectField<ArrayT<T>>(*this, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
@@ -370,7 +377,7 @@ public:
 	template <typename K, typename V>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<MapT<K,V>>(core_, id, end);
+			return DetectField<MapT<K,V>>(*this, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
@@ -379,7 +386,6 @@ public:
 	}
 
 private:
-	Message core_;
 	std::bitset<N> _accessed;
 
 	template <typename T>

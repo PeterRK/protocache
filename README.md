@@ -46,18 +46,17 @@ ASSERT_FALSE(!root);
 // =========extra api=========
 ::ex::test::Main ex_root(data.data());
 
-
 auto copy = ex_root.Serialize();
 ASSERT_EQ(data.size(), copy.size());
 
 // deserialize to pb
 protocache::Deserialize(view, &pb_mirror);
 ```
-You can create protocache binary by serializing a protobuf message with protocache::Serialize. The Basic API offers fast read-only access with zero-copy technique. Extra APIs provide a mutable object and another serialization method.
+You can create protocache binary by serializing a protobuf message with protocache::Serialize. The Basic API offers fast read-only access with zero-copy technique. Extra APIs provide a mutable object and another serialization method, which only reserialize accessed parts. 
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize (1 million times) | 550ms | 2555ms | 7768ms |
+| Serialize (1 million times) | 550ms | 357 ~ 2327ms | 7768ms |
 | Decode + Traverse + Dealloc (1 million times) | 1941ms | 1048ms | 154ms |
 
 ## Reflection

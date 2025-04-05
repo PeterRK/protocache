@@ -595,6 +595,11 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\treturn " << cxx_ns << "Detect(ptr, end);\n"
 		<< "\t}\n"
 		<< "\tprotocache::Data Serialize(const uint32_t* end=nullptr) const {\n"
+		<< "\t\tauto clean_head = __view__.CleanHead();\n"
+		<< "\t\tif (clean_head != nullptr) {\n"
+		<< "\t\t\tauto view = Detect(clean_head, end);\n"
+		<< "\t\t\treturn {view.data(), view.size()};\n"
+		<< "\t\t}\n"
 		<< "\t\tstd::vector<protocache::Data> raw(" << proto.field_size() << ");\n"
 		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << proto.field_size() << ");\n";
 
