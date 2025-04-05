@@ -34,20 +34,17 @@ template <>
 struct Adapter<Slice<uint8_t>> { using TypeEX = std::string; };
 
 template <typename T>
-class ArrayEX final {
-private:
+class BaseArrayEX {
+protected:
 	using TypeEX = typename Adapter<T>::TypeEX;
 	using Iterator = typename std::vector<TypeEX>::iterator;
 	using ConstIterator = typename std::vector<TypeEX>::const_iterator;
 	std::vector<TypeEX> core_;
 
 public:
-	ArrayEX() = default;
-	ArrayEX(const uint32_t* data, const uint32_t* end);
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
 		return ArrayT<T>::Detect(ptr, end);
 	}
-	Data Serialize() const;
 
 	size_t size() const noexcept { return core_.size(); }
 	bool empty() const noexcept { return core_.empty(); }
@@ -72,62 +69,95 @@ public:
 	}
 };
 
-template <> inline ArrayEX<bool>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = String(data, end).GetBoolArray();
-	core_.resize(view.size());
-	memcpy(core_.data(), view.data(), view.size());
-}
-template <> inline Data ArrayEX<bool>::Serialize() const {
-	return ::protocache::Serialize(Slice<uint8_t>(core_));
+template <typename T>
+static inline Data Serialize(const T& obj) {
+	return obj.Serialize();
 }
 
-template <> inline ArrayEX<int32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<int32_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<int32_t>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <typename T>
+struct ArrayEX final : public BaseArrayEX<T> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) {
+		auto view = Array(data, end);
+		this->core_.reserve(view.Size());
+		for (auto field : view) {
+			this->core_.emplace_back(field.GetObject(), end);
+		}
+	}
+	Data Serialize() const {
+		std::vector<Data> elements;
+		elements.reserve(this->core_.size());
+		for (auto& one : this->core_) {
+			elements.push_back(::protocache::Serialize(one));
+			if (elements.back().empty()) {
+				return {};
+			}
+		}
+		return ::protocache::SerializeArray(elements);
+	}
+};
 
-template <> inline ArrayEX<uint32_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<uint32_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<uint32_t>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <typename T>
+struct ScalarArrayEX : public BaseArrayEX<T> {
+	static_assert(std::is_scalar<T>::value, "");
+	ScalarArrayEX() = default;
+	ScalarArrayEX(const uint32_t* data, const uint32_t* end) {
+		auto view = Array(data, end).Numbers<T>();
+		this->core_.assign(view.begin(), view.end());
+	};
+	Data Serialize() const {
+		return ::protocache::SerializeScalarArray(this->core_);
+	}
+};
 
-template <> inline ArrayEX<int64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<int64_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<int64_t>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <>
+struct ArrayEX<bool> final : BaseArrayEX<bool> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) {
+		auto view = String(data, end).GetBoolArray();
+		this->core_.resize(view.size());
+		memcpy(this->core_.data(), view.data(), view.size());
+	}
+	Data Serialize() const {
+		return ::protocache::Serialize(Slice<uint8_t>(core_));
+	}
+};
 
-template <> inline ArrayEX<uint64_t>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<uint64_t>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<uint64_t>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <>
+struct ArrayEX<int32_t> final : ScalarArrayEX<int32_t> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<int32_t>(data, end) {}
+};
 
-template <> inline ArrayEX<float>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<float>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<float>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <>
+struct ArrayEX<uint32_t> final : ScalarArrayEX<uint32_t> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<uint32_t>(data, end) {}
+};
 
-template <> inline ArrayEX<double>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end).Numbers<double>();
-	core_.assign(view.begin(), view.end());
-}
-template <> inline Data ArrayEX<double>::Serialize() const {
-	return ::protocache::SerializeScalarArray(core_);
-}
+template <>
+struct ArrayEX<int64_t> final : ScalarArrayEX<int64_t> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<int64_t>(data, end) {}
+};
+
+template <>
+struct ArrayEX<uint64_t> final : ScalarArrayEX<uint64_t> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<uint64_t>(data, end) {}
+};
+
+template <>
+struct ArrayEX<float> final : ScalarArrayEX<float> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<float>(data, end) {}
+};
+
+template <>
+struct ArrayEX<double> final : ScalarArrayEX<double> {
+	ArrayEX() = default;
+	ArrayEX(const uint32_t* data, const uint32_t* end) : ScalarArrayEX<double>(data, end) {}
+};
 
 template <> inline ArrayEX<Slice<char>>::ArrayEX(const uint32_t* data, const uint32_t* end) {
 	auto view = ArrayT<Slice<char>>(data, end);
@@ -143,33 +173,6 @@ template <> inline ArrayEX<Slice<uint8_t>>::ArrayEX(const uint32_t* data, const 
 	for (auto one : view) {
 		core_.emplace_back(one.data(), one.size());
 	}
-}
-
-template <typename T>
-inline ArrayEX<T>::ArrayEX(const uint32_t* data, const uint32_t* end) {
-	auto view = Array(data, end);
-	core_.reserve(view.Size());
-	for (auto field : view) {
-		core_.emplace_back(field.GetObject(), end);
-	}
-}
-
-template <typename T>
-static inline Data Serialize(const T& obj) {
-	return obj.Serialize();
-}
-
-template <typename T>
-inline Data ArrayEX<T>::Serialize() const {
-	std::vector<Data> elements;
-	elements.reserve(core_.size());
-	for (auto& one : core_) {
-		elements.push_back(::protocache::Serialize(one));
-		if (elements.back().empty()) {
-			return {};
-		}
-	}
-	return ::protocache::SerializeArray(elements);
 }
 
 template <typename T>
@@ -398,7 +401,6 @@ private:
 		out.assign(view.data(), view.size());
 	}
 };
-
 
 } // protocache
 #endif // PROTOCACHE_ACCESS_EX_H_

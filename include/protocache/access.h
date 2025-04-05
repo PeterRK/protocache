@@ -491,6 +491,50 @@ private:
 };
 
 template <typename T>
+class ScalarField {
+public:
+	explicit ScalarField(const Field &field) : core_(field) {}
+	bool operator!() const noexcept {
+		return !core_;
+	}
+
+	T Get(const uint32_t* end=nullptr) const {
+		auto view = core_.GetValue();
+		if (view.size() != WordSize(sizeof(T))) {
+			return 0;
+		}
+		return *reinterpret_cast<const T*>(view.data());
+	}
+
+	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const {
+		return core_.GetValue();
+	}
+
+private:
+	Field core_;
+};
+
+template <typename T>
+class StringField {
+public:
+	explicit StringField(const Field &field) : core_(field) {}
+	bool operator!() const noexcept {
+		return !core_;
+	}
+
+	Slice<T> Get(const uint32_t* end=nullptr) const {
+		return SliceCast<T>(String(core_.GetObject(end), end).Get());
+	}
+
+	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const {
+		return String::Detect(core_.GetObject(end), end);
+	}
+
+private:
+	Field core_;
+};
+
+template <typename T>
 class FieldT final {
 public:
 	explicit FieldT(const Field& field) : core_(field) {}
@@ -498,132 +542,67 @@ public:
 		return !core_;
 	}
 
-	T Get(const uint32_t* end=nullptr) const;
-	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const;
+	T Get(const uint32_t* end=nullptr) const {
+		return T(core_.GetObject(end), end);
+	}
+
+	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const {
+		return T::Detect(core_.GetObject(end), end);
+	}
 
 private:
 	Field core_;
-
-	T GetScalar() const noexcept {
-		auto view = core_.GetValue();
-		if (view.size() != WordSize(sizeof(T))) {
-			return 0;
-		}
-		return *reinterpret_cast<const T*>(view.data());
-	}
 };
 
 template <>
-inline bool FieldT<bool>::Get(const uint32_t*) const {
-	return GetScalar();
-}
+struct FieldT<bool> final : public ScalarField<bool> {
+	explicit FieldT(const Field& field) : ScalarField<bool>(field) {}
+};
 
 template <>
-inline Slice<uint32_t> FieldT<bool>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
+struct FieldT<int32_t> final : public ScalarField<int32_t> {
+	explicit FieldT(const Field& field) : ScalarField<int32_t>(field) {}
+};
 
 template <>
-inline int32_t FieldT<int32_t>::Get(const uint32_t*) const {
-	return GetScalar();
-}
+struct FieldT<uint32_t> final : public ScalarField<uint32_t> {
+	explicit FieldT(const Field& field) : ScalarField<uint32_t>(field) {}
+};
 
 template <>
-inline Slice<uint32_t> FieldT<int32_t>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
+struct FieldT<int64_t> final : public ScalarField<int64_t> {
+	explicit FieldT(const Field& field) : ScalarField<int64_t>(field) {}
+};
 
 template <>
-inline uint32_t FieldT<uint32_t>::Get(const uint32_t*) const {
-	return GetScalar();
-}
+struct FieldT<uint64_t> final : public ScalarField<uint64_t> {
+	explicit FieldT(const Field& field) : ScalarField<uint64_t>(field) {}
+};
 
 template <>
-inline Slice<uint32_t> FieldT<uint32_t>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
+struct FieldT<float> final : public ScalarField<float> {
+	explicit FieldT(const Field& field) : ScalarField<float>(field) {}
+};
 
 template <>
-inline int64_t FieldT<int64_t>::Get(const uint32_t*) const {
-	return GetScalar();
-}
+struct FieldT<double> final : public ScalarField<double> {
+	explicit FieldT(const Field& field) : ScalarField<double>(field) {}
+};
 
 template <>
-inline Slice<uint32_t> FieldT<int64_t>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
+struct FieldT<Slice<char>> final : public StringField<char> {
+	explicit FieldT(const Field& field) : StringField<char>(field) {}
+};
 
 template <>
-inline uint64_t FieldT<uint64_t>::Get(const uint32_t*) const {
-	return GetScalar();
-}
+struct FieldT<Slice<uint8_t>> final : public StringField<uint8_t> {
+	explicit FieldT(const Field& field) : StringField<uint8_t>(field) {}
+};
 
 template <>
-inline Slice<uint32_t> FieldT<uint64_t>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
-
-template <>
-inline float FieldT<float>::Get(const uint32_t*) const {
-	return GetScalar();
-}
-
-template <>
-inline Slice<uint32_t> FieldT<float>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
-
-template <>
-inline double FieldT<double>::Get(const uint32_t*) const {
-	return GetScalar();
-}
-
-template <>
-inline Slice<uint32_t> FieldT<double>::Detect(const uint32_t*) const {
-	return core_.GetValue();
-}
-
-
-
-template <>
-inline Slice<char> FieldT<Slice<char>>::Get(const uint32_t* end) const {
-	return String(core_.GetObject(end), end).Get();
-}
-
-template <>
-inline Slice<uint32_t> FieldT<Slice<char>>::Detect(const uint32_t* end) const {
-	return String::Detect(core_.GetObject(end), end);
-}
-
-template <>
-inline Slice<uint8_t> FieldT<Slice<uint8_t>>::Get(const uint32_t* end) const {
-	return String(core_.GetObject(end), end).GetBytes();
-}
-
-template <>
-inline Slice<uint32_t> FieldT<Slice<uint8_t>>::Detect(const uint32_t* end) const {
-	return String::Detect(core_.GetObject(end), end);
-}
-
-template <>
-inline Slice<bool> FieldT<Slice<bool>>::Get(const uint32_t* end) const {
-	return String(core_.GetObject(end), end).GetBoolArray();
-}
-
-template <>
-inline Slice<uint32_t> FieldT<Slice<bool>>::Detect(const uint32_t* end) const {
-	return String::Detect(core_.GetObject(end), end);
-}
-
-template <typename T>
-inline T FieldT<T>::Get(const uint32_t* end) const {
-	return T(core_.GetObject(end), end);
-}
-
-template <typename T>
-inline Slice<uint32_t> FieldT<T>::Detect(const uint32_t* end) const {
-	return T::Detect(core_.GetObject(end), end);
-}
+struct FieldT<Slice<bool>> final : public StringField<bool> {
+	explicit FieldT(const Field& field) : StringField<bool>(field) {}
+};
 
 template <typename T>
 class ArrayT final {
@@ -708,6 +687,9 @@ public:
 	bool operator!() const noexcept {
 		return !core_;
 	}
+	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
+		return Array::Detect(ptr, end);
+	}
 	uint32_t Size() const noexcept {
 		return core_.size();
 	}
@@ -737,54 +719,36 @@ template <>
 struct ArrayT<int32_t> final : public ScalarArray<int32_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<int32_t>(Array(ptr, end).Numbers<int32_t>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <>
 struct ArrayT<uint32_t> final : public ScalarArray<uint32_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<uint32_t>(Array(ptr, end).Numbers<uint32_t>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <>
 struct ArrayT<int64_t> final : public ScalarArray<int64_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<int64_t>(Array(ptr, end).Numbers<int64_t>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <>
 struct ArrayT<uint64_t> final : public ScalarArray<uint64_t> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<uint64_t>(Array(ptr, end).Numbers<uint64_t>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <>
 struct ArrayT<float> final : public ScalarArray<float> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<float>(Array(ptr, end).Numbers<float>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <>
 struct ArrayT<double> final : public ScalarArray<double> {
 	explicit ArrayT(const uint32_t* ptr, const uint32_t* end=nullptr)
 		: ScalarArray<double>(Array(ptr, end).Numbers<double>()) {}
-	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return Array::Detect(ptr, end);
-	}
 };
 
 template <typename K, typename V>
