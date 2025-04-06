@@ -479,6 +479,7 @@ static const std::unordered_map<std::string, std::string> g_predefined_proto = {
 		{"google/protobuf/any.proto", "protocache/protobuf/any.proto"},
 		{"google/protobuf/timestamp.proto", "protocache/protobuf/timestamp.proto"},
 		{"google/protobuf/duration.proto", "protocache/protobuf/duration.proto"},
+		{"google/protobuf/wrappers.proto", "protocache/protobuf/wrappers.proto"},
 };
 
 static bool IsIgnoredDependency(const std::string& path) {
