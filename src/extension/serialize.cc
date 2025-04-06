@@ -304,10 +304,10 @@ Data Serialize(const google::protobuf::Message& message) {
 	for (unsigned i = 0; i < fields.size(); i++) {
 		auto field = fields[i];
 		auto& unit = parts[i];
-		auto name = field->name().c_str();
-		if (field->options().deprecated()) {
+		if (field == nullptr || field->options().deprecated()) {
 			continue;
 		}
+		//auto name = field->name().c_str();
 		if (field->is_repeated()) {
 			if (reflection->FieldSize(message, field) == 0) {
 				continue;
@@ -323,7 +323,7 @@ Data Serialize(const google::protobuf::Message& message) {
 			}
 			unit = SerializeField(message, field);
 		}
-		auto size = unit.size();
+		//auto size = unit.size();
 		if (unit.empty()) {
 			return {};
 		}

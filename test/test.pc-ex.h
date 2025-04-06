@@ -20,8 +20,8 @@ struct Small final {
 			auto view = Detect(clean_head, end);
 			return {view.data(), view.size()};
 		}
-		std::vector<protocache::Data> raw(3);
-		std::vector<protocache::Slice<uint32_t>> parts(3);
+		std::vector<protocache::Data> raw(4);
+		std::vector<protocache::Slice<uint32_t>> parts(4);
 		parts[_::i32] = __view__.SerializeField(_::i32, end, _i32, raw[_::i32]);
 		parts[_::flag] = __view__.SerializeField(_::flag, end, _flag, raw[_::flag]);
 		parts[_::str] = __view__.SerializeField(_::str, end, _str, raw[_::str]);
@@ -34,7 +34,7 @@ struct Small final {
 
 private:
 	using _ = ::test::Small::_;
-	protocache::MessageEX<3> __view__;
+	protocache::MessageEX<4> __view__;
 	int32_t _i32;
 	bool _flag;
 	std::string _str;

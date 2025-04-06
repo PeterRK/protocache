@@ -19,7 +19,7 @@ public:
 	struct _ {
 		static constexpr unsigned i32 = 0;
 		static constexpr unsigned flag = 1;
-		static constexpr unsigned str = 2;
+		static constexpr unsigned str = 3;
 	};
 
 	explicit Small(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}

@@ -595,6 +595,11 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 	cxx_ns += proto.name();
 	cxx_ns += "::";
 
+	int max_id = 1;
+	for (auto& field : proto.field()) {
+		max_id = std::max(max_id, field.number());
+	}
+
 	oss << '\t' << proto.name() << "() = default;\n"
 		<< "\texplicit " << proto.name() << "(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}\n"
 		<< "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
@@ -608,8 +613,8 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\t\tauto view = Detect(clean_head, end);\n"
 		<< "\t\t\treturn {view.data(), view.size()};\n"
 		<< "\t\t}\n"
-		<< "\t\tstd::vector<protocache::Data> raw(" << proto.field_size() << ");\n"
-		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << proto.field_size() << ");\n";
+		<< "\t\tstd::vector<protocache::Data> raw(" << max_id << ");\n"
+		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << max_id << ");\n";
 
 	for (auto& one : proto.field()) {
 		if (one.options().deprecated()) {
@@ -710,7 +715,7 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 
 	oss << "\nprivate:\n"
 		<< "\tusing _ = " << cxx_ns << "_;\n"
-		<< "\tprotocache::MessageEX<" << proto.field_size() << "> __view__;\n";
+		<< "\tprotocache::MessageEX<" << max_id << "> __view__;\n";
 	for (int i = 0; i < proto.field_size(); i++) {
 		auto &one = proto.field(i);
 		if (one.options().deprecated()) {

@@ -26,7 +26,7 @@ message Vec2D {
 	repeated Vec1D _ = 1;
 }
 ```
-Some features in Protobuf, like Services, are not supported by ProtoCache.
+Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache.
 
 ## Code Gen
 ```sh

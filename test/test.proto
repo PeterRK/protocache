@@ -19,7 +19,8 @@ enum Mode {
 message Small {
 	int32 i32 = 1;
 	bool flag = 2;
-	string str = 3;
+	// skip 3
+	string str = 4;
 }
 
 message Vec2D {
