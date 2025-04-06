@@ -464,6 +464,12 @@ static std::string HeaderName(const std::string& proto_name) {
 	return out;
 }
 
+static const std::unordered_map<std::string, std::string> g_predefined_proto = {
+		{"google/protobuf/any.proto", "protocache/protobuf/any.proto"},
+		{"google/protobuf/timestamp.proto", "protocache/protobuf/timestamp.proto"},
+		{"google/protobuf/duration.proto", "protocache/protobuf/duration.proto"},
+};
+
 static bool IsIgnoredDependency(const std::string& path) {
 	static const std::string prefix = "google/protobuf/";
 	if (path.size() >= prefix.size()
@@ -482,10 +488,12 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 
 	oss << "\n#include <protocache/access.h>\n";
 	for (auto& one : proto.dependency()) {
-		if (IsIgnoredDependency(one)) {
-			continue;
+		auto it = g_predefined_proto.find(one);
+		if (it != g_predefined_proto.end()) {
+			oss << "#include <" << ConvertFilename(it->second) << ">\n";
+		} else if (!IsIgnoredDependency(one)) {
+			oss << "#include \"" << ConvertFilename(one) << "\"\n";
 		}
-		oss << "#include \"" << ConvertFilename(one) << "\"\n";
 	}
 	oss << '\n';
 
@@ -731,10 +739,12 @@ static std::string GenFileEX(const ::google::protobuf::FileDescriptorProto& prot
 
 	oss << "\n#include <protocache/access-ex.h>\n";
 	for (auto& one : proto.dependency()) {
-		if (IsIgnoredDependency(one)) {
-			continue;
+		auto it = g_predefined_proto.find(one);
+		if (it != g_predefined_proto.end()) {
+			oss << "#include <" << ConvertExFilename(it->second) << ">\n";
+		} else if (!IsIgnoredDependency(one)) {
+			oss << "#include \"" << ConvertExFilename(one) << "\"\n";
 		}
-		oss << "#include \"" << ConvertExFilename(one) << "\"\n";
 	}
 	oss << '\n';
 
