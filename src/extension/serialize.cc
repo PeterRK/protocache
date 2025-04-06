@@ -268,37 +268,28 @@ Data Serialize(const google::protobuf::Message& message) {
 	if (field_count <= 0) {
 		return {};
 	}
-	std::vector<const google::protobuf::FieldDescriptor*> fields(field_count);
+
+	auto max_id = 1;
 	for (int i = 0; i < field_count; i++) {
-		fields[i] = descriptor->field(i);
-	}
-	std::sort(fields.begin(), fields.end(),
-			  [](const google::protobuf::FieldDescriptor* a, const google::protobuf::FieldDescriptor* b)->bool{
-				  return a->number() < b->number();
-			  });
-	if (fields[0]->number() <= 0) {
-		return {};
-	}
-	for (int i = 1; i < field_count; i++) {
-		if (fields[i]->number() == fields[i-1]->number()) {
+		auto field = descriptor->field(i);
+		if (field == nullptr || field->number() <= 0) {
 			return {};
 		}
+		max_id = std::max(max_id, field->number());
 	}
-	auto max_id = fields.back()->number();
-	if (max_id - field_count > 6 && max_id > field_count*2) {
+	if (max_id > (12 + 25*255) || (max_id - field_count > 6 && max_id > field_count*2)) {
 		return {};
-	}
-	if (max_id > (12 + 25*255)) {
-		return {};
-	}
-	fields.resize(max_id, nullptr);
-	for (int i = field_count-1; i >= 0; i--) {
-		auto j = fields[i]->number() - 1;
-		if (i != j) {
-			std::swap(fields[i], fields[j]);
-		}
 	}
 
+	std::vector<const google::protobuf::FieldDescriptor*> fields(max_id, nullptr);
+	for (int i = 0; i < field_count; i++) {
+		auto field = descriptor->field(i);
+		auto j = field->number() - 1;
+		if (fields[j] != nullptr) {
+			return {};
+		}
+		fields[j] = field;
+	}
 	std::vector<Data> parts(fields.size());
 	auto reflection = message.GetReflection();
 	for (unsigned i = 0; i < fields.size(); i++) {
