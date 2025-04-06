@@ -3,6 +3,7 @@
 #define PROTOCACHE_INCLUDED_EX_any_proto
 
 #include <protocache/access-ex.h>
+#include "any.pc.h"
 
 namespace ex {
 namespace google {

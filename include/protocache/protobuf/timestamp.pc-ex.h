@@ -3,6 +3,7 @@
 #define PROTOCACHE_INCLUDED_EX_timestamp_proto
 
 #include <protocache/access-ex.h>
+#include "timestamp.pc.h"
 
 namespace ex {
 namespace google {

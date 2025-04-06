@@ -3,6 +3,7 @@
 #define PROTOCACHE_INCLUDED_EX_duration_proto
 
 #include <protocache/access-ex.h>
+#include "duration.pc.h"
 
 namespace ex {
 namespace google {

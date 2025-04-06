@@ -51,12 +51,23 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 	return true;
 }
 
-static std::string ConvertFilename(const std::string& name) {
+static std::string ConvertFilename(const std::string& name, bool trim=false) {
 	auto pos = name.rfind('.');
 	if (pos == std::string::npos) {
 		return name + ".pc.h";
 	}
-	return name.substr(0, pos+1) + "pc.h";
+	auto sep = std::string::npos;
+	if (trim) {
+#ifdef _WIN32
+		sep = name.rfind('\\', pos);
+#else
+		sep= name.rfind('/', pos);
+#endif
+	}
+	if (sep == std::string::npos) {
+		return name.substr(0, pos+1) + "pc.h";
+	}
+	return name.substr(sep+1, pos-sep) + "pc.h";
 }
 
 static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type, const std::string& clazz, bool extra=false) {
@@ -742,7 +753,8 @@ static std::string GenFileEX(const ::google::protobuf::FileDescriptorProto& prot
 		<< "#ifndef PROTOCACHE_INCLUDED_EX_" << header_name << '\n'
 		<< "#define PROTOCACHE_INCLUDED_EX_" << header_name << '\n';
 
-	oss << "\n#include <protocache/access-ex.h>\n";
+	oss << "\n#include <protocache/access-ex.h>\n"
+		<< "#include \"" << ConvertFilename(proto.name(), true) << "\"\n";
 	for (auto& one : proto.dependency()) {
 		auto it = g_predefined_proto.find(one);
 		if (it != g_predefined_proto.end()) {
