@@ -401,11 +401,9 @@ int BenchmarkProtoCacheEX() {
 	}
 	Junk2 junk;
 
-	protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t*>(raw.data()), raw.size()/4);
-
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
-		::ex::test::Main root(view);
+		::ex::test::Main root(reinterpret_cast<const uint32_t*>(raw.data()));
 		junk.Traverse(root);
 	}
 	auto delta_ms = DeltaMs(start);
@@ -420,9 +418,7 @@ int BenchmarkProtoCacheSerialize(bool partly) {
 		puts("fail to load test.pc");
 		return -1;
 	}
-
-	protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t*>(raw.data()), raw.size()/4);
-	::ex::test::Main root(view);
+	::ex::test::Main root(reinterpret_cast<const uint32_t*>(raw.data()));
 
 	if (partly) {
 		root.i32();
