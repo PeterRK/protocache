@@ -32,7 +32,7 @@ Some features in Protobuf, like Services, are not supported by ProtoCache. Messa
 ```sh
 protoc --pccx_out=. [--pccx_opt=extra] test.proto
 ```
-A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-gen-pccx.cc) to generate header-only C++ file. The generated file is short and human friendly. Howerver, there is a known flaw that type declaration order may break C++ compilation. Don't mind to edit it if nessasery. If option `extra` is set, it will generate more header and source files for extra APIs.
+A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-gen-pccx.cc) to generate header-only C++ file. If option `extra` is set, it will generate another file for extra APIs.
 
 ## APIs
 ```cpp
