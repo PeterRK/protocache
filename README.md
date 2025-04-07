@@ -40,7 +40,7 @@ auto data = protocache::Serialize(pb_message);
 ASSERT_FALSE(data.empty());
 
 // =========basic api=========
-test::Main root(data.data());
+auto& root = protocache::Message(data.data()).Cast<test::Main>();
 ASSERT_FALSE(!root);
 
 // =========extra api=========

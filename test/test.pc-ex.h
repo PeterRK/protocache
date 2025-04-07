@@ -3,6 +3,7 @@
 #define PROTOCACHE_INCLUDED_EX_test_proto
 
 #include <protocache/access-ex.h>
+#include "test.pc.h"
 
 namespace ex {
 namespace test {

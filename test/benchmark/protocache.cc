@@ -68,9 +68,9 @@ void Junk2::Traverse(const ::test::Main& root) {
 		f64 += v;
 	}
 
-	Traverse(root.object());
+	Traverse(*root.object());
 	for (auto v : root.objectv()) {
-		Traverse(v);
+		Traverse(*v);
 	}
 
 	for (auto p : root.index()) {
@@ -79,7 +79,7 @@ void Junk2::Traverse(const ::test::Main& root) {
 
 	for (auto p : root.objects()) {
 		u32 += p.Key();
-		Traverse(p.Value());
+		Traverse(*p.Value());
 	}
 
 	for (auto u : root.matrix()) {
@@ -348,7 +348,7 @@ int BenchmarkProtoCache() {
 
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
-		::test::Main root(reinterpret_cast<const uint32_t*>(raw.data()));
+		auto& root = *protocache::Message(reinterpret_cast<const uint32_t*>(raw.data())).Cast<::test::Main>();
 		junk.Traverse(root);
 	}
 	auto delta_ms = DeltaMs(start);

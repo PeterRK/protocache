@@ -14,6 +14,10 @@
 
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
 
+static bool IsAlias(const ::google::protobuf::DescriptorProto& proto) {
+	return proto.field_size() == 1 && proto.field(0).name() == "_";
+}
+
 static bool CollectAlias(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
@@ -26,7 +30,7 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 			return false;
 		}
 	}
-	if (proto.field_size() != 1 || proto.field(0).name() != "_") {
+	if (!IsAlias(proto)) {
 		return true;
 	}
 	// alias
@@ -74,9 +78,12 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type,
 	switch (type) {
 		case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 		{
+			auto alias = g_alias_book.find(clazz) != g_alias_book.end();
 			std::string name;
 			if (extra) {
 				name += "::ex";
+			} else if (!alias) {
+				name += "const ";
 			}
 			for (auto ch : clazz) {
 				if (ch == '.') {
@@ -85,8 +92,10 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type,
 					name += ch;
 				}
 			}
-			if (g_alias_book.find(clazz) != g_alias_book.end()) {
+			if (alias) {
 				name += "::ALIAS";
+			} else if (!extra) {
+				name += '*';
 			}
 			return name;
 		}
@@ -197,14 +206,12 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	std::ostringstream oss;
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 
-	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
-
-	if (alias_mode) {
+	if (IsAlias(proto)) {
 		oss << "struct " << proto.name() << " final {\n";
 	} else {
 		oss << "class " << proto.name() << " final {\n"
 			<< "private:\n"
-			<< "\tprotocache::Message core_;\n"
+			<< '\t' << proto.name() << "() = default;\n"
 			<< "public:\n"
 			<< "\tstruct _ {\n";
 		for (auto& one : proto.field()) {
@@ -220,6 +227,16 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		oss << "\t};\n\n";
 	}
 
+	bool declared = false;
+	for (auto& one : proto.nested_type()) {
+		if (!one.options().deprecated() && !IsAlias(one) && !one.options().map_entry()) {
+			oss << "\tclass " << one.name() << ";\n";
+			declared = true;
+		}
+	}
+	if (declared) {
+		oss << '\n';
+	}
 	for (auto& one : proto.enum_type()) {
 		if (one.options().deprecated()) {
 			continue;
@@ -242,7 +259,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		oss << AddIndent(piece);
 	}
 
-	if (alias_mode) {
+	if (IsAlias(proto)) {
 		auto it = g_alias_book.find(fullname);
 		if (it == g_alias_book.end()) {
 			std::cerr << "alias lost: " << fullname << std::endl;
@@ -267,11 +284,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		return oss.str();
 	}
 
-	oss << "\texplicit " << proto.name() << "(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}\n"
-		<< "\texplicit " << proto.name() << "(const protocache::Slice<uint32_t>& data) : "
-		<< proto.name() << "(data.begin(), data.end()) {}\n"
-		<< "\tbool operator!() const noexcept { return !core_; }\n"
-		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }\n\n"
+	oss << "\tbool operator!() const noexcept { return !protocache::Message::Cast(this); }\n"
+		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return protocache::Message::Cast(this).HasField(id,end); }\n\n"
 		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
 		<< "\t\tauto view = protocache::Message::Detect(ptr, end);\n"
 		<< "\t\tif (!view) return {};\n"
@@ -395,7 +409,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			out_type = tmp.c_str();
 		}
 		oss << '\t' << out_type << ' ' << field_name << "(const uint32_t* end=nullptr) const noexcept {\n"
-			<< "\t\treturn protocache::GetField<" << out_type << ">(core_, _::" << field_name << ", end);\n"
+			<< "\t\treturn protocache::GetField<" << out_type << ">(protocache::Message::Cast(this), _::" << field_name << ", end);\n"
 			<< "\t}\n";
 	};
 
@@ -520,6 +534,12 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	}
 	oss << '\n';
 
+	for (auto& one : proto.message_type()) {
+		if (!one.options().deprecated() && !IsAlias(one)) {
+			oss << "class " << one.name() << ";\n";
+		}
+	}
+	oss << '\n';
 	for (auto& one : proto.enum_type()) {
 		if (one.options().deprecated()) {
 			continue;
@@ -550,8 +570,6 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 	std::ostringstream oss;
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 
-	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
-
 	oss << "struct " << proto.name() << " final {\n";
 
 	for (auto& one : proto.nested_type()) {
@@ -570,7 +588,7 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		oss << AddIndent(piece);
 	}
 
-	if (alias_mode) {
+	if (IsAlias(proto)) {
 		auto it = g_alias_book.find(fullname);
 		if (it == g_alias_book.end()) {
 			std::cerr << "alias lost: " << fullname << std::endl;

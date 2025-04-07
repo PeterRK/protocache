@@ -213,6 +213,15 @@ public:
 		return Field(body + off, width);
 	}
 
+	static Message Cast(const void* pt) noexcept {
+		return *reinterpret_cast<Message*>(&pt);
+	}
+
+	template<typename T>
+	const T* Cast() const noexcept {
+		return reinterpret_cast<const T*>(ptr_);
+	}
+
 protected:
 	const uint32_t* ptr_;
 	static const uint32_t s_empty;
@@ -554,6 +563,26 @@ private:
 	Field core_;
 };
 
+template <typename T>
+struct FieldT<const T*> final {
+public:
+	explicit FieldT(const Field& field) : core_(field) {}
+	bool operator!() const noexcept {
+		return !core_;
+	}
+
+	const T* Get(const uint32_t* end=nullptr) const {
+		return Message(core_.GetObject(end), end).Cast<T>();
+	}
+
+	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const {
+		return T::Detect(core_.GetObject(end), end);
+	}
+
+private:
+	Field core_;
+};
+
 template <>
 struct FieldT<bool> final : public ScalarField<bool> {
 	explicit FieldT(const Field& field) : ScalarField<bool>(field) {}
@@ -617,7 +646,7 @@ public:
 		if (!view) {
 			return {};
 		}
-		static_assert(!std::is_scalar<T>::value, "");
+		static_assert(std::is_pointer<T>::value || !std::is_scalar<T>::value, "");
 		Array core(ptr);
 		for (auto it = core.end(); it != core.begin();) {
 			FieldT<T> field(*--it);
@@ -781,14 +810,14 @@ public:
 		auto view =  Map::Detect(ptr, end);
 		if (!view) {
 			return {};
-		} else if (std::is_scalar<K>::value && std::is_scalar<V>::value) {
+		} else if (std::is_scalar<K>::value && !std::is_pointer<V>::value && std::is_scalar<V>::value) {
 			return view;
 		}
 		Map core(ptr);
 		for (auto it = core.end(); it != core.begin();) {
 			Pair pair(*--it);
 			Slice<uint32_t> t;
-			if (!std::is_scalar<V>::value) {
+			if (std::is_pointer<V>::value || !std::is_scalar<V>::value) {
 				t = FieldT<V>(pair.Value()).Detect(end);
 				if (t.end() > view.end()) {
 					return {view.data(), static_cast<size_t>(t.end()-view.data())};
@@ -846,12 +875,12 @@ private:
 };
 
 template <typename T>
-static inline T GetField(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
+static inline T GetField(const Message message, unsigned id, const uint32_t* end=nullptr) noexcept {
 	return FieldT<T>(message.GetField(id, end)).Get(end);
 }
 
 template <typename T>
-static inline Slice<uint32_t> DetectField(const Message& message, unsigned id, const uint32_t* end=nullptr) noexcept {
+static inline Slice<uint32_t> DetectField(const Message message, unsigned id, const uint32_t* end=nullptr) noexcept {
 	return FieldT<T>(message.GetField(id, end)).Detect(end);
 }
 

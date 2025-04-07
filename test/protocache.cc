@@ -83,7 +83,7 @@ TEST(PtotoCache, Basic) {
 	auto data = SerializeByProtobuf();
 	ASSERT_EQ(195, data.size());
 	auto end = data.data() + data.size();
-	test::Main root(data.data());
+	auto& root = *protocache::Message(data.data()).Cast<test::Main>();
 	ASSERT_FALSE(!root);
 
 	ASSERT_EQ(-999, root.i32(end));
@@ -100,7 +100,7 @@ TEST(PtotoCache, Basic) {
 	ASSERT_EQ(-2.1f, root.f32(end));
 	ASSERT_EQ(1.0, root.f64(end));
 
-	auto leaf = root.object(end);
+	auto& leaf = *root.object(end);
 	ASSERT_FALSE(!leaf);
 	ASSERT_EQ(88, leaf.i32(end));
 	ASSERT_FALSE(leaf.flag(end));
@@ -153,10 +153,10 @@ TEST(PtotoCache, Basic) {
 	auto objects = root.objectv(end);
 	ASSERT_FALSE(!objects);
 	ASSERT_EQ(objects.Size(), 3);
-	ASSERT_EQ(objects[0].i32(end), 1);
-	ASSERT_TRUE(objects[1].flag(end));
+	ASSERT_EQ(objects[0]->i32(end), 1);
+	ASSERT_TRUE(objects[1]->flag(end));
 	expected_str = "good luck!";
-	ASSERT_EQ(objects[2].str(end), expected_str);
+	ASSERT_EQ(objects[2]->str(end), expected_str);
 
 	ASSERT_TRUE(root.HasField(::test::Main::_::objectv));
 	ASSERT_FALSE(root.HasField(::test::Main::_::t_i32));
@@ -181,7 +181,7 @@ TEST(PtotoCache, Basic) {
 	for (const auto& pair : map2) {
 		auto key = pair.Key(end);
 		ASSERT_NE(key, 0);
-		auto val = pair.Value(end);
+		auto& val = *pair.Value(end);
 		ASSERT_FALSE(!val);
 		ASSERT_EQ(key, val.i32(end));
 	}
