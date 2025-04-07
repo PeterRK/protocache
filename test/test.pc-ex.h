@@ -8,6 +8,11 @@
 namespace ex {
 namespace test {
 
+class Small;
+class Main;
+class CyclicA;
+class CyclicB;
+
 struct Small final {
 	Small() = default;
 	explicit Small(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}
@@ -115,7 +120,7 @@ struct Main final {
 	std::string& data(const uint32_t* end=nullptr) { return __view__.GetField(_::data, end, _data); }
 	float& f32(const uint32_t* end=nullptr) { return __view__.GetField(_::f32, end, _f32); }
 	double& f64(const uint32_t* end=nullptr) { return __view__.GetField(_::f64, end, _f64); }
-	::ex::test::Small& object(const uint32_t* end=nullptr) { return __view__.GetField(_::object, end, _object); }
+	std::unique_ptr<::ex::test::Small>& object(const uint32_t* end=nullptr) { return __view__.GetField(_::object, end, _object); }
 	protocache::ArrayEX<int32_t>& i32v(const uint32_t* end=nullptr) { return __view__.GetField(_::i32v, end, _i32v); }
 	protocache::ArrayEX<uint64_t>& u64v(const uint32_t* end=nullptr) { return __view__.GetField(_::u64v, end, _u64v); }
 	protocache::ArrayEX<protocache::Slice<char>>& strv(const uint32_t* end=nullptr) { return __view__.GetField(_::strv, end, _strv); }
@@ -123,7 +128,7 @@ struct Main final {
 	protocache::ArrayEX<float>& f32v(const uint32_t* end=nullptr) { return __view__.GetField(_::f32v, end, _f32v); }
 	protocache::ArrayEX<double>& f64v(const uint32_t* end=nullptr) { return __view__.GetField(_::f64v, end, _f64v); }
 	protocache::ArrayEX<bool>& flags(const uint32_t* end=nullptr) { return __view__.GetField(_::flags, end, _flags); }
-	protocache::ArrayEX<::ex::test::Small>& objectv(const uint32_t* end=nullptr) { return __view__.GetField(_::objectv, end, _objectv); }
+	protocache::ArrayEX<std::unique_ptr<::ex::test::Small>>& objectv(const uint32_t* end=nullptr) { return __view__.GetField(_::objectv, end, _objectv); }
 	uint32_t& t_u32(const uint32_t* end=nullptr) { return __view__.GetField(_::t_u32, end, _t_u32); }
 	int32_t& t_i32(const uint32_t* end=nullptr) { return __view__.GetField(_::t_i32, end, _t_i32); }
 	int32_t& t_s32(const uint32_t* end=nullptr) { return __view__.GetField(_::t_s32, end, _t_s32); }
@@ -131,7 +136,7 @@ struct Main final {
 	int64_t& t_i64(const uint32_t* end=nullptr) { return __view__.GetField(_::t_i64, end, _t_i64); }
 	int64_t& t_s64(const uint32_t* end=nullptr) { return __view__.GetField(_::t_s64, end, _t_s64); }
 	protocache::MapEX<protocache::Slice<char>,int32_t>& index(const uint32_t* end=nullptr) { return __view__.GetField(_::index, end, _index); }
-	protocache::MapEX<int32_t,::ex::test::Small>& objects(const uint32_t* end=nullptr) { return __view__.GetField(_::objects, end, _objects); }
+	protocache::MapEX<int32_t,std::unique_ptr<::ex::test::Small>>& objects(const uint32_t* end=nullptr) { return __view__.GetField(_::objects, end, _objects); }
 	::ex::test::Vec2D::ALIAS& matrix(const uint32_t* end=nullptr) { return __view__.GetField(_::matrix, end, _matrix); }
 	protocache::ArrayEX<::ex::test::ArrMap::ALIAS>& vector(const uint32_t* end=nullptr) { return __view__.GetField(_::vector, end, _vector); }
 	::ex::test::ArrMap::ALIAS& arrays(const uint32_t* end=nullptr) { return __view__.GetField(_::arrays, end, _arrays); }
@@ -149,7 +154,7 @@ private:
 	std::string _data;
 	float _f32;
 	double _f64;
-	::ex::test::Small _object;
+	std::unique_ptr<::ex::test::Small> _object;
 	protocache::ArrayEX<int32_t> _i32v;
 	protocache::ArrayEX<uint64_t> _u64v;
 	protocache::ArrayEX<protocache::Slice<char>> _strv;
@@ -157,7 +162,7 @@ private:
 	protocache::ArrayEX<float> _f32v;
 	protocache::ArrayEX<double> _f64v;
 	protocache::ArrayEX<bool> _flags;
-	protocache::ArrayEX<::ex::test::Small> _objectv;
+	protocache::ArrayEX<std::unique_ptr<::ex::test::Small>> _objectv;
 	uint32_t _t_u32;
 	int32_t _t_i32;
 	int32_t _t_s32;
@@ -165,10 +170,70 @@ private:
 	int64_t _t_i64;
 	int64_t _t_s64;
 	protocache::MapEX<protocache::Slice<char>,int32_t> _index;
-	protocache::MapEX<int32_t,::ex::test::Small> _objects;
+	protocache::MapEX<int32_t,std::unique_ptr<::ex::test::Small>> _objects;
 	::ex::test::Vec2D::ALIAS _matrix;
 	protocache::ArrayEX<::ex::test::ArrMap::ALIAS> _vector;
 	::ex::test::ArrMap::ALIAS _arrays;
+};
+
+struct CyclicA final {
+	CyclicA() = default;
+	explicit CyclicA(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}
+	explicit CyclicA(const protocache::Slice<uint32_t>& data) : CyclicA(data.begin(), data.end()) {}
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		return ::test::CyclicA::Detect(ptr, end);
+	}
+	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+		auto clean_head = __view__.CleanHead();
+		if (clean_head != nullptr) {
+			auto view = Detect(clean_head, end);
+			return {view.data(), view.size()};
+		}
+		std::vector<protocache::Data> raw(2);
+		std::vector<protocache::Slice<uint32_t>> parts(2);
+		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		parts[_::cyclic] = __view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic]);
+		return protocache::SerializeMessage(parts);
+	}
+
+	int32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
+	std::unique_ptr<::ex::test::CyclicB>& cyclic(const uint32_t* end=nullptr) { return __view__.GetField(_::cyclic, end, _cyclic); }
+
+private:
+	using _ = ::test::CyclicA::_;
+	protocache::MessageEX<2> __view__;
+	int32_t _value;
+	std::unique_ptr<::ex::test::CyclicB> _cyclic;
+};
+
+struct CyclicB final {
+	CyclicB() = default;
+	explicit CyclicB(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}
+	explicit CyclicB(const protocache::Slice<uint32_t>& data) : CyclicB(data.begin(), data.end()) {}
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		return ::test::CyclicB::Detect(ptr, end);
+	}
+	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+		auto clean_head = __view__.CleanHead();
+		if (clean_head != nullptr) {
+			auto view = Detect(clean_head, end);
+			return {view.data(), view.size()};
+		}
+		std::vector<protocache::Data> raw(2);
+		std::vector<protocache::Slice<uint32_t>> parts(2);
+		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		parts[_::cyclic] = __view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic]);
+		return protocache::SerializeMessage(parts);
+	}
+
+	int32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
+	std::unique_ptr<::ex::test::CyclicA>& cyclic(const uint32_t* end=nullptr) { return __view__.GetField(_::cyclic, end, _cyclic); }
+
+private:
+	using _ = ::test::CyclicB::_;
+	protocache::MessageEX<2> __view__;
+	int32_t _value;
+	std::unique_ptr<::ex::test::CyclicA> _cyclic;
 };
 
 } // test

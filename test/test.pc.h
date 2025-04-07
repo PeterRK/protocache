@@ -8,6 +8,8 @@ namespace test {
 
 class Small;
 class Main;
+class CyclicA;
+class CyclicB;
 
 enum Mode : int32_t {
 	MODE_A = 0,
@@ -234,6 +236,66 @@ public:
 	}
 	::test::ArrMap::ALIAS arrays(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetField<::test::ArrMap::ALIAS>(protocache::Message::Cast(this), _::arrays, end);
+	}
+};
+
+class CyclicA final {
+private:
+	CyclicA() = default;
+public:
+	struct _ {
+		static constexpr unsigned value = 0;
+		static constexpr unsigned cyclic = 1;
+	};
+
+	bool operator!() const noexcept { return !protocache::Message::Cast(this); }
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return protocache::Message::Cast(this).HasField(id,end); }
+
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		auto view = protocache::Message::Detect(ptr, end);
+		if (!view) return {};
+		protocache::Message core(ptr);
+		protocache::Slice<uint32_t> t;
+		t = protocache::DetectField<const ::test::CyclicB*>(core, _::cyclic, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		return view;
+	}
+
+	int32_t value(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetField<int32_t>(protocache::Message::Cast(this), _::value, end);
+	}
+	const ::test::CyclicB* cyclic(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetField<const ::test::CyclicB*>(protocache::Message::Cast(this), _::cyclic, end);
+	}
+};
+
+class CyclicB final {
+private:
+	CyclicB() = default;
+public:
+	struct _ {
+		static constexpr unsigned value = 0;
+		static constexpr unsigned cyclic = 1;
+	};
+
+	bool operator!() const noexcept { return !protocache::Message::Cast(this); }
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return protocache::Message::Cast(this).HasField(id,end); }
+
+	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+		auto view = protocache::Message::Detect(ptr, end);
+		if (!view) return {};
+		protocache::Message core(ptr);
+		protocache::Slice<uint32_t> t;
+		t = protocache::DetectField<const ::test::CyclicA*>(core, _::cyclic, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
+		return view;
+	}
+
+	int32_t value(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetField<int32_t>(protocache::Message::Cast(this), _::value, end);
+	}
+	const ::test::CyclicA* cyclic(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetField<const ::test::CyclicA*>(protocache::Message::Cast(this), _::cyclic, end);
 	}
 };
 

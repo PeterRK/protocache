@@ -80,9 +80,13 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type,
 		{
 			auto alias = g_alias_book.find(clazz) != g_alias_book.end();
 			std::string name;
-			if (extra) {
-				name += "::ex";
-			} else if (!alias) {
+			if (alias) {
+				if (extra) {
+					name += "::ex";
+				}
+			} else if (extra) {
+				name += "std::unique_ptr<::ex";
+			} else {
 				name += "const ";
 			}
 			for (auto ch : clazz) {
@@ -94,7 +98,9 @@ static std::string TypeName(::google::protobuf::FieldDescriptorProto::Type type,
 			}
 			if (alias) {
 				name += "::ALIAS";
-			} else if (!extra) {
+			} else if (extra) {
+				name += '>';
+			} else {
 				name += '*';
 			}
 			return name;
@@ -238,10 +244,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		oss << '\n';
 	}
 	for (auto& one : proto.enum_type()) {
-		if (one.options().deprecated()) {
-			continue;
+		if (!one.options().deprecated()) {
+			oss << AddIndent(GenEnum(one));
 		}
-		oss << AddIndent(GenEnum(one));
 	}
 	for (auto& one : proto.nested_type()) {
 		if (one.options().deprecated()) {
@@ -541,10 +546,9 @@ static std::string GenFile(const ::google::protobuf::FileDescriptorProto& proto)
 	}
 	oss << '\n';
 	for (auto& one : proto.enum_type()) {
-		if (one.options().deprecated()) {
-			continue;
+		if (!one.options().deprecated()) {
+			oss << GenEnum(one);
 		}
-		oss << GenEnum(one);
 	}
 	for (auto& one : proto.message_type()) {
 		if (one.options().deprecated()) {
@@ -572,6 +576,16 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 
 	oss << "struct " << proto.name() << " final {\n";
 
+	bool declared = false;
+	for (auto& one : proto.nested_type()) {
+		if (!one.options().deprecated() && !IsAlias(one) && !one.options().map_entry()) {
+			oss << "\tclass " << one.name() << ";\n";
+			declared = true;
+		}
+	}
+	if (declared) {
+		oss << '\n';
+	}
 	for (auto& one : proto.nested_type()) {
 		if (one.options().deprecated()) {
 			continue;
@@ -797,10 +811,15 @@ static std::string GenFileEX(const ::google::protobuf::FileDescriptorProto& prot
 	oss << '\n';
 
 	for (auto& one : proto.message_type()) {
-		if (one.options().deprecated()) {
-			continue;
+		if (!one.options().deprecated() && !IsAlias(one)) {
+			oss << "class " << one.name() << ";\n";
 		}
-		oss << GenMessageEX(ns, one);
+	}
+	oss << '\n';
+	for (auto& one : proto.message_type()) {
+		if (!one.options().deprecated()) {
+			oss << GenMessageEX(ns, one);
+		}
 	}
 
 	for (auto it = ns_parts.rbegin(); it != ns_parts.rend(); ++it) {

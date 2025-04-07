@@ -75,13 +75,33 @@ static inline Data Serialize(const T& obj) {
 }
 
 template <typename T>
-struct ArrayEX final : public BaseArrayEX<T> {
+static inline Data Serialize(const std::unique_ptr<T>& obj) {
+	if (obj == nullptr) {
+		return {0};
+	}
+	return obj->Serialize();
+}
+
+template <typename T>
+class ArrayEX final : public BaseArrayEX<T> {
+private:
+	template <typename U>
+	static void Extract(const uint32_t* data, const uint32_t* end, U& out) {
+		out = U(data, end);
+	}
+
+	template <typename U>
+	static void Extract(const uint32_t* data, const uint32_t* end, std::unique_ptr<U>& out) {
+		out.reset(new U(data, end));
+	}
+
+public:
 	ArrayEX() = default;
 	ArrayEX(const uint32_t* data, const uint32_t* end) {
 		auto view = Array(data, end);
-		this->core_.reserve(view.Size());
-		for (auto field : view) {
-			this->core_.emplace_back(field.GetObject(), end);
+		this->core_.resize(view.Size());
+		for (unsigned i = 0; i < view.Size(); i++) {
+			Extract(view[i].GetObject(end), end, this->core_[i]);
 		}
 	}
 	Data Serialize() const {
@@ -175,23 +195,6 @@ template <> inline ArrayEX<Slice<uint8_t>>::ArrayEX(const uint32_t* data, const 
 	}
 }
 
-template <typename T>
-static inline T ExtractField(const FieldT<T>& field, const uint32_t* end) {
-	return field.Get(end);
-}
-
-static inline std::string ExtractField(const FieldT<Slice<char>>& field, const uint32_t* end) {
-	auto view = field.Get(end);
-	std::string out(view.data(), view.size());
-	return out;
-}
-
-static inline std::string ExtractField(const FieldT<Slice<uint8_t>>& field, const uint32_t* end) {
-	auto view = SliceCast<char>(field.Get(end));
-	std::string out(view.data(), view.size());
-	return out;
-}
-
 template <typename K, typename V>
 class _MapKeyReader : public KeyReader {
 public:
@@ -254,14 +257,35 @@ private:
 	using ConstIterator = typename std::unordered_map<KeyEX,ValEX>::const_iterator;
 	std::unordered_map<KeyEX,ValEX> core_;
 
+	template <typename T>
+	static typename Adapter<T>::TypeEX Extract(Field field, const uint32_t* end, const T*) {
+		return FieldT<T>(field).Get(end);
+	}
+
+	template <typename T>
+	static std::unique_ptr<T> Extract(Field field, const uint32_t* end, const std::unique_ptr<T>*) {
+		std::unique_ptr<T> out(new T);
+		*out = FieldT<T>(field).Get(end);
+		return out;
+	}
+
+	static std::string Extract(Field field, const uint32_t* end, const Slice<char>*) {
+		auto view = FieldT<Slice<char>>(field).Get(end);
+		return {view.data(), view.size()};
+	}
+	static std::string Extract(Field field, const uint32_t* end, const Slice<uint8_t>*) {
+		auto view = FieldT<Slice<char>>(field).Get(end);
+		return {view.data(), view.size()};
+	}
+
 public:
 	MapEX() = default;
 	MapEX(const uint32_t* data, const uint32_t* end) {
 		auto view = Map(data, end);
 		core_.reserve(view.Size());
 		for (auto pair : view) {
-			auto key = ExtractField(FieldT<Key>(pair.Key()), end);
-			auto val = ExtractField(FieldT<Val>(pair.Value()), end);
+			auto key = Extract(pair.Key(), end, (const Key*)nullptr);
+			auto val = Extract(pair.Value(), end, (const Val*)nullptr);
 			core_.emplace(std::move(key), std::move(val));
 		}
 	}
@@ -312,7 +336,20 @@ public:
 };
 
 template <size_t N>
-class MessageEX final : public Message {
+class MessageEX final : private Message {
+private:
+	std::bitset<N> _accessed;
+
+	template <typename T>
+	void ExtractField(unsigned id, const uint32_t* end, T& out) {
+		out = FieldT<T>(Message::GetField(id, end)).Get(end);
+	}
+
+	void ExtractField(unsigned id, const uint32_t* end, std::string& out) {
+		auto view = FieldT<Slice<char>>(Message::GetField(id, end)).Get(end);
+		out.assign(view.data(), view.size());
+	}
+
 public:
 	MessageEX() = default;
 	MessageEX(const uint32_t* ptr, const uint32_t* end) : Message(ptr, end) {}
@@ -328,7 +365,17 @@ public:
 	T& GetField(unsigned id, const uint32_t* end, T& field) {
 		if (!_accessed.test(id)) {
 			_accessed.set(id);
-			ExtractField(*this, id, end, field);
+			ExtractField(id, end, field);
+		}
+		return field;
+	}
+
+	template <typename T>
+	std::unique_ptr<T>& GetField(unsigned id, const uint32_t* end, std::unique_ptr<T>& field) {
+		if (!_accessed.test(id)) {
+			_accessed.set(id);
+			field.reset(new T);
+			ExtractField(id, end, *field);
 		}
 		return field;
 	}
@@ -367,7 +414,30 @@ public:
 	}
 
 	template <typename T>
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::unique_ptr<T>& field, Data& data) const {
+		if (!_accessed.test(id)) {
+			return DetectField<T>(*this, id, end);
+		}
+		data = Serialize(field);
+		if (data.size() == 1) {
+			data.clear();
+		}
+		return Slice<uint32_t>(data);
+	}
+
+	template <typename T>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
+		if (!_accessed.test(id)) {
+			return DetectField<ArrayT<T>>(*this, id, end);
+		} else if (field.empty()) {
+			return {};
+		}
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
+	}
+
+	template <typename T>
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<std::unique_ptr<T>>& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<ArrayT<T>>(*this, id, end);
 		} else if (field.empty()) {
@@ -388,17 +458,15 @@ public:
 		return Slice<uint32_t>(data);
 	}
 
-private:
-	std::bitset<N> _accessed;
-
-	template <typename T>
-	static void ExtractField(const Message& message, unsigned id, const uint32_t* end, T& out) {
-		out = FieldT<T>(message.GetField(id, end)).Get(end);
-	}
-
-	static void ExtractField(const Message& message, unsigned id, const uint32_t* end, std::string& out) {
-		auto view = FieldT<Slice<char>>(message.GetField(id, end)).Get(end);
-		out.assign(view.data(), view.size());
+	template <typename K, typename V>
+	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,std::unique_ptr<V>>& field, Data& data) const {
+		if (!_accessed.test(id)) {
+			return DetectField<MapT<K,V>>(*this, id, end);
+		} else if (field.empty()) {
+			return {};
+		}
+		data = Serialize(field);
+		return Slice<uint32_t>(data);
 	}
 };
 

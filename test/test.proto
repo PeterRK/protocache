@@ -69,3 +69,13 @@ message Main {
 	repeated ArrMap vector = 29;
 	ArrMap arrays = 30;
 }
+
+message CyclicA {
+    int32 value = 1;
+    CyclicB cyclic = 2;
+}
+
+message CyclicB {
+    int32 value = 1;
+    CyclicA cyclic = 2;
+}

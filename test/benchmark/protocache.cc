@@ -303,18 +303,18 @@ void Junk2::Traverse(::ex::test::Main& root) {
 		f64 += v;
 	}
 
-	Traverse(root.object());
+	Traverse(*root.object());
 	for (auto& v : root.objectv()) {
-		Traverse(v);
+		Traverse(*v);
 	}
 
 	for (auto& p : root.index()) {
 		u32 += JunkHash(p.first) + p.second;
 	}
 
-	for (auto p : root.objects()) {
+	for (auto& p : root.objects()) {
 		u32 += p.first;
-		Traverse(p.second);
+		Traverse(*p.second);
 	}
 
 	for (auto& u : root.matrix()) {

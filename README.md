@@ -26,7 +26,7 @@ message Vec2D {
 	repeated Vec1D _ = 1;
 }
 ```
-Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache. All messages must be defined before used, so cyclic dependency is not allowed.
+Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache.
 
 ## Code Gen
 ```sh
@@ -56,8 +56,8 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize (1 million times) | 550ms | 357 ~ 2327ms | 7768ms |
-| Decode + Traverse + Dealloc (1 million times) | 1941ms | 1048ms | 154ms |
+| Serialize (1 million times) | 550ms | 360 ~ 2662ms | 7768ms |
+| Decode + Traverse + Dealloc (1 million times) | 1941ms | 1134ms | 154ms |
 
 ## Reflection
 ```cpp

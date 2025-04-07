@@ -341,9 +341,9 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(-2.1f, root.f32());
 	ASSERT_EQ(1.0, root.f64());
 
-	ASSERT_EQ(88, root.object().i32());
-	ASSERT_FALSE(root.object().flag());
-	ASSERT_EQ(root.object().str(), "tmp");
+	ASSERT_EQ(88, root.object()->i32());
+	ASSERT_FALSE(root.object()->flag());
+	ASSERT_EQ(root.object()->str(), "tmp");
 
 	ASSERT_EQ(root.i32v().size(), 2);
 	ASSERT_EQ(root.i32v()[0], 1);
@@ -378,9 +378,9 @@ TEST(PtotoCacheEX, Basic) {
 	}
 
 	ASSERT_EQ(root.objectv().size(), 3);
-	ASSERT_EQ(root.objectv()[0].i32(), 1);
-	ASSERT_TRUE(root.objectv()[1].flag());
-	ASSERT_EQ(root.objectv()[2].str(), "good luck!");
+	ASSERT_EQ(root.objectv()[0]->i32(), 1);
+	ASSERT_TRUE(root.objectv()[1]->flag());
+	ASSERT_EQ(root.objectv()[2]->str(), "good luck!");
 
 	ASSERT_EQ(root.index().size(), 6);
 	auto mit = root.index().find("abc-1");
@@ -397,7 +397,7 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(root.objects().size(), 4);
 	for (auto& pair : root.objects()) {
 		ASSERT_NE(pair.first, 0);
-		ASSERT_EQ(pair.first, pair.second.i32());
+		ASSERT_EQ(pair.first, pair.second->i32());
 	}
 
 	ASSERT_EQ(root.matrix().size(), 3);
@@ -420,6 +420,10 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(vec4.size(), 2);
 	ASSERT_EQ(vec4[0], 51);
 	ASSERT_EQ(vec4[1], 52);
+
+	// check compile error
+	::ex::test::CyclicA cyclic;
+	ASSERT_NE(cyclic.cyclic(), nullptr);
 }
 
 TEST(PtotoCacheEX, Serialize) {
@@ -435,7 +439,7 @@ TEST(PtotoCacheEX, Serialize) {
 	ex.matrix(end)[1][1] = 999;
 
 	for (auto& pair : ex.objects(end)) {
-		pair.second.i32(end) = pair.first + 1;
+		pair.second->i32(end) = pair.first + 1;
 	}
 
 	auto modified = ex.Serialize();
@@ -465,7 +469,7 @@ TEST(PtotoCacheEX, Serialize) {
 
 	ASSERT_EQ(root.objects(end).size(), 4);
 	for (auto& pair : root.objects(end)) {
-		ASSERT_EQ(pair.first+1, pair.second.i32(end));
+		ASSERT_EQ(pair.first+1, pair.second->i32(end));
 	}
 
 	auto mit4 = root.arrays().find("lv5");
