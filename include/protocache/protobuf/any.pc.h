@@ -7,19 +7,19 @@
 namespace google {
 namespace protobuf {
 
+class Any;
+
 class Any final {
 private:
-	protocache::Message core_;
+	Any() = default;
 public:
 	struct _ {
 		static constexpr unsigned type_url = 0;
 		static constexpr unsigned value = 1;
 	};
 
-	explicit Any(const uint32_t* ptr, const uint32_t* end=nullptr) : core_(ptr, end) {}
-	explicit Any(const protocache::Slice<uint32_t>& data) : Any(data.begin(), data.end()) {}
-	bool operator!() const noexcept { return !core_; }
-	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return core_.HasField(id,end); }
+	bool operator!() const noexcept { return !protocache::Message::Cast(this); }
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return protocache::Message::Cast(this).HasField(id,end); }
 
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
@@ -34,10 +34,10 @@ public:
 	}
 
 	protocache::Slice<char> type_url(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetField<protocache::Slice<char>>(core_, _::type_url, end);
+		return protocache::GetField<protocache::Slice<char>>(protocache::Message::Cast(this), _::type_url, end);
 	}
 	protocache::Slice<uint8_t> value(const uint32_t* end=nullptr) const noexcept {
-		return protocache::GetField<protocache::Slice<uint8_t>>(core_, _::value, end);
+		return protocache::GetField<protocache::Slice<uint8_t>>(protocache::Message::Cast(this), _::value, end);
 	}
 };
 

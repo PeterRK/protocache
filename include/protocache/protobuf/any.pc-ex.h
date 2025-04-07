@@ -9,6 +9,8 @@ namespace ex {
 namespace google {
 namespace protobuf {
 
+class Any;
+
 struct Any final {
 	Any() = default;
 	explicit Any(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}

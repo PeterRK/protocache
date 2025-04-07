@@ -34,6 +34,12 @@ template <>
 struct Adapter<Slice<uint8_t>> { using TypeEX = std::string; };
 
 template <typename T>
+struct Unwrapper { using Type = T; };
+
+template <typename T>
+struct Unwrapper<std::unique_ptr<T>> { using Type = T; };
+
+template <typename T>
 class BaseArrayEX {
 protected:
 	using TypeEX = typename Adapter<T>::TypeEX;
@@ -43,7 +49,7 @@ protected:
 
 public:
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return ArrayT<T>::Detect(ptr, end);
+		return ArrayT<typename Unwrapper<T>::Type>::Detect(ptr, end);
 	}
 
 	size_t size() const noexcept { return core_.size(); }
@@ -290,7 +296,7 @@ public:
 		}
 	}
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		return MapT<Key,Val>::Detect(ptr, end);
+		return MapT<Key,typename Unwrapper<Val>::Type>::Detect(ptr, end);
 	}
 	Data Serialize() const {
 		_MapKeyReader<KeyEX,ValEX> reader(core_);
@@ -345,6 +351,12 @@ private:
 		out = FieldT<T>(Message::GetField(id, end)).Get(end);
 	}
 
+	template <typename T>
+	void ExtractField(unsigned id, const uint32_t* end, std::unique_ptr<T>& out) {
+		out.reset(new T);
+		*out = FieldT<T>(Message::GetField(id, end)).Get(end);
+	}
+
 	void ExtractField(unsigned id, const uint32_t* end, std::string& out) {
 		auto view = FieldT<Slice<char>>(Message::GetField(id, end)).Get(end);
 		out.assign(view.data(), view.size());
@@ -366,16 +378,6 @@ public:
 		if (!_accessed.test(id)) {
 			_accessed.set(id);
 			ExtractField(id, end, field);
-		}
-		return field;
-	}
-
-	template <typename T>
-	std::unique_ptr<T>& GetField(unsigned id, const uint32_t* end, std::unique_ptr<T>& field) {
-		if (!_accessed.test(id)) {
-			_accessed.set(id);
-			field.reset(new T);
-			ExtractField(id, end, *field);
 		}
 		return field;
 	}
@@ -404,19 +406,7 @@ public:
 	template <typename T, std::enable_if_t<!std::is_scalar<T>::value, bool> = true>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<T>(*this, id, end);
-		}
-		data = Serialize(field);
-		if (data.size() == 1) {
-			data.clear();
-		}
-		return Slice<uint32_t>(data);
-	}
-
-	template <typename T>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::unique_ptr<T>& field, Data& data) const {
-		if (!_accessed.test(id)) {
-			return DetectField<T>(*this, id, end);
+			return DetectField<typename Unwrapper<T>::Type>(*this, id, end);
 		}
 		data = Serialize(field);
 		if (data.size() == 1) {
@@ -428,18 +418,7 @@ public:
 	template <typename T>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<ArrayT<T>>(*this, id, end);
-		} else if (field.empty()) {
-			return {};
-		}
-		data = Serialize(field);
-		return Slice<uint32_t>(data);
-	}
-
-	template <typename T>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<std::unique_ptr<T>>& field, Data& data) const {
-		if (!_accessed.test(id)) {
-			return DetectField<ArrayT<T>>(*this, id, end);
+			return DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end);
 		} else if (field.empty()) {
 			return {};
 		}
@@ -450,18 +429,7 @@ public:
 	template <typename K, typename V>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data) const {
 		if (!_accessed.test(id)) {
-			return DetectField<MapT<K,V>>(*this, id, end);
-		} else if (field.empty()) {
-			return {};
-		}
-		data = Serialize(field);
-		return Slice<uint32_t>(data);
-	}
-
-	template <typename K, typename V>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,std::unique_ptr<V>>& field, Data& data) const {
-		if (!_accessed.test(id)) {
-			return DetectField<MapT<K,V>>(*this, id, end);
+			return DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end);
 		} else if (field.empty()) {
 			return {};
 		}

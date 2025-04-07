@@ -9,6 +9,8 @@ namespace ex {
 namespace google {
 namespace protobuf {
 
+class Duration;
+
 struct Duration final {
 	Duration() = default;
 	explicit Duration(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}

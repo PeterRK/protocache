@@ -31,6 +31,10 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 		}
 	}
 	if (!IsAlias(proto)) {
+		if (proto.field_size() == 1
+			&& proto.field(0).label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+			std::cerr << fullname << " may be alias?" << std::endl;
+		}
 		return true;
 	}
 	// alias
