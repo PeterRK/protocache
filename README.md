@@ -12,8 +12,8 @@ With about 1KB dictionary trained by [random small ProtoCache objects](tools/ran
 
 | Level | -1 | 1 | 3 | 5 | 11 | 22 |
 |:-------:|:----:|:----:|:----:|:----:|:----:|:----:|
-| Compressed data size | 604 | 513 | 513 | 501 | 496 | 486 |
-| Decompress (1 million times) | 393ms | 1490ms | 1554ms | 1504ms | 1493ms | 1576ms |
+| Compressed data size | 598 | 511 | 515 | 500 | 492 | 486 |
+| Decompress (1 million times) | 375ms | 1461ms | 1493ms | 1449ms | 1471ms | 1520ms |
 
 
 ## Difference to Protobuf
