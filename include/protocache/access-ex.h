@@ -15,6 +15,7 @@
 #include <bitset>
 #include <vector>
 #include <unordered_map>
+#include <type_traits>
 #include "access.h"
 #include "serialize.h"
 #include "perfect_hash.h"
@@ -392,7 +393,7 @@ public:
 		return Slice<uint32_t>(data);
 	}
 
-	template<typename T, std::enable_if_t<std::is_scalar<T>::value, bool> = true>
+	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<T>(*this, id, end);
@@ -403,7 +404,7 @@ public:
 		return Slice<uint32_t>(data);
 	}
 
-	template <typename T, std::enable_if_t<!std::is_scalar<T>::value, bool> = true>
+	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<typename Unwrapper<T>::Type>(*this, id, end);
