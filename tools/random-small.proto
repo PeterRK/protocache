@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-message Dummy {
-	repeated int32 ivec = 1;
-	map<string, int64> imap = 2;
-}

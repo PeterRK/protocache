@@ -62,9 +62,6 @@ install(
     ARCHIVE DESTINATION lib
 )
 
-add_executable(random-small tools/random-small.cc)
-target_link_libraries(random-small protocache-lite)
-
 #file(GLOB bench_src
 #    test/benchmark/*.cc
 #)

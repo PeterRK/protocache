@@ -453,3 +453,31 @@ int BenchmarkProtoCacheSerialize(bool partly) {
 	}
 	return 0;
 }
+
+int BenchmarkCompress(const char* name, const std::string& filepath) {
+	std::string raw;
+	if (!protocache::LoadFile(filepath, &raw)) {
+		printf("fail to load %s\n", filepath.c_str());
+		return -1;
+	}
+	std::string cooked;
+	cooked.reserve(raw.size());
+
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		protocache::Compress(raw, &cooked);
+	}
+	auto delta_ms = DeltaMs(start);
+	printf("%s-compress: %luB %ldms\n", name, cooked.size(), delta_ms);
+
+	start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kLoop; i++) {
+		if (!protocache::Decompress(cooked, &raw)) {
+			puts("fail to decompress");
+			return 1;
+		}
+	}
+	delta_ms = DeltaMs(start);
+	printf("%s-decompress: %ldms\n", name, delta_ms);
+	return 0;
+}

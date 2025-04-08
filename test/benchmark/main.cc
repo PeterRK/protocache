@@ -19,5 +19,10 @@ int main() {
 	BenchmarkProtoCacheSerialize(true);
 	BenchmarkProtoCacheSerialize(false);
 	BenchmarkProtoCacheSerializeReflect();
+
+	std::cout << "========compress========" << std::endl;
+	BenchmarkCompress("pb", "test.pb");
+	BenchmarkCompress("pc", "test.pc");
+	BenchmarkCompress("fb", "test.fb");
 	return 0;
 }

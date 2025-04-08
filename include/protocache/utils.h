@@ -89,5 +89,27 @@ static inline constexpr Slice<D> SliceCast(const Slice<S>& src) noexcept {
 
 extern bool LoadFile(const std::string& path, std::string* out);
 
+extern void Compress(const uint8_t* src, size_t len, std::string* out);
+extern bool Decompress(const uint8_t* src, size_t len, std::string* out);
+
+static inline void Compress(const Slice<uint8_t>& src, std::string* out) {
+	Compress(src.data(), src.size(), out);
+}
+static inline void Compress(const Slice<char>& src, std::string* out) {
+	Compress(SliceCast<uint8_t>(src), out);
+}
+static inline void Compress(const std::string& src, std::string* out) {
+	Compress(Slice<char>(src), out);
+}
+static inline bool Decompress(const Slice<uint8_t>& src, std::string* out) {
+	return Decompress(src.data(), src.size(), out);
+}
+static inline bool Decompress(const Slice<char>& src, std::string* out) {
+	return Decompress(SliceCast<uint8_t>(src), out);
+}
+static inline bool Decompress(const std::string& src, std::string* out) {
+	return Decompress(Slice<char>(src), out);
+}
+
 } // protocache
 #endif //PROTOCACHE_UTILS_H_

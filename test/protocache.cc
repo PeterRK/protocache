@@ -480,3 +480,17 @@ TEST(PtotoCacheEX, Serialize) {
 	ASSERT_EQ(vec4[1], 52);
 }
 
+TEST(Compress, All) {
+	auto data = SerializeByProtobuf();
+	ASSERT_FALSE(data.empty());
+
+	protocache::Slice<uint8_t> view(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4);
+	std::string cooked;
+	protocache::Compress(view, &cooked);
+	ASSERT_NE(0, cooked.size());
+	ASSERT_LT(cooked.size(), view.size());
+
+	std::string raw;
+	ASSERT_TRUE(protocache::Decompress(cooked, &raw));
+	ASSERT_EQ(protocache::SliceCast<char>(view), protocache::Slice<char>(raw));
+}

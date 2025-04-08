@@ -56,3 +56,6 @@ extern int BenchmarkProtoCacheSerializeReflect();
 extern int BenchmarkProtoCacheEX();
 extern int BenchmarkProtoCacheSerialize(bool partly=false);
 
+extern int BenchmarkCompress(const char* name, const std::string& filepath);
+
+
