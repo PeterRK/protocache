@@ -14,6 +14,7 @@ DEFINE_string(output, "data.json", "output file");
 DEFINE_string(schema, "schema.proto", "schema file");
 DEFINE_string(root, "", "root message name");
 DEFINE_bool(flat, true, "input protocache binary instead of protobuf binary");
+DEFINE_bool(decompress, false, "decompress flat binary");
 
 int main(int argc, char* argv[]) {
 	google::ParseCommandLineFlags(&argc, &argv, true);
@@ -54,14 +55,21 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (FLAGS_flat) {
+		if (FLAGS_decompress) {
+			std::string tmp = std::move(raw);
+			if (!protocache::Decompress(tmp, &raw)) {
+				std::cerr << "fail to decompress" << std::endl;
+				return -4;
+			}
+		}
 		protocache::Slice<uint32_t> view(reinterpret_cast<const uint32_t *>(raw.data()), raw.size() / sizeof(uint32_t));
 		if (!protocache::Deserialize(view, message.get())) {
-			std::cerr << "fail to deserialize:" << std::endl;
+			std::cerr << "fail to deserialize" << std::endl;
 			return -4;
 		}
 	} else {
 		if (!message->ParseFromString(raw)) {
-			std::cerr << "fail to deserialize:" << std::endl;
+			std::cerr << "fail to deserialize" << std::endl;
 			return -4;
 		}
 	}

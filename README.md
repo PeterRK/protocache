@@ -81,27 +81,27 @@ The reflection apis are simliar to protobuf's. An example can be found in the [t
 ## Data Size Evaluation
 Following work in [paper](https://arxiv.org/pdf/2201.03051), we can find that protocache has smaller data size than [FlatBuffers](https://flatbuffers.dev/) and [Cap'n Proto](https://capnproto.org/), in most cases.
 
-|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto  |
-|:-------|----:|----:|----:|----:|
-| CircleCI Definition (Blank) | 5 | 8 | 20 | 24 |
-| CircleCI Matrix Definition | 26 | 88 | 104 | 96 |
-| Entry Point Regulation Manifest | 247 | 352 | 504 | 536 |
-| ESLint Configuration Document | 161 | 276 | 320 | 216 |
-| ECMAScript Module Loader Definition | 23 | 44 | 80 | 80 |
-| GeoJSON Example Document | 325 | 432 | 680 | 448 |
-| GitHub FUNDING Sponsorship Definition (Empty) | 17 | 24 | 68 | 40 |
-| GitHub Workflow Definition | 189 | 288 | 440 | 464 |
-| Grunt.js Clean Task Definition | 20 | 48 | 116 | 96 |
-| ImageOptimizer Azure Webjob Configuration | 23 | 60 | 100 | 96 |
-| JSON-e Templating Engine Reverse Sort Example | 21 | 68 | 136 | 240 |
-| JSON-e Templating Engine Sort Example | 10 | 36 | 44 | 48 |
-| JSON Feed Example Document | 413 | 484 | 584 | 568 |
-| JSON Resume Example | 2225 | 2608 | 3116 | 3152 |
-| .NET Core Project | 284 | 328 | 636 | 608 |
-| OpenWeatherMap API Example Document | 188 | 244 | 384 | 320 |
-| OpenWeather Road Risk API Example | 173 | 240 | 328 | 296 |
-| NPM Package.json Example Manifest | 1581 | 1736 | 2268 | 2216 |
-| TravisCI Notifications Configuration | 521 | 600 | 668 | 640 |
-| TSLint Linter Definition (Basic) | 8 | 24 | 60 | 48 |
-| TSLint Linter Definition (Extends Only) | 47 | 68 | 88 | 88 |
-| TSLint Linter Definition (Multi-rule) | 14 | 32 | 84 | 80 |
+|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto  | ProtoCache (Packed) | Cap'n Proto (Packed) |
+|:-------|----:|----:|----:|----:|----:|----:|
+| CircleCI Definition (Blank) | 5 | 8 | 20 | 24 | 6 | 6 |
+| CircleCI Matrix Definition | 26 | 88 | 104 | 96 | 50 | 36 |
+| Entry Point Regulation Manifest | 247 | 352 | 504 | 536 | 303 | 318 |
+| ESLint Configuration Document | 161 | 276 | 320 | 216 | 175 | 131 |
+| ECMAScript Module Loader Definition | 23 | 44 | 80 | 80 | 33 | 35 |
+| GeoJSON Example Document | 325 | 432 | 680 | 448 | 250 | 228 |
+| GitHub FUNDING Sponsorship Definition (Empty) | 17 | 24 | 68 | 40 | 23 | 25 |
+| GitHub Workflow Definition | 189 | 288 | 440 | 464 | 237 | 242 |
+| Grunt.js Clean Task Definition | 20 | 48 | 116 | 96 | 28 | 39 |
+| ImageOptimizer Azure Webjob Configuration | 23 | 60 | 100 | 96 | 40 | 44 |
+| JSON-e Templating Engine Reverse Sort Example | 21 | 68 | 136 | 240 | 38 | 43 |
+| JSON-e Templating Engine Sort Example | 10 | 36 | 44 | 48 | 21 | 18 |
+| JSON Feed Example Document | 413 | 484 | 584 | 568 | 474 | 470 |
+| JSON Resume Example | 2225 | 2608 | 3116 | 3152 | 2537 | 2549 |
+| .NET Core Project | 284 | 328 | 636 | 608 | 303 | 376 |
+| OpenWeatherMap API Example Document | 188 | 244 | 384 | 320 | 199 | 206 |
+| OpenWeather Road Risk API Example | 173 | 240 | 328 | 296 | 205 | 204 |
+| NPM Package.json Example Manifest | 1581 | 1736 | 2268 | 2216 | 1726 | 1755 |
+| TravisCI Notifications Configuration | 521 | 600 | 668 | 640 | 601 | 566 |
+| TSLint Linter Definition (Basic) | 8 | 24 | 60 | 48 | 14 | 12 |
+| TSLint Linter Definition (Extends Only) | 47 | 68 | 88 | 88 | 62 | 62 |
+| TSLint Linter Definition (Multi-rule) | 14 | 32 | 84 | 80 | 20 | 23 |

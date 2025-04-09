@@ -14,6 +14,7 @@ DEFINE_string(output, "data.bin", "output file");
 DEFINE_string(schema, "schema.proto", "schema file");
 DEFINE_string(root, "", "root message name");
 DEFINE_bool(flat, true, "output protocache binary instead of protobuf binary");
+DEFINE_bool(compress, false, "compress flat binary");
 
 int main(int argc, char* argv[]) {
 	google::ParseCommandLineFlags(&argc, &argv, true);
@@ -57,15 +58,21 @@ int main(int argc, char* argv[]) {
 		return 2;
 	}
 	if (FLAGS_flat) {
-		auto data = protocache::Serialize(*message);
-		if (data.empty()) {
-			std::cerr << "fail to serialize:" << std::endl;
+		protocache::Data data;
+		if (!protocache::Serialize(*message, &data)) {
+			std::cerr << "fail to serialize" << std::endl;
 			return -4;
 		}
-		output.write(reinterpret_cast<const char*>(data.data()), data.size()*4U);
+		if (FLAGS_compress) {
+			std::string cooked;
+			protocache::Compress(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4U, &cooked);
+			output.write(cooked.data(), cooked.size());
+		} else {
+			output.write(reinterpret_cast<const char*>(data.data()), data.size()*4U);
+		}
 	} else {
 		auto data = message->SerializePartialAsString();
-		output.write(reinterpret_cast<const char*>(data.data()), data.size());
+		output.write(data.data(), data.size());
 	}
 	return 0;
 }
