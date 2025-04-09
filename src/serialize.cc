@@ -153,7 +153,7 @@ Data SerializeMessage(std::vector<Slice<uint32_t>>& parts) {
 
 static size_t BestArraySize(const std::vector<Data>& parts, unsigned& m) {
 	size_t sizes[3] = {0, 0, 0};
-	for (auto one : parts) {
+	for (auto& one : parts) {
 		sizes[0] += 1;
 		sizes[1] += 2;
 		sizes[2] += 3;
