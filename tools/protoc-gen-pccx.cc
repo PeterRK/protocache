@@ -327,11 +327,13 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			<< "\t\tif (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};\n";
 	};
 
+	int max_id = 1;
 	for (int i = proto.field_size()-1; i >= 0; i--) {
 		auto& one = proto.field(i);
 		if (one.options().deprecated()) {
 			continue;
 		}
+		max_id = std::max(max_id, one.number());
 		if (one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
 			switch (one.type()) {
 				case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
@@ -408,6 +410,15 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 	oss << "\t\treturn view;\n"
 		<< "\t}\n\n";
+
+	if (max_id > (12 + 25*255)) {
+		std::cerr << "too many fields in message " << proto.name() << std::endl;
+		return {};
+	}
+	if (max_id - proto.field_size() > 6 && max_id > proto.field_size()*2) {
+		std::cerr << "fields in message are too sparse " << proto.name() << std::endl;
+		return {};
+	}
 
 	auto handle_get = [&oss](bool repeated, const std::string& field_name, const char* out_type) {
 		std::string tmp;
