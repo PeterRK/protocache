@@ -75,7 +75,11 @@ static protocache::Data SerializeByProtobuf() {
 		std::cerr << "fail to load json" << std::endl;
 		return {};
 	}
-	return protocache::Serialize(*message);
+	protocache::Data out;
+	if (!protocache::Serialize(*message, &out)) {
+		return {};
+	}
+	return out;
 }
 
 
@@ -311,8 +315,8 @@ TEST(PtotoCache, Reflection) {
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 
 	ASSERT_TRUE(protocache::LoadJson("test.json", message.get()));
-	auto data = protocache::Serialize(*message);
-	ASSERT_FALSE(data.empty());
+	protocache::Data data;
+	ASSERT_TRUE(protocache::Serialize(*message, &data));
 	auto end = data.data() + data.size();
 	protocache::Message unit(data.data(), end);
 
@@ -442,7 +446,8 @@ TEST(PtotoCacheEX, Serialize) {
 		pair.second->i32(end) = pair.first + 1;
 	}
 
-	auto modified = ex.Serialize();
+	protocache::Data modified;
+	ASSERT_TRUE(ex.Serialize(&modified));
 	ASSERT_EQ(data.size(), modified.size());
 	end = modified.data() + modified.size();
 

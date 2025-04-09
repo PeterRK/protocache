@@ -23,36 +23,33 @@ static inline T* Cast(const void* p) noexcept {
 }
 
 template <typename T>
-static inline Data SerializeScalar(T v) {
+static inline bool SerializeScalar(T v, Data* out) {
 	static_assert(std::is_scalar<T>::value, "");
-	Data out(WordSize(sizeof(T)), 0);
-	*Cast<T>(out.data()) = v;
+	out->clear();
+	out->resize(WordSize(sizeof(T)), 0);
+	*Cast<T>(out->data()) = v;
 	return out;
 }
 
-static inline Data Serialize(bool v) {
-	//return SerializeScalar(v);
-	//FIXME: GCC fail with SerializeScalar
-	Data out = {(uint32_t)v};
-	return out;
-}
-static inline Data Serialize(int32_t v) { return SerializeScalar(v); }
-static inline Data Serialize(uint32_t v) { return SerializeScalar(v); }
-static inline Data Serialize(int64_t v) { return SerializeScalar(v); }
-static inline Data Serialize(uint64_t v) { return SerializeScalar(v); }
-static inline Data Serialize(float v) { return SerializeScalar(v); }
-static inline Data Serialize(double v) { return SerializeScalar(v); }
+static inline bool Serialize(bool v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(int32_t v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(uint32_t v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(int64_t v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(uint64_t v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(float v, Data* out) { return SerializeScalar(v, out); }
+static inline bool Serialize(double v, Data* out) { return SerializeScalar(v, out); }
 
 template <typename T>
-static inline Data SerializeScalarArray(const std::vector<T>& array) {
+static inline bool SerializeScalarArray(const std::vector<T>& array, Data* out) {
 	static_assert(std::is_scalar<T>::value, "");
 	auto m = WordSize(sizeof(T));
-	Data out(1 + m*array.size(), 0);
-	if (out.size() >= (1U << 30U)) {
-		return {};
+	if (m*array.size() >= (1U << 30U)) {
+		return false;
 	}
-	out[0] = (array.size() << 2U) | m;
-	auto p = out.data() + 1;
+	out->clear();
+	out->resize(1 + m*array.size(), 0);
+	out->front() = (array.size() << 2U) | m;
+	auto p = out->data() + 1;
 	for (auto v : array) {
 		*Cast<T>(p) = v;
 		p += m;
@@ -60,24 +57,25 @@ static inline Data SerializeScalarArray(const std::vector<T>& array) {
 	return out;
 }
 
-extern Data Serialize(const Slice<char>& str);
+extern bool Serialize(const Slice<char>& str, Data* out);
 
-static inline Data Serialize(const Slice<uint8_t>& data) {
-	return Serialize(SliceCast<char>(data));
+static inline bool Serialize(const Slice<uint8_t>& data, Data* out) {
+	return Serialize(SliceCast<char>(data), out);
 }
 
-static inline Data Serialize(const Slice<bool>& data) {
-	return Serialize(SliceCast<char>(data));
+static inline bool Serialize(const Slice<bool>& data, Data* out) {
+	return Serialize(SliceCast<char>(data), out);
 }
 
-static inline Data Serialize(const std::string& str) {
-	return Serialize(Slice<char>(str));
+static inline bool Serialize(const std::string& str, Data* out) {
+	return Serialize(Slice<char>(str), out);
 }
 
-extern Data SerializeMessage(std::vector<Slice<uint32_t>>& parts);
-extern Data SerializeMessage(std::vector<Data>& parts);
-extern Data SerializeArray(const std::vector<Data>& elements);
-extern Data SerializeMap(const Slice<uint8_t>& index, const std::vector<Data>& keys, const std::vector<Data>& values);
+extern bool SerializeMessage(std::vector<Slice<uint32_t>>& parts, Data* out);
+extern bool SerializeMessage(std::vector<Data>& parts, Data* out);
+extern bool SerializeArray(const std::vector<Data>& elements, Data* out);
+extern bool SerializeMap(const Slice<uint8_t>& index,
+						 const std::vector<Data>& keys, const std::vector<Data>& values, Data* out);
 
 } // protocache
 #endif //PROTOCACHE_SERIALIZE_H_

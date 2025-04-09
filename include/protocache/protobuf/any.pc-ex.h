@@ -18,17 +18,18 @@ struct Any final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::Any::Detect(ptr, end);
 	}
-	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
 			auto view = Detect(clean_head, end);
-			return {view.data(), view.size()};
+			out->assign(view.data(), view.size());
+			return true;
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
 		parts[_::type_url] = __view__.SerializeField(_::type_url, end, _type_url, raw[_::type_url]);
 		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
-		return protocache::SerializeMessage(parts);
+		return protocache::SerializeMessage(parts, out);
 	}
 
 	std::string& type_url(const uint32_t* end=nullptr) { return __view__.GetField(_::type_url, end, _type_url); }

@@ -76,17 +76,32 @@ public:
 	}
 };
 
+template <typename T> class ArrayEX;
+template <typename K, typename V> class MapEX;
+
 template <typename T>
-static inline Data Serialize(const T& obj) {
-	return obj.Serialize();
+static inline bool Serialize(const T& obj, const uint32_t*, Data* out) {
+	return Serialize(obj, out);
 }
 
 template <typename T>
-static inline Data Serialize(const std::unique_ptr<T>& obj) {
+static inline bool Serialize(const ArrayEX<T>& obj, const uint32_t* end, Data* out) {
+	return obj.Serialize(out, end);
+}
+
+template <typename K, typename V>
+static inline bool Serialize(const MapEX<K,V>& obj, const uint32_t* end, Data* out) {
+	return obj.Serialize(out, end);
+}
+
+template <typename T>
+static inline bool Serialize(const std::unique_ptr<T>& obj, const uint32_t* end, Data* out) {
 	if (obj == nullptr) {
-		return {0};
+		out->clear();
+		out->push_back(0);
+		return true;
 	}
-	return obj->Serialize();
+	return obj->Serialize(out, end);
 }
 
 template <typename T>
@@ -111,16 +126,16 @@ public:
 			Extract(view[i].GetObject(end), end, this->core_[i]);
 		}
 	}
-	Data Serialize() const {
+	bool Serialize(Data* out, const uint32_t* end=nullptr) const {
 		std::vector<Data> elements;
 		elements.reserve(this->core_.size());
 		for (auto& one : this->core_) {
-			elements.push_back(::protocache::Serialize(one));
-			if (elements.back().empty()) {
-				return {};
+			elements.emplace_back();
+			if (!::protocache::Serialize(one, end, &elements.back())) {
+				return false;
 			}
 		}
-		return ::protocache::SerializeArray(elements);
+		return ::protocache::SerializeArray(elements, out);
 	}
 };
 
@@ -132,8 +147,8 @@ struct ScalarArrayEX : public BaseArrayEX<T> {
 		auto view = Array(data, end).Numbers<T>();
 		this->core_.assign(view.begin(), view.end());
 	};
-	Data Serialize() const {
-		return ::protocache::SerializeScalarArray(this->core_);
+	bool Serialize(Data* out, const uint32_t*) const {
+		return ::protocache::SerializeScalarArray(this->core_, out);
 	}
 };
 
@@ -145,8 +160,8 @@ struct ArrayEX<bool> final : BaseArrayEX<bool> {
 		this->core_.resize(view.size());
 		memcpy(this->core_.data(), view.data(), view.size());
 	}
-	Data Serialize() const {
-		return ::protocache::Serialize(Slice<uint8_t>(core_));
+	bool Serialize(Data* out, const uint32_t*) const {
+		return ::protocache::Serialize(Slice<uint8_t>(core_), out);
 	}
 };
 
@@ -299,11 +314,11 @@ public:
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
 		return MapT<Key,typename Unwrapper<Val>::Type>::Detect(ptr, end);
 	}
-	Data Serialize() const {
+	bool Serialize(Data* out, const uint32_t* end=nullptr) const {
 		_MapKeyReader<KeyEX,ValEX> reader(core_);
 		auto index = PerfectHash::Build(reader, true);
 		if (!index) {
-			return {};
+			return false;
 		}
 		std::vector<Data> keys(core_.size());
 		std::vector<Data> values(core_.size());
@@ -311,16 +326,12 @@ public:
 		for (auto& pair : core_) {
 			auto key = reader.Read();
 			auto pos = index.Locate(key.data(), key.size());
-			keys[pos] = ::protocache::Serialize(pair.first);
-			if (keys[pos].empty()) {
-				return {};
-			}
-			values[pos] = ::protocache::Serialize(pair.second);
-			if (values[pos].empty()) {
-				return {};
+			if (!::protocache::Serialize(pair.first, &keys[pos])
+				|| !::protocache::Serialize(pair.second, end, &values[pos])) {
+				return false;
 			}
 		}
-		return ::protocache::SerializeMap(index.Data(), keys, values);
+		return ::protocache::SerializeMap(index.Data(), keys, values, out);
 	}
 
 	size_t size() const noexcept { return core_.size(); }
@@ -386,10 +397,9 @@ public:
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<Slice<char>>(*this, id, end);
-		} else if (field.empty()) {
+		} else if (field.empty() || !::protocache::Serialize(field, &data)) {
 			return {};
 		}
-		data = Serialize(field);
 		return Slice<uint32_t>(data);
 	}
 
@@ -397,10 +407,9 @@ public:
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<T>(*this, id, end);
-		} else if (field == 0) {
+		} else if (field == 0 || !::protocache::Serialize(field, &data)) {
 			return {};
 		}
-		data = Serialize(field);
 		return Slice<uint32_t>(data);
 	}
 
@@ -408,8 +417,9 @@ public:
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<typename Unwrapper<T>::Type>(*this, id, end);
+		} else if (!::protocache::Serialize(field, end, &data)) {
+			return {};
 		}
-		data = Serialize(field);
 		if (data.size() == 1) {
 			data.clear();
 		}
@@ -420,10 +430,9 @@ public:
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end);
-		} else if (field.empty()) {
+		} else if (field.empty() || !::protocache::Serialize(field, end, &data)) {
 			return {};
 		}
-		data = Serialize(field);
 		return Slice<uint32_t>(data);
 	}
 
@@ -431,10 +440,9 @@ public:
 	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data) const {
 		if (!_accessed.test(id)) {
 			return DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end);
-		} else if (field.empty()) {
+		} else if (field.empty() || !::protocache::Serialize(field, end, &data)) {
 			return {};
 		}
-		data = Serialize(field);
 		return Slice<uint32_t>(data);
 	}
 };

@@ -18,17 +18,18 @@ struct Duration final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::Duration::Detect(ptr, end);
 	}
-	protocache::Data Serialize(const uint32_t* end=nullptr) const {
+	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
 			auto view = Detect(clean_head, end);
-			return {view.data(), view.size()};
+			out->assign(view.data(), view.size());
+			return true;
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
 		parts[_::seconds] = __view__.SerializeField(_::seconds, end, _seconds, raw[_::seconds]);
 		parts[_::nanos] = __view__.SerializeField(_::nanos, end, _nanos, raw[_::nanos]);
-		return protocache::SerializeMessage(parts);
+		return protocache::SerializeMessage(parts, out);
 	}
 
 	int64_t& seconds(const uint32_t* end=nullptr) { return __view__.GetField(_::seconds, end, _seconds); }

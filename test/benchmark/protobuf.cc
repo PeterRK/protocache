@@ -307,7 +307,9 @@ int BenchmarkProtoCacheSerializeReflect() {
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
-		cnt += protocache::Serialize(*root).size();
+		protocache::Data data;
+		protocache::Serialize(*root, &data);
+		cnt += data.size();
 	}
 	auto delta_ms = DeltaMs(start);
 
