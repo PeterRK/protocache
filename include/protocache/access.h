@@ -457,17 +457,19 @@ public:
 		return Find(key.data(), key.size(), end);
 	}
 
-	Iterator Find(uint64_t key, const uint32_t* end=nullptr) const noexcept {
-		return Find<2>(reinterpret_cast<const uint32_t *>(&key), end);
-	}
-	Iterator Find(int64_t key, const uint32_t* end=nullptr) const noexcept {
-		return Find<2>(reinterpret_cast<const uint32_t *>(&key), end);
-	}
-	Iterator Find(uint32_t key, const uint32_t* end=nullptr) const noexcept {
-		return Find<1>(&key, end);
-	}
-	Iterator Find(int32_t key, const uint32_t* end=nullptr) const noexcept {
-		return Find<1>(reinterpret_cast<const uint32_t *>(&key), end);
+	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	Iterator Find(T val, const uint32_t* end=nullptr) const noexcept {
+		auto pos = index_.Locate(reinterpret_cast<const uint8_t *>(val), sizeof(T));
+		if (pos >= index_.Size()) {
+			return this->end();
+		}
+		Iterator it(body_ + (key_width_ + value_width_) * pos, key_width_, value_width_);
+		auto view = (*it).Key().GetValue(end);
+		if (view.size() ==  (sizeof(T)+3) / 4
+			&& val == *reinterpret_cast<const T*>(view.data())) {
+			return it;
+		}
+		return this->end();
 	}
 
 private:
@@ -475,28 +477,6 @@ private:
 	const uint32_t* body_ = nullptr;
 	unsigned key_width_ = 0;
 	unsigned value_width_ = 0;
-
-	template<unsigned LEN>
-	Iterator Find(const uint32_t* val, const uint32_t* end=nullptr) const noexcept {
-		auto pos = index_.Locate(reinterpret_cast<const uint8_t *>(val), LEN * 4);
-		if (pos >= index_.Size()) {
-			return this->end();
-		}
-		Iterator it(body_ + (key_width_ + value_width_) * pos, key_width_, value_width_);
-		auto view = (*it).Key().GetValue();
-		if (view.size() == LEN) {
-			if (LEN == 2) {
-				if (*reinterpret_cast<const uint64_t*>(val) == *reinterpret_cast<const uint64_t*>(view.data())) {
-					return it;
-				}
-			} else {
-				if (*val == *view.data()) {
-					return it;
-				}
-			}
-		}
-		return this->end();
-	}
 };
 
 template <typename T>
@@ -508,7 +488,7 @@ public:
 	}
 
 	T Get(const uint32_t* end=nullptr) const {
-		auto view = core_.GetValue();
+		auto view = core_.GetValue(end);
 		if (view.size() != WordSize(sizeof(T))) {
 			return 0;
 		}
@@ -516,7 +496,7 @@ public:
 	}
 
 	Slice<uint32_t> Detect(const uint32_t* end=nullptr) const {
-		return core_.GetValue();
+		return core_.GetValue(end);
 	}
 
 private:
