@@ -13,7 +13,6 @@
 #include "proto-gen-utils.h"
 
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
-
 static std::unordered_map<std::string, std::string> g_java_names;
 
 static void CollectAlias(const std::string& ns, const std::string& java_ns, const ::google::protobuf::EnumDescriptorProto& proto) {
@@ -39,12 +38,15 @@ static bool CollectAlias(const std::string& ns, const std::string& java_ns, cons
 			return false;
 		}
 	}
-	if (proto.field_size() != 1 || proto.field(0).name() != "_") {
+	if (!IsAlias(proto)) {
+		if (proto.field_size() == 1 && IsRepeated(proto.field(0))) {
+			std::cerr << fullname << " may be alias?" << std::endl;
+		}
 		return true;
 	}
 	// alias
 	auto& field = proto.field(0);
-	if (field.label() != ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+	if (!IsRepeated(field)) {
 		std::cerr << "illegal alias: " << fullname << std::endl;
 		return false;
 	}
@@ -192,10 +194,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	} else {
 		oss << "public final static class " << proto.name() << " extends ";
 	}
-
-	auto alias_mode = proto.field_size() == 1 && proto.field(0).name() == "_";
-
-	if (alias_mode) {
+	if (IsAlias(proto)) {
 		auto it = g_alias_book.find(fullname);
 		if (it == g_alias_book.end()) {
 			std::cerr << "alias lost: " << fullname << std::endl;
@@ -234,21 +233,19 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		oss << AddIndent(piece);
 	}
 
-	if (alias_mode) {
+	auto fields = FieldsInOrder(proto);
+	if (IsAlias(proto) || fields.empty()) {
 		oss << "}\n";
 		return oss.str();
 	}
 
 	oss << '\n';
-	for (auto& one : proto.field()) {
-		if (one.options().deprecated()) {
-			continue;
-		}
-		if (one.name() == "_") {
+	for (auto one : fields) {
+		if (one->name() == "_") {
 			std::cerr << "found illegal field in message " << fullname << std::endl;
 			return {};
 		}
-		oss << "\tpublic static final int FIELD_" << one.name() << " = " << (one.number()-1) << ";\n";
+		oss << "\tpublic static final int FIELD_" << one->name() << " = " << (one->number()-1) << ";\n";
 	}
 	oss << "\n\tpublic " << proto.name() << "(){}\n"
 		<< "\tpublic " << proto.name() << "(byte[] data){ this(data, 0); }\n"
@@ -257,56 +254,53 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	std::vector<std::string> to_clean;
 	to_clean.reserve(proto.field_size());
 
-	auto handle_simple_field = [&oss, &to_clean](bool repeated, const std::string& field_name,
-								const char* raw_type, const char* boxed_type, bool primary=true) {
-		if (repeated) {
-			oss << "\tprivate com.github.peterrk.protocache." << boxed_type << "Array _" << field_name << " = null;\n"
+	auto handle_simple_field = [&oss, &to_clean](
+			const ::google::protobuf::FieldDescriptorProto& field,
+			const char* raw_type, const char* boxed_type, bool primary=true) {
+		if (IsRepeated(field)) {
+			oss << "\tprivate com.github.peterrk.protocache." << boxed_type << "Array _" << field.name() << " = null;\n"
 				<< "\tpublic com.github.peterrk.protocache." << boxed_type << "Array"
-				<< " get" << JavaFieldName(field_name) << "() {\n"
-				<< "\t\tif (_" << field_name << " == null) {\n"
-				<< "\t\t\t_" << field_name << " = get" << boxed_type << "Array(FIELD_" << field_name << ");\n"
+				<< " get" << JavaFieldName(field.name()) << "() {\n"
+				<< "\t\tif (_" << field.name() << " == null) {\n"
+				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "Array(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
-				<< "\t\treturn _" << field_name << ";\n"
+				<< "\t\treturn _" << field.name() << ";\n"
 				<< "\t}\n";
-			to_clean.push_back(field_name);
+			to_clean.push_back(field.name());
 		} else if (primary) {
-			oss << "\tpublic " << raw_type << " get" << JavaFieldName(field_name)
-				<< "() { return get" << boxed_type << "(FIELD_" << field_name << "); }\n";
+			oss << "\tpublic " << raw_type << " get" << JavaFieldName(field.name())
+				<< "() { return get" << boxed_type << "(FIELD_" << field.name() << "); }\n";
 		} else {
-			oss << "\tprivate " << raw_type << " _" << field_name << " = null;\n"
-				<< "\tpublic " << raw_type << " get" << JavaFieldName(field_name) << "() {\n"
-				<< "\t\tif (_" << field_name << " == null) {\n"
-				<< "\t\t\t_" << field_name << " = get" << boxed_type << "(FIELD_" << field_name << ");\n"
+			oss << "\tprivate " << raw_type << " _" << field.name() << " = null;\n"
+				<< "\tpublic " << raw_type << " get" << JavaFieldName(field.name()) << "() {\n"
+				<< "\t\tif (_" << field.name() << " == null) {\n"
+				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
-				<< "\t\treturn _" << field_name << ";\n"
+				<< "\t\treturn _" << field.name() << ";\n"
 				<< "\t}\n";
-			to_clean.push_back(field_name);
+			to_clean.push_back(field.name());
 		}
 	};
 
-	for (auto& one : proto.field()) {
-		if (one.options().deprecated()) {
-			continue;
-		}
-		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
-		switch (one.type()) {
+	for (auto one : fields) {
+		switch (one->type()) {
 			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 			{
 				std::string java_type;
-				if (repeated) {
+				if (IsRepeated(*one)) {
 					AliasUnit unit;
-					unit.value_type = one.type();
-					auto it = map_entries.find(one.type_name());
+					unit.value_type = one->type();
+					auto it = map_entries.find(one->type_name());
 					if (it != map_entries.end()) {
 						unit.key_type = it->second->field(0).type();
 						unit.value_type = it->second->field(1).type();
 						unit.value_class = it->second->field(1).type_name();
 					} else {
-						unit.value_class = one.type_name();
+						unit.value_class = one->type_name();
 					}
 					java_type = CalcAliasName(unit);
 				} else {
-					auto it = g_java_names.find(one.type_name());
+					auto it = g_java_names.find(one->type_name());
 					if (it != g_java_names.end()) {
 						java_type = it->second;
 					}
@@ -314,34 +308,34 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				if (java_type.empty()) {
 					return {};
 				}
-				oss << "\tprivate " << java_type << " _" << one.name() << " = null;\n"
-					<< "\tpublic " << java_type << " get" << JavaFieldName(one.name()) << "() {\n"
-					<< "\t\tif (_" << one.name() << " == null) {\n"
-					<< "\t\t\t_" << one.name() << " = getField(FIELD_" << one.name() << ", " << java_type << "::new);\n"
+				oss << "\tprivate " << java_type << " _" << one->name() << " = null;\n"
+					<< "\tpublic " << java_type << " get" << JavaFieldName(one->name()) << "() {\n"
+					<< "\t\tif (_" << one->name() << " == null) {\n"
+					<< "\t\t\t_" << one->name() << " = getField(FIELD_" << one->name() << ", " << java_type << "::new);\n"
 					<< "\t\t}\n"
-					<< "\t\treturn _" << one.name() << ";\n"
+					<< "\t\treturn _" << one->name() << ";\n"
 					<< "\t}\n";
-				to_clean.push_back(one.name());
+				to_clean.push_back(one->name());
 			}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				handle_simple_field(repeated, one.name(), "byte[]", "Bytes", false);
+				handle_simple_field(*one, "byte[]", "Bytes", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				handle_simple_field(repeated, one.name(), "String", "Str", false);
+				handle_simple_field(*one, "String", "Str", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-				handle_simple_field(repeated, one.name(), "double", "Float64");
+				handle_simple_field(*one, "double", "Float64");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-				handle_simple_field(repeated, one.name(), "float", "Float32");
+				handle_simple_field(*one, "float", "Float32");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-				handle_simple_field(repeated, one.name(), "long", "Int64");
+				handle_simple_field(*one, "long", "Int64");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
@@ -349,13 +343,13 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				handle_simple_field(repeated, one.name(), "int", "Int32");
+				handle_simple_field(*one, "int", "Int32");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				handle_simple_field(repeated, one.name(), "boolean", "Bool");
+				handle_simple_field(*one, "boolean", "Bool");
 				break;
 			default:
-				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
+				std::cerr << "unsupported field " << one->name() << " in message " << proto.name() << std::endl;
 				return {};
 		}
 	}

@@ -14,10 +14,6 @@
 
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
 
-static bool IsAlias(const ::google::protobuf::DescriptorProto& proto) {
-	return proto.field_size() == 1 && proto.field(0).name() == "_";
-}
-
 static bool CollectAlias(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
@@ -31,15 +27,14 @@ static bool CollectAlias(const std::string& ns, const ::google::protobuf::Descri
 		}
 	}
 	if (!IsAlias(proto)) {
-		if (proto.field_size() == 1
-			&& proto.field(0).label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+		if (proto.field_size() == 1 && IsRepeated(proto.field(0))) {
 			std::cerr << fullname << " may be alias?" << std::endl;
 		}
 		return true;
 	}
 	// alias
 	auto& field = proto.field(0);
-	if (field.label() != ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+	if (!IsRepeated(field)) {
 		std::cerr << "illegal alias: " << fullname << std::endl;
 		return false;
 	}
@@ -211,12 +206,15 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto)
 	return oss.str();
 }
 
+
+
 static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	std::ostringstream oss;
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 
-	if (IsAlias(proto)) {
+	auto fields = FieldsInOrder(proto);
+	if (IsAlias(proto) || fields.empty()) {
 		oss << "struct " << proto.name() << " final {\n";
 	} else {
 		oss << "class " << proto.name() << " final {\n"
@@ -224,15 +222,12 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			<< '\t' << proto.name() << "() = default;\n"
 			<< "public:\n"
 			<< "\tstruct _ {\n";
-		for (auto& one : proto.field()) {
-			if (one.options().deprecated()) {
-				continue;
-			}
-			if (one.name() == "_") {
+		for (auto one : fields) {
+			if (one->name() == "_") {
 				std::cerr << "found illegal field in message " << fullname << std::endl;
 				return {};
 			}
-			oss << "\t\tstatic constexpr unsigned " << one.name() << " = " << (one.number()-1) << ";\n";
+			oss << "\t\tstatic constexpr unsigned " << one->name() << " = " << (one->number()-1) << ";\n";
 		}
 		oss << "\t};\n\n";
 	}
@@ -291,6 +286,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		}
 		oss << "};\n\n";
 		return oss.str();
+	} else if (fields.empty()) {
+		oss << "};\n\n";
+		return oss.str();
 	}
 
 	oss << "\tbool operator!() const noexcept { return !protocache::Message::Cast(this); }\n"
@@ -327,14 +325,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			<< "\t\tif (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};\n";
 	};
 
-	int max_id = 1;
-	for (int i = proto.field_size()-1; i >= 0; i--) {
-		auto& one = proto.field(i);
-		if (one.options().deprecated()) {
-			continue;
-		}
-		max_id = std::max(max_id, one.number());
-		if (one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED) {
+	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
+		auto& one = *fields[i];
+		if (IsRepeated(one)) {
 			switch (one.type()) {
 				case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
 				{
@@ -411,6 +404,8 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	oss << "\t\treturn view;\n"
 		<< "\t}\n\n";
 
+	assert(!fields.empty());
+	int max_id = fields.back()->number();
 	if (max_id > (12 + 25*255)) {
 		std::cerr << "too many fields in message " << proto.name() << std::endl;
 		return {};
@@ -433,64 +428,60 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			<< "\t}\n";
 	};
 
-	for (auto& one : proto.field()) {
-		if (one.options().deprecated()) {
-			continue;
-		}
-		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
-		switch (one.type()) {
+	for (auto one : fields) {
+		switch (one->type()) {
 			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
-				if (repeated) { // array or map
-					auto it = map_entries.find(one.type_name());
+				if (IsRepeated(*one)) { // array or map
+					auto it = map_entries.find(one->type_name());
 					if (it != map_entries.end()) {
 						auto out_type = get_map_type(it->second);
 						if (out_type.empty()) {
 							return {};
 						}
-						handle_get(false, one.name(), out_type.c_str());
+						handle_get(false, one->name(), out_type.c_str());
 						break;
 					}
 				}
-				handle_get(repeated, one.name(), TypeName(one.type(), one.type_name()).c_str());
+				handle_get(IsRepeated(*one), one->name(), TypeName(one->type(), one->type_name()).c_str());
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				handle_get(repeated, one.name(), "protocache::Slice<uint8_t>");
+				handle_get(IsRepeated(*one), one->name(), "protocache::Slice<uint8_t>");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				handle_get(repeated, one.name(), "protocache::Slice<char>");
+				handle_get(IsRepeated(*one), one->name(), "protocache::Slice<char>");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-				handle_get(repeated, one.name(), "double");
+				handle_get(IsRepeated(*one), one->name(), "double");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-				handle_get(repeated, one.name(), "float");
+				handle_get(IsRepeated(*one), one->name(), "float");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-				handle_get(repeated, one.name(), "uint64_t");
+				handle_get(IsRepeated(*one), one->name(), "uint64_t");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-				handle_get(repeated, one.name(), "uint32_t");
+				handle_get(IsRepeated(*one), one->name(), "uint32_t");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-				handle_get(repeated, one.name(), "int64_t");
+				handle_get(IsRepeated(*one), one->name(), "int64_t");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-				handle_get(repeated, one.name(), "int32_t");
+				handle_get(IsRepeated(*one), one->name(), "int32_t");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				handle_get(repeated, one.name(), "bool");
+				handle_get(IsRepeated(*one), one->name(), "bool");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				handle_get(repeated, one.name(), "protocache::EnumValue");
+				handle_get(IsRepeated(*one), one->name(), "protocache::EnumValue");
 				break;
 			default:
-				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
+				std::cerr << "unsupported field " << one->name() << " in message " << proto.name() << std::endl;
 				return {};
 		}
 	}
@@ -642,6 +633,13 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		return oss.str();
 	}
 
+	auto fields = FieldsInOrder(proto);
+	if (fields.empty()) {
+		oss << "};\n\n";
+		return oss.str();
+	}
+	int max_id = fields.back()->number();
+
 	std::string cxx_ns;
 	for (auto ch : ns) {
 		if (ch == '.') {
@@ -653,11 +651,6 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 	cxx_ns += "::";
 	cxx_ns += proto.name();
 	cxx_ns += "::";
-
-	int max_id = 1;
-	for (auto& field : proto.field()) {
-		max_id = std::max(max_id, field.number());
-	}
 
 	oss << '\t' << proto.name() << "() = default;\n"
 		<< "\texplicit " << proto.name() << "(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}\n"
@@ -676,31 +669,20 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\tstd::vector<protocache::Data> raw(" << max_id << ");\n"
 		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << max_id << ");\n";
 
-	for (auto& one : proto.field()) {
-		if (one.options().deprecated()) {
-			continue;
-		}
-		oss << "\t\tparts[_::" << one.name() << "] = __view__.SerializeField(_::"
-			<< one.name() << ", end, _" << one.name() << ", raw[_::" << one.name() << "]);\n";
+	for (auto one : fields) {
+		oss << "\t\tparts[_::" << one->name() << "] = __view__.SerializeField(_::"
+			<< one->name() << ", end, _" << one->name() << ", raw[_::" << one->name() << "]);\n";
 	}
 	oss << "\t\treturn protocache::SerializeMessage(parts, out);\n"
 		<< "\t}\n\n";
 
-	std::vector<std::string> types(proto.field_size());
-	for (int i = 0; i < proto.field_size(); i++) {
-		auto& one = proto.field(i);
-		if (one.options().deprecated()) {
-			continue;
-		}
-		if (one.name() == "_") {
-			std::cerr << "found illegal field in message " << fullname << std::endl;
-			return {};
-		}
+	std::vector<std::string> types(fields.size());
+	for (unsigned i = 0; i < fields.size(); i++) {
+		auto& one = *fields[i];
 		auto& type = types[i];
-		auto repeated = one.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
 		switch (one.type()) {
 			case ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE:
-				if (repeated) { // array or map
+				if (IsRepeated(one)) { // array or map
 					auto it = map_entries.find(one.type_name());
 					if (it != map_entries.end()) {
 						auto& key_field = it->second->field(0);
@@ -730,40 +712,40 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 				}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				type = repeated? "protocache::ArrayEX<protocache::Slice<uint8_t>>" : "std::string";
+				type = IsRepeated(one)? "protocache::ArrayEX<protocache::Slice<uint8_t>>" : "std::string";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				type = repeated? "protocache::ArrayEX<protocache::Slice<char>>" : "std::string";
+				type = IsRepeated(one)? "protocache::ArrayEX<protocache::Slice<char>>" : "std::string";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-				type = repeated? "protocache::ArrayEX<double>" : "double";
+				type = IsRepeated(one)? "protocache::ArrayEX<double>" : "double";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-				type = repeated? "protocache::ArrayEX<float>" : "float";
+				type = IsRepeated(one)? "protocache::ArrayEX<float>" : "float";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-				type = repeated? "protocache::ArrayEX<uint64_t>" : "uint64_t";
+				type = IsRepeated(one)? "protocache::ArrayEX<uint64_t>" : "uint64_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-				type = repeated? "protocache::ArrayEX<uint32_t>" : "uint32_t";
+				type = IsRepeated(one)? "protocache::ArrayEX<uint32_t>" : "uint32_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-				type = repeated? "protocache::ArrayEX<int64_t>" : "int64_t";
+				type = IsRepeated(one)? "protocache::ArrayEX<int64_t>" : "int64_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 			case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-				type = repeated? "protocache::ArrayEX<int32_t>" : "int32_t";
+				type = IsRepeated(one)? "protocache::ArrayEX<int32_t>" : "int32_t";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-				type = repeated? "protocache::ArrayEX<bool>" : "bool";
+				type = IsRepeated(one)? "protocache::ArrayEX<bool>" : "bool";
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-				type = repeated? "protocache::ArrayEX<protocache::EnumValue>" : "protocache::EnumValue";
+				type = IsRepeated(one)? "protocache::ArrayEX<protocache::EnumValue>" : "protocache::EnumValue";
 				break;
 			default:
 				std::cerr << "unsupported field " << one.name() << " in message " << proto.name() << std::endl;
@@ -776,12 +758,8 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 	oss << "\nprivate:\n"
 		<< "\tusing _ = " << cxx_ns << "_;\n"
 		<< "\tprotocache::MessageEX<" << max_id << "> __view__;\n";
-	for (int i = 0; i < proto.field_size(); i++) {
-		auto &one = proto.field(i);
-		if (one.options().deprecated()) {
-			continue;
-		}
-		oss << '\t' << types[i] << " _" << one.name() << ";\n";
+	for (unsigned i = 0; i < fields.size(); i++) {
+		oss << '\t' << types[i] << " _" << fields[i]->name() << ";\n";
 	}
 	oss << "};\n\n";
 	return oss.str();

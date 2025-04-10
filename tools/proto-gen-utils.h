@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/compiler/plugin.pb.h>
 
 static inline std::string NaiveJoinName(const std::string& ns, const std::string& name) {
@@ -46,3 +48,26 @@ struct AliasUnit {
 	::google::protobuf::FieldDescriptorProto::Type value_type = TYPE_NONE;
 	std::string value_class;
 };
+
+static std::vector<const ::google::protobuf::FieldDescriptorProto*> FieldsInOrder(const ::google::protobuf::DescriptorProto& proto) {
+	std::vector<const ::google::protobuf::FieldDescriptorProto*> out;
+	out.reserve(proto.field_size());
+	for (auto& one : proto.field()) {
+		if (!one.options().deprecated()) {
+			out.push_back(&one);
+		}
+	}
+	std::sort(out.begin(), out.end(),
+			  [](const ::google::protobuf::FieldDescriptorProto* a, const ::google::protobuf::FieldDescriptorProto* b)->bool{
+				  return a->number() < b->number();
+			  });
+	return out;
+}
+
+static inline bool IsRepeated(const ::google::protobuf::FieldDescriptorProto& proto) {
+	return proto.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
+}
+
+static inline bool IsAlias(const ::google::protobuf::DescriptorProto& proto) {
+	return proto.field_size() == 1 && proto.field(0).name() == "_";
+}

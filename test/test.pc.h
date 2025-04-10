@@ -10,6 +10,7 @@ class Small;
 class Main;
 class CyclicA;
 class CyclicB;
+class Deprecated;
 
 enum Mode : int32_t {
 	MODE_A = 0,
@@ -297,6 +298,35 @@ public:
 	const ::test::CyclicA* cyclic(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetField<const ::test::CyclicA*>(protocache::Message::Cast(this), _::cyclic, end);
 	}
+};
+
+struct Deprecated final {
+	class Valid;
+
+	class Valid final {
+	private:
+		Valid() = default;
+	public:
+		struct _ {
+			static constexpr unsigned val = 0;
+		};
+
+		bool operator!() const noexcept { return !protocache::Message::Cast(this); }
+		bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept { return protocache::Message::Cast(this).HasField(id,end); }
+
+		static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+			auto view = protocache::Message::Detect(ptr, end);
+			if (!view) return {};
+			protocache::Message core(ptr);
+			protocache::Slice<uint32_t> t;
+			return view;
+		}
+
+		int32_t val(const uint32_t* end=nullptr) const noexcept {
+			return protocache::GetField<int32_t>(protocache::Message::Cast(this), _::val, end);
+		}
+	};
+
 };
 
 } // test

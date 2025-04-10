@@ -12,6 +12,7 @@ class Small;
 class Main;
 class CyclicA;
 class CyclicB;
+class Deprecated;
 
 struct Small final {
 	Small() = default;
@@ -238,6 +239,39 @@ private:
 	protocache::MessageEX<2> __view__;
 	int32_t _value;
 	std::unique_ptr<::ex::test::CyclicA> _cyclic;
+};
+
+struct Deprecated final {
+	class Valid;
+
+	struct Valid final {
+		Valid() = default;
+		explicit Valid(const uint32_t* data, const uint32_t* end=nullptr) : __view__(data, end) {}
+		explicit Valid(const protocache::Slice<uint32_t>& data) : Valid(data.begin(), data.end()) {}
+		static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
+			return ::test::Deprecated::Valid::Detect(ptr, end);
+		}
+		bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
+			auto clean_head = __view__.CleanHead();
+			if (clean_head != nullptr) {
+				auto view = Detect(clean_head, end);
+				out->assign(view.data(), view.size());
+				return true;
+			}
+			std::vector<protocache::Data> raw(1);
+			std::vector<protocache::Slice<uint32_t>> parts(1);
+			parts[_::val] = __view__.SerializeField(_::val, end, _val, raw[_::val]);
+			return protocache::SerializeMessage(parts, out);
+		}
+
+		int32_t& val(const uint32_t* end=nullptr) { return __view__.GetField(_::val, end, _val); }
+
+	private:
+		using _ = ::test::Deprecated::Valid::_;
+		protocache::MessageEX<1> __view__;
+		int32_t _val;
+	};
+
 };
 
 } // test

@@ -17,10 +17,11 @@ enum Mode {
 }
 
 message Small {
+	string str = 4;
 	int32 i32 = 1;
 	bool flag = 2;
 	// skip 3
-	string str = 4;
+	int64 junk = 5 [deprecated = true];
 }
 
 message Vec2D {
@@ -78,4 +79,11 @@ message CyclicA {
 message CyclicB {
     int32 value = 1;
     CyclicA cyclic = 2;
+}
+
+message Deprecated {
+    int32 junk = 1 [deprecated = true];
+    message Valid {
+        int32 val = 1;
+    }
 }
