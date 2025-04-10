@@ -5,12 +5,12 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 |  | Protobuf | ProtoCache | FlatBuffers |
 |:-------|----:|----:|----:|
 | Wire format size | **574B** | 780B | 1296B |
-| Decode + Traverse + Dealloc (1 million times) | 1941ms | 154ms | **83ms** |
-| Decode + Traverse + Dealloc (1 million times, reflection) | 6127ms | **323ms** | 478ms |
+| Decode + Traverse + Dealloc | 1941ns | 154ns | **83ns** |
+| Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns |
 | Compressed size | 566B | 571B | 856B |
 | Compression ratio | 0.99 | 0.73 | 0.66 |
-| Compress (1 million times) | 258ms | 465ms | 883ms |
-| Decompress (1 million times) | 127ms | 311ms | 575ms |
+| Compress | 258ns | 465ns | 883ns |
+| Decompress | 127ns | 311ns | 575ns |
 
 A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. 
 
@@ -55,8 +55,8 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize (1 million times) | 550ms | 360 ~ 2662ms | 7768ms |
-| Decode + Traverse + Dealloc (1 million times) | 1941ms | 1134ms | 154ms |
+| Serialize | 550ns | 360 ~ 2662ns | 7768ns |
+| Decode + Traverse + Dealloc | 1941ns | 1134ns | 154ns |
 
 ## Reflection
 ```cpp
