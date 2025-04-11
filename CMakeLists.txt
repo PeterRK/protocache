@@ -7,6 +7,8 @@ project(protocache)
 
 set(CMAKE_CXX_STANDARD 11)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2")
+
 option(WITH_TEST "enable test" ON)
 
 find_package(Protobuf REQUIRED)
