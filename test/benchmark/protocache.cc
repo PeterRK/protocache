@@ -440,11 +440,12 @@ int BenchmarkProtoCacheSerialize(bool partly) {
 	}
 
 	unsigned cnt = 0;
+	protocache::Buffer buf;
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
-		protocache::Data data;
-		root.Serialize(&data);
-		cnt += data.size();
+		buf.Clear();
+		root.Serialize(&buf);
+		cnt += buf.Size();
 	}
 	auto delta_ms = DeltaMs(start);
 
