@@ -204,7 +204,7 @@ static bool SerializeMapField(const google::protobuf::Message& message,
 	for (auto& one : elements) {
 		auto reflection = one.GetReflection();
 		if (!reflection->HasField(one, key_field) || !reflection->HasField(one, value_field)) {
-			return {};
+			return false;
 		}
 		keys.emplace_back();
 		values.emplace_back();
@@ -291,7 +291,7 @@ bool Serialize(const google::protobuf::Message& message, Data* out) {
 		auto field = descriptor->field(i);
 		auto j = field->number() - 1;
 		if (fields[j] != nullptr) {
-			return {};
+			return false;
 		}
 		fields[j] = field;
 	}

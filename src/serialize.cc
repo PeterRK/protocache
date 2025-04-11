@@ -104,7 +104,7 @@ bool DoSerializeMessage(std::vector<T>& parts, Data* out) {
 			next = parts.size();
 		}
 		if (cnt >= (1U<<14U)) {
-			return {};
+			return false;
 		}
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
 		for (unsigned j = 0; i < next; j+=2) {
