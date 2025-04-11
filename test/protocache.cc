@@ -326,6 +326,7 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_FLOAT);
 	ASSERT_EQ(-2.1f, protocache::GetField<float>(unit, it->second.id, end));
 }
+
 TEST(PtotoCacheEX, Basic) {
 	auto data = SerializeByProtobuf();
 	ASSERT_FALSE(data.empty());
@@ -425,8 +426,8 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_EQ(vec4[1], 52);
 
 	// check compile error
-//	::ex::test::CyclicA cyclic;
-//	ASSERT_NE(cyclic.cyclic(), nullptr);
+	::ex::test::CyclicA cyclic;
+	ASSERT_NE(cyclic.cyclic(), nullptr);
 }
 
 TEST(PtotoCacheEX, Serialize) {
@@ -445,9 +446,8 @@ TEST(PtotoCacheEX, Serialize) {
 		pair.second->i32(end) = pair.first + 1;
 	}
 
-	protocache::Buffer buf;
-	ASSERT_TRUE(ex.Serialize(&buf));
-	auto modified = buf.View();
+	protocache::Data modified;
+	ASSERT_TRUE(ex.Serialize(&modified));
 	ASSERT_EQ(data.size(), modified.size());
 	end = modified.data() + modified.size();
 
@@ -491,7 +491,7 @@ TEST(Compress, All) {
 
 	protocache::Slice<uint8_t> view(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4);
 	std::string cooked;
-	protocache::Compress(view.data(), view.size(), &cooked);
+	protocache::Compress(view, &cooked);
 	ASSERT_NE(0, cooked.size());
 	ASSERT_LT(cooked.size(), view.size());
 
