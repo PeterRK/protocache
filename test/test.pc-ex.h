@@ -30,9 +30,9 @@ struct Small final {
 		}
 		std::vector<protocache::Data> raw(4);
 		std::vector<protocache::Slice<uint32_t>> parts(4);
-		parts[_::i32] = __view__.SerializeField(_::i32, end, _i32, raw[_::i32]);
-		parts[_::flag] = __view__.SerializeField(_::flag, end, _flag, raw[_::flag]);
-		parts[_::str] = __view__.SerializeField(_::str, end, _str, raw[_::str]);
+		if (!__view__.SerializeField(_::i32, end, _i32, raw[_::i32], parts[_::i32])) return false;
+		if (!__view__.SerializeField(_::flag, end, _flag, raw[_::flag], parts[_::flag])) return false;
+		if (!__view__.SerializeField(_::str, end, _str, raw[_::str], parts[_::str])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -80,36 +80,36 @@ struct Main final {
 		}
 		std::vector<protocache::Data> raw(30);
 		std::vector<protocache::Slice<uint32_t>> parts(30);
-		parts[_::i32] = __view__.SerializeField(_::i32, end, _i32, raw[_::i32]);
-		parts[_::u32] = __view__.SerializeField(_::u32, end, _u32, raw[_::u32]);
-		parts[_::i64] = __view__.SerializeField(_::i64, end, _i64, raw[_::i64]);
-		parts[_::u64] = __view__.SerializeField(_::u64, end, _u64, raw[_::u64]);
-		parts[_::flag] = __view__.SerializeField(_::flag, end, _flag, raw[_::flag]);
-		parts[_::mode] = __view__.SerializeField(_::mode, end, _mode, raw[_::mode]);
-		parts[_::str] = __view__.SerializeField(_::str, end, _str, raw[_::str]);
-		parts[_::data] = __view__.SerializeField(_::data, end, _data, raw[_::data]);
-		parts[_::f32] = __view__.SerializeField(_::f32, end, _f32, raw[_::f32]);
-		parts[_::f64] = __view__.SerializeField(_::f64, end, _f64, raw[_::f64]);
-		parts[_::object] = __view__.SerializeField(_::object, end, _object, raw[_::object]);
-		parts[_::i32v] = __view__.SerializeField(_::i32v, end, _i32v, raw[_::i32v]);
-		parts[_::u64v] = __view__.SerializeField(_::u64v, end, _u64v, raw[_::u64v]);
-		parts[_::strv] = __view__.SerializeField(_::strv, end, _strv, raw[_::strv]);
-		parts[_::datav] = __view__.SerializeField(_::datav, end, _datav, raw[_::datav]);
-		parts[_::f32v] = __view__.SerializeField(_::f32v, end, _f32v, raw[_::f32v]);
-		parts[_::f64v] = __view__.SerializeField(_::f64v, end, _f64v, raw[_::f64v]);
-		parts[_::flags] = __view__.SerializeField(_::flags, end, _flags, raw[_::flags]);
-		parts[_::objectv] = __view__.SerializeField(_::objectv, end, _objectv, raw[_::objectv]);
-		parts[_::t_u32] = __view__.SerializeField(_::t_u32, end, _t_u32, raw[_::t_u32]);
-		parts[_::t_i32] = __view__.SerializeField(_::t_i32, end, _t_i32, raw[_::t_i32]);
-		parts[_::t_s32] = __view__.SerializeField(_::t_s32, end, _t_s32, raw[_::t_s32]);
-		parts[_::t_u64] = __view__.SerializeField(_::t_u64, end, _t_u64, raw[_::t_u64]);
-		parts[_::t_i64] = __view__.SerializeField(_::t_i64, end, _t_i64, raw[_::t_i64]);
-		parts[_::t_s64] = __view__.SerializeField(_::t_s64, end, _t_s64, raw[_::t_s64]);
-		parts[_::index] = __view__.SerializeField(_::index, end, _index, raw[_::index]);
-		parts[_::objects] = __view__.SerializeField(_::objects, end, _objects, raw[_::objects]);
-		parts[_::matrix] = __view__.SerializeField(_::matrix, end, _matrix, raw[_::matrix]);
-		parts[_::vector] = __view__.SerializeField(_::vector, end, _vector, raw[_::vector]);
-		parts[_::arrays] = __view__.SerializeField(_::arrays, end, _arrays, raw[_::arrays]);
+		if (!__view__.SerializeField(_::i32, end, _i32, raw[_::i32], parts[_::i32])) return false;
+		if (!__view__.SerializeField(_::u32, end, _u32, raw[_::u32], parts[_::u32])) return false;
+		if (!__view__.SerializeField(_::i64, end, _i64, raw[_::i64], parts[_::i64])) return false;
+		if (!__view__.SerializeField(_::u64, end, _u64, raw[_::u64], parts[_::u64])) return false;
+		if (!__view__.SerializeField(_::flag, end, _flag, raw[_::flag], parts[_::flag])) return false;
+		if (!__view__.SerializeField(_::mode, end, _mode, raw[_::mode], parts[_::mode])) return false;
+		if (!__view__.SerializeField(_::str, end, _str, raw[_::str], parts[_::str])) return false;
+		if (!__view__.SerializeField(_::data, end, _data, raw[_::data], parts[_::data])) return false;
+		if (!__view__.SerializeField(_::f32, end, _f32, raw[_::f32], parts[_::f32])) return false;
+		if (!__view__.SerializeField(_::f64, end, _f64, raw[_::f64], parts[_::f64])) return false;
+		if (!__view__.SerializeField(_::object, end, _object, raw[_::object], parts[_::object])) return false;
+		if (!__view__.SerializeField(_::i32v, end, _i32v, raw[_::i32v], parts[_::i32v])) return false;
+		if (!__view__.SerializeField(_::u64v, end, _u64v, raw[_::u64v], parts[_::u64v])) return false;
+		if (!__view__.SerializeField(_::strv, end, _strv, raw[_::strv], parts[_::strv])) return false;
+		if (!__view__.SerializeField(_::datav, end, _datav, raw[_::datav], parts[_::datav])) return false;
+		if (!__view__.SerializeField(_::f32v, end, _f32v, raw[_::f32v], parts[_::f32v])) return false;
+		if (!__view__.SerializeField(_::f64v, end, _f64v, raw[_::f64v], parts[_::f64v])) return false;
+		if (!__view__.SerializeField(_::flags, end, _flags, raw[_::flags], parts[_::flags])) return false;
+		if (!__view__.SerializeField(_::objectv, end, _objectv, raw[_::objectv], parts[_::objectv])) return false;
+		if (!__view__.SerializeField(_::t_u32, end, _t_u32, raw[_::t_u32], parts[_::t_u32])) return false;
+		if (!__view__.SerializeField(_::t_i32, end, _t_i32, raw[_::t_i32], parts[_::t_i32])) return false;
+		if (!__view__.SerializeField(_::t_s32, end, _t_s32, raw[_::t_s32], parts[_::t_s32])) return false;
+		if (!__view__.SerializeField(_::t_u64, end, _t_u64, raw[_::t_u64], parts[_::t_u64])) return false;
+		if (!__view__.SerializeField(_::t_i64, end, _t_i64, raw[_::t_i64], parts[_::t_i64])) return false;
+		if (!__view__.SerializeField(_::t_s64, end, _t_s64, raw[_::t_s64], parts[_::t_s64])) return false;
+		if (!__view__.SerializeField(_::index, end, _index, raw[_::index], parts[_::index])) return false;
+		if (!__view__.SerializeField(_::objects, end, _objects, raw[_::objects], parts[_::objects])) return false;
+		if (!__view__.SerializeField(_::matrix, end, _matrix, raw[_::matrix], parts[_::matrix])) return false;
+		if (!__view__.SerializeField(_::vector, end, _vector, raw[_::vector], parts[_::vector])) return false;
+		if (!__view__.SerializeField(_::arrays, end, _arrays, raw[_::arrays], parts[_::arrays])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -195,8 +195,8 @@ struct CyclicA final {
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
-		parts[_::cyclic] = __view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
+		if (!__view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic], parts[_::cyclic])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -226,8 +226,8 @@ struct CyclicB final {
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
-		parts[_::cyclic] = __view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
+		if (!__view__.SerializeField(_::cyclic, end, _cyclic, raw[_::cyclic], parts[_::cyclic])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -260,7 +260,7 @@ struct Deprecated final {
 			}
 			std::vector<protocache::Data> raw(1);
 			std::vector<protocache::Slice<uint32_t>> parts(1);
-			parts[_::val] = __view__.SerializeField(_::val, end, _val, raw[_::val]);
+			if (!__view__.SerializeField(_::val, end, _val, raw[_::val], parts[_::val])) return false;
 			return protocache::SerializeMessage(parts, out);
 		}
 

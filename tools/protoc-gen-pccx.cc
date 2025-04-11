@@ -670,8 +670,9 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\tstd::vector<protocache::Slice<uint32_t>> parts(" << max_id << ");\n";
 
 	for (auto one : fields) {
-		oss << "\t\tparts[_::" << one->name() << "] = __view__.SerializeField(_::"
-			<< one->name() << ", end, _" << one->name() << ", raw[_::" << one->name() << "]);\n";
+		oss << "\t\tif (!__view__.SerializeField(_::"
+			<< one->name() << ", end, _" << one->name() << ", raw[_::" << one->name()
+			<< "], parts[_::" << one->name() << "])) return false;\n";
 	}
 	oss << "\t\treturn protocache::SerializeMessage(parts, out);\n"
 		<< "\t}\n\n";

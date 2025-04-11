@@ -27,8 +27,8 @@ struct Duration final {
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
-		parts[_::seconds] = __view__.SerializeField(_::seconds, end, _seconds, raw[_::seconds]);
-		parts[_::nanos] = __view__.SerializeField(_::nanos, end, _nanos, raw[_::nanos]);
+		if (!__view__.SerializeField(_::seconds, end, _seconds, raw[_::seconds], parts[_::seconds])) return false;
+		if (!__view__.SerializeField(_::nanos, end, _nanos, raw[_::nanos], parts[_::nanos])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 

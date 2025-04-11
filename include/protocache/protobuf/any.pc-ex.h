@@ -27,8 +27,8 @@ struct Any final {
 		}
 		std::vector<protocache::Data> raw(2);
 		std::vector<protocache::Slice<uint32_t>> parts(2);
-		parts[_::type_url] = __view__.SerializeField(_::type_url, end, _type_url, raw[_::type_url]);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::type_url, end, _type_url, raw[_::type_url], parts[_::type_url])) return false;
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
