@@ -7,6 +7,8 @@ project(protocache)
 
 set(CMAKE_CXX_STANDARD 11)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
 option(WITH_TEST "enable test" ON)
 
 find_package(Protobuf REQUIRED)
@@ -62,9 +64,9 @@ install(
     ARCHIVE DESTINATION lib
 )
 
-#file(GLOB bench_src
-#    test/benchmark/*.cc
-#)
-#
+file(GLOB bench_src
+    test/benchmark/*.cc
+)
+
 #add_executable(benchmark ${bench_src})
 #target_link_libraries(benchmark protocache protobuf flatbuffers pthread)

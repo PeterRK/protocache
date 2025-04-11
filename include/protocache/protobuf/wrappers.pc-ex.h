@@ -35,7 +35,7 @@ struct DoubleValue final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -63,7 +63,7 @@ struct FloatValue final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -91,7 +91,7 @@ struct Int64Value final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -119,7 +119,7 @@ struct UInt64Value final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -147,7 +147,7 @@ struct Int32Value final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -175,7 +175,7 @@ struct UInt32Value final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -203,7 +203,7 @@ struct BoolValue final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -231,7 +231,7 @@ struct StringValue final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 
@@ -259,7 +259,7 @@ struct BytesValue final {
 		}
 		std::vector<protocache::Data> raw(1);
 		std::vector<protocache::Slice<uint32_t>> parts(1);
-		parts[_::value] = __view__.SerializeField(_::value, end, _value, raw[_::value]);
+		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, out);
 	}
 

@@ -394,56 +394,77 @@ public:
 		return field;
 	}
 
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data) const {
+	bool SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data, Slice<uint32_t>& view) const {
 		if (!_accessed.test(id)) {
-			return DetectField<Slice<char>>(*this, id, end);
-		} else if (field.empty() || !::protocache::Serialize(field, &data)) {
-			return {};
+			view = DetectField<Slice<char>>(*this, id, end);
+			return true;
+		} else if (field.empty()) {
+			view = {};
+			return true;
+		} else if (!::protocache::Serialize(field, &data)) {
+			return false;
 		}
-		return Slice<uint32_t>(data);
+		view = Slice<uint32_t>(data);
+		return true;
 	}
 
 	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
+	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data, Slice<uint32_t>& view) const {
 		if (!_accessed.test(id)) {
-			return DetectField<T>(*this, id, end);
-		} else if (field == 0 || !::protocache::Serialize(field, &data)) {
-			return {};
+			view = DetectField<T>(*this, id, end);
+			return true;
+		} else if (field == 0) {
+			view = {};
+			return true;
+		} else if (!::protocache::Serialize(field, &data)) {
+			return false;
 		}
-		return Slice<uint32_t>(data);
+		view = Slice<uint32_t>(data);
+		return true;
 	}
 
 	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data) const {
+	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data, Slice<uint32_t>& view) const {
 		if (!_accessed.test(id)) {
-			return DetectField<typename Unwrapper<T>::Type>(*this, id, end);
+			view = DetectField<typename Unwrapper<T>::Type>(*this, id, end);
+			return true;
 		} else if (!::protocache::Serialize(field, end, &data)) {
-			return {};
-		}
-		if (data.size() == 1) {
+			return false;
+		} else if (data.size() == 1) {
 			data.clear();
 		}
-		return Slice<uint32_t>(data);
+		view = Slice<uint32_t>(data);
+		return true;
 	}
 
 	template <typename T>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data) const {
+	bool SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data, Slice<uint32_t>& view) const {
 		if (!_accessed.test(id)) {
-			return DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end);
-		} else if (field.empty() || !::protocache::Serialize(field, end, &data)) {
-			return {};
+			view = DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end);
+			return true;
+		} else if (field.empty()) {
+			view = {};
+			return true;
+		} else if (!::protocache::Serialize(field, end, &data)) {
+			return false;
 		}
-		return Slice<uint32_t>(data);
+		view = Slice<uint32_t>(data);
+		return true;
 	}
 
 	template <typename K, typename V>
-	Slice<uint32_t> SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data) const {
+	bool SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data, Slice<uint32_t>& view) const {
 		if (!_accessed.test(id)) {
-			return DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end);
-		} else if (field.empty() || !::protocache::Serialize(field, end, &data)) {
-			return {};
+			view = DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end);
+			return true;
+		} else if (field.empty()) {
+			view = {};
+			return true;
+		} else if (!::protocache::Serialize(field, end, &data)) {
+			return false;
 		}
-		return Slice<uint32_t>(data);
+		view = Slice<uint32_t>(data);
+		return true;
 	}
 };
 

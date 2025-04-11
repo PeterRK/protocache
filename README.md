@@ -9,8 +9,8 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 | Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns |
 | Compressed size | 566B | 571B | 856B |
 | Compression ratio | 0.99 | 0.73 | 0.66 |
-| Compress | 258ns | 465ns | 883ns |
-| Decompress | 127ns | 311ns | 575ns |
+| Compress | 257ns | 401ns | 763ns |
+| Decompress | 107ns | 250ns | 561ns |
 
 A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. 
 
@@ -55,7 +55,7 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize | 550ns | 360 ~ 2662ns | 7768ns |
+| Serialize | 555ns | 397 ~ 2254ns | 7243ns |
 | Decode + Traverse + Dealloc | 1941ns | 1134ns | 154ns |
 
 ## Reflection
