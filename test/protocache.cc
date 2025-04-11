@@ -442,12 +442,13 @@ TEST(PtotoCacheEX, Alias) {
 	auto& matrix = root.matrix();
 	matrix.resize(3);
 	matrix[2].resize(3);
-	protocache::Data data;
-	ASSERT_TRUE(root.Serialize(&data));
-	ASSERT_EQ(data.size(), 12);
-	ASSERT_EQ(data[4], 0xd);
-	ASSERT_EQ(data[5], 1);
-	ASSERT_EQ(data[6], 1);
+	protocache::Buffer buf;
+	ASSERT_TRUE(root.Serialize(&buf));
+	auto view = buf.View();
+	ASSERT_EQ(view.size(), 12);
+	ASSERT_EQ(view[4], 0xd);
+	ASSERT_EQ(view[5], 1);
+	ASSERT_EQ(view[6], 1);
 }
 
 TEST(PtotoCacheEX, Serialize) {
@@ -466,8 +467,9 @@ TEST(PtotoCacheEX, Serialize) {
 		pair.second->i32(end) = pair.first + 1;
 	}
 
-	protocache::Data modified;
-	ASSERT_TRUE(ex.Serialize(&modified));
+	protocache::Buffer buf;
+	ASSERT_TRUE(ex.Serialize(&buf));
+	auto modified = buf.View();
 	ASSERT_EQ(data.size(), modified.size());
 	end = modified.data() + modified.size();
 
@@ -511,7 +513,7 @@ TEST(Compress, All) {
 
 	protocache::Slice<uint8_t> view(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4);
 	std::string cooked;
-	protocache::Compress(view, &cooked);
+	protocache::Compress(view.data(), view.size(), &cooked);
 	ASSERT_NE(0, cooked.size());
 	ASSERT_LT(cooked.size(), view.size());
 

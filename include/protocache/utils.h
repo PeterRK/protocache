@@ -6,11 +6,13 @@
 #ifndef PROTOCACHE_UTILS_H_
 #define PROTOCACHE_UTILS_H_
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
 #include <atomic>
+#include <memory>
 
 namespace protocache {
 
@@ -92,24 +94,134 @@ extern bool LoadFile(const std::string& path, std::string* out);
 extern void Compress(const uint8_t* src, size_t len, std::string* out);
 extern bool Decompress(const uint8_t* src, size_t len, std::string* out);
 
-static inline void Compress(const Slice<uint8_t>& src, std::string* out) {
-	Compress(src.data(), src.size(), out);
-}
-static inline void Compress(const Slice<char>& src, std::string* out) {
-	Compress(SliceCast<uint8_t>(src), out);
-}
 static inline void Compress(const std::string& src, std::string* out) {
-	Compress(Slice<char>(src), out);
-}
-static inline bool Decompress(const Slice<uint8_t>& src, std::string* out) {
-	return Decompress(src.data(), src.size(), out);
-}
-static inline bool Decompress(const Slice<char>& src, std::string* out) {
-	return Decompress(SliceCast<uint8_t>(src), out);
+	Compress(reinterpret_cast<const uint8_t*>(src.data()), src.size(), out);
 }
 static inline bool Decompress(const std::string& src, std::string* out) {
-	return Decompress(Slice<char>(src), out);
+	return Decompress(reinterpret_cast<const uint8_t*>(src.data()), src.size(), out);
 }
+
+class Buffer final {
+public:
+	struct Seg {
+		size_t pos;
+		size_t len;
+		size_t end() const noexcept { return pos-len; }
+	};
+
+	Buffer() = default;
+	Buffer(const Buffer&) = delete;
+	Buffer(Buffer &&other) noexcept:
+		data_(std::move(other.data_)), size_(other.size_), off_(other.off_) {
+		other.size_ = 0;
+		other.off_ = 0;
+	}
+	Buffer& operator=(const Buffer&) = delete;
+	Buffer& operator=(Buffer&& other) noexcept {
+		if (&other != this) {
+			this->~Buffer();
+			new(this) Buffer(std::move(other));
+		}
+		return *this;
+	}
+
+	Slice<uint32_t> View() const noexcept {
+		return {data_.get()+off_, Size()};
+	};
+	Data Export() const noexcept {
+		return {data_.get()+off_, Size()};
+	}
+	size_t Size() const noexcept {
+		return size_ - off_;
+	}
+	uint32_t* AtSize(size_t size) noexcept {
+		return data_.get() + size_ - size;
+	}
+	uint32_t* Head() const noexcept {
+		return data_.get() + off_;
+	}
+	void Clear() noexcept {
+		off_ = size_;
+	}
+
+	void Put(bool v) noexcept {
+		*Expand(1) = static_cast<uint32_t>(v);
+	}
+	void Put(int32_t v) noexcept {
+		*reinterpret_cast<int32_t*>(Expand(1)) = v;
+	}
+	void Put(uint32_t v) noexcept {
+		*Expand(1) = v;
+	}
+	void Put(float v) noexcept {
+		*reinterpret_cast<float*>(Expand(1)) = v;
+	}
+	void Put(int64_t v) noexcept {
+		*reinterpret_cast<int64_t*>(Expand(2)) = v;
+	}
+	void Put(uint64_t v) noexcept {
+		*reinterpret_cast<uint64_t*>(Expand(2)) = v;
+	}
+	void Put(double v) noexcept {
+		*reinterpret_cast<double*>(Expand(2)) = v;
+	}
+	void Put(const Slice<uint32_t>& data) noexcept {
+		auto dest = Expand(data.size());
+		for (size_t i = 0; i < data.size(); i++) {
+			dest[i] = data[i];
+		}
+	}
+	void Put(const Data& data) noexcept {
+		Put(Slice<uint32_t>(data));
+	}
+
+	uint32_t* Expand(size_t delta) {
+		if (off_ >= delta) {
+			off_ -= delta;
+			return Head();
+		}
+		if (data_ == nullptr) {
+			size_ = std::max(delta, 8UL);
+			data_.reset(new uint32_t[size_]);
+			off_ = size_ - delta;
+			return Head();
+		}
+		auto size = size_ * 2;
+		if (size_ >= 256*1024) {
+			size = size_ * 3 / 2;
+		}
+		size = std::max(size, size_+delta);
+		std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
+		auto off = size - Size();
+		memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
+		data_ = std::move(data);
+		size_ = size;
+		off_ = off - delta;
+		return Head();
+	}
+
+	void Shrink(size_t delta) noexcept {
+		assert(delta <= Size());
+		off_ += delta;
+	}
+
+	void Reserve(size_t size) {
+		if (size <= size_) {
+			return;
+		}
+		std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
+		auto off = size - Size();
+		memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
+		data_ = std::move(data);
+		size_ = size;
+		off_ = off;
+	}
+
+private:
+	std::unique_ptr<uint32_t[]> data_;
+	size_t size_ = 0;
+	size_t off_ = 0;
+};
 
 } // protocache
 #endif //PROTOCACHE_UTILS_H_

@@ -284,16 +284,19 @@ int BenchmarkProtobufSerialize(bool flat) {
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
 	if (flat) {
+		protocache::Buffer buf;
 		for (size_t i = 0; i < kLoop; i++) {
-			protocache::Data data;
-			protocache::Serialize(*root, &data);
-			cnt += data.size();
+			protocache::Serialize(*root, &buf);
+			cnt += buf.Size();
+			buf.Clear();
 		}
 		auto delta_ms = DeltaMs(start);
 		printf("protocache-reflect: %ldms %x\n", delta_ms, cnt);
 	} else {
+		std::string data;
 		for (size_t i = 0; i < kLoop; i++) {
-			cnt += root->SerializeAsString().size();
+			root->SerializeToString(&data);
+			cnt += data.size();
 		}
 		auto delta_ms = DeltaMs(start);
 		printf("protobuf: %ldms %x\n", delta_ms, cnt);
@@ -317,16 +320,19 @@ int BenchmarkTwitterSerializePB(bool flat) {
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
 	if (flat) {
+		protocache::Buffer buf;
 		for (size_t i = 0; i < kSmallLoop; i++) {
-			protocache::Data data;
-			protocache::Serialize(*root, &data);
-			cnt += data.size();
+			protocache::Serialize(*root, &buf);
+			cnt += buf.Size();
+			buf.Clear();
 		}
 		auto delta_ms = DeltaMs(start);
 		printf("protocache-twitter: %ldms %x\n", delta_ms, cnt);
 	} else {
+		std::string data;
 		for (size_t i = 0; i < kSmallLoop; i++) {
-			cnt += root->SerializeAsString().size();
+			root->SerializeToString(&data);
+			cnt += data.size();
 		}
 		auto delta_ms = DeltaMs(start);
 		printf("protobuf-twitter: %ldms %x\n", delta_ms, cnt);

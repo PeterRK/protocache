@@ -21,18 +21,17 @@ struct Any final {
 	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
 		return __view__.HasField(id, end);
 	}
-	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
+	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			auto view = Detect(clean_head, end);
-			out->assign(view.data(), view.size());
+			buf->Put(Detect(clean_head, end));
 			return true;
 		}
-		std::vector<protocache::Data> raw(2);
-		std::vector<protocache::Slice<uint32_t>> parts(2);
-		if (!__view__.SerializeField(_::type_url, end, _type_url, raw[_::type_url], parts[_::type_url])) return false;
-		if (!__view__.SerializeField(_::value, end, _value, raw[_::value], parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, out);
+		std::vector<protocache::Buffer::Seg> parts(2, {0,0});
+		auto tail = buf->Size();
+		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
+		if (!__view__.SerializeField(_::type_url, end, _type_url, buf, parts[_::type_url])) return false;
+		return protocache::SerializeMessage(parts, *buf, tail);
 	}
 
 	std::string& type_url(const uint32_t* end=nullptr) { return __view__.GetField(_::type_url, end, _type_url); }

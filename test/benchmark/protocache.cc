@@ -441,11 +441,12 @@ int BenchmarkProtoCacheSerialize(bool partly) {
 	}
 
 	unsigned cnt = 0;
+	protocache::Buffer buf;
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
-		protocache::Data data;
-		root.Serialize(&data);
-		cnt += data.size();
+		root.Serialize(&buf);
+		cnt += buf.Size();
+		buf.Clear();
 	}
 	auto delta_ms = DeltaMs(start);
 
@@ -624,11 +625,12 @@ int BenchmarkTwitterSerializePC() {
 	Touch(*root.search_metadata());
 
 	unsigned cnt = 0;
+	protocache::Buffer buf;
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kSmallLoop; i++) {
-		protocache::Data data;
-		root.Serialize(&data);
-		cnt += data.size();
+		root.Serialize(&buf);
+		cnt += buf.Size();
+		buf.Clear();
 	}
 	auto delta_ms = DeltaMs(start);
 

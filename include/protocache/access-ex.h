@@ -80,28 +80,27 @@ template <typename T> class ArrayEX;
 template <typename K, typename V> class MapEX;
 
 template <typename T>
-static inline bool Serialize(const T& obj, const uint32_t*, Data* out) {
-	return Serialize(obj, out);
+static inline bool Serialize(const T& obj, const uint32_t*, Buffer* buf) {
+	return Serialize(obj, buf);
 }
 
 template <typename T>
-static inline bool Serialize(const ArrayEX<T>& obj, const uint32_t* end, Data* out) {
-	return obj.Serialize(out, end);
+static inline bool Serialize(const ArrayEX<T>& obj, const uint32_t* end, Buffer* buf) {
+	return obj.Serialize(buf, end);
 }
 
 template <typename K, typename V>
-static inline bool Serialize(const MapEX<K,V>& obj, const uint32_t* end, Data* out) {
-	return obj.Serialize(out, end);
+static inline bool Serialize(const MapEX<K,V>& obj, const uint32_t* end, Buffer* buf) {
+	return obj.Serialize(buf, end);
 }
 
 template <typename T>
-static inline bool Serialize(const std::unique_ptr<T>& obj, const uint32_t* end, Data* out) {
+static inline bool Serialize(const std::unique_ptr<T>& obj, const uint32_t* end, Buffer* buf) {
 	if (obj == nullptr) {
-		out->clear();
-		out->push_back(0);
+		buf->Put(0U);
 		return true;
 	}
-	return obj->Serialize(out, end);
+	return obj->Serialize(buf, end);
 }
 
 template <typename T>
@@ -126,29 +125,39 @@ public:
 			Extract(view[i].GetObject(end), end, this->core_[i]);
 		}
 	}
-	bool Serialize(Data* out, const uint32_t* end=nullptr) const {
-		std::vector<Data> elements;
-		elements.reserve(this->core_.size());
-		for (auto& one : this->core_) {
-			elements.emplace_back();
-			if (!::protocache::Serialize(one, end, &elements.back())) {
+	bool Serialize(Buffer* buf, const uint32_t* end=nullptr) const {
+		std::vector<Buffer::Seg> elements(this->size());
+		auto tail = buf->Size();
+		auto last = tail;
+		for (int i = static_cast<int>(this->size())-1; i >= 0; i--) {
+			if (!::protocache::Serialize(this->core_[i], end, buf)) {
 				return false;
 			}
+			elements[i] = Segment(last, buf->Size());
+			last = buf->Size();
 		}
-		return ::protocache::SerializeArray(elements, out);
+		return SerializeArray(elements, *buf, tail);
 	}
 };
 
-template <typename T>
+template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
 struct ScalarArrayEX : public BaseArrayEX<T> {
-	static_assert(std::is_scalar<T>::value, "");
 	ScalarArrayEX() = default;
 	ScalarArrayEX(const uint32_t* data, const uint32_t* end) {
 		auto view = Array(data, end).Numbers<T>();
 		this->core_.assign(view.begin(), view.end());
 	};
-	bool Serialize(Data* out, const uint32_t*) const {
-		return ::protocache::SerializeScalarArray(this->core_, out);
+	bool Serialize(Buffer* buf, const uint32_t*) const {
+		auto m = WordSize(sizeof(T));
+		if (m*this->size() >= (1U << 30U)) {
+			return false;
+		}
+		for (int i = static_cast<int>(this->size())-1; i >= 0; i--) {
+			buf->Put(this->core_[i]);
+		}
+		uint32_t head = (this->size() << 2U) | m;
+		buf->Put(head);
+		return true;
 	}
 };
 
@@ -160,8 +169,8 @@ struct ArrayEX<bool> final : BaseArrayEX<bool> {
 		this->core_.resize(view.size());
 		memcpy(this->core_.data(), view.data(), view.size());
 	}
-	bool Serialize(Data* out, const uint32_t*) const {
-		return ::protocache::Serialize(Slice<uint8_t>(core_), out);
+	bool Serialize(Buffer* buf, const uint32_t*) const {
+		return ::protocache::Serialize(Slice<uint8_t>(core_), buf);
 	}
 };
 
@@ -217,59 +226,6 @@ template <> inline ArrayEX<Slice<uint8_t>>::ArrayEX(const uint32_t* data, const 
 	}
 }
 
-template <typename K, typename V>
-class _MapKeyReader : public KeyReader {
-public:
-	static_assert(sizeof(K) >= 4, "");
-	explicit _MapKeyReader(const std::unordered_map<K,V>& core)
-		: core_(core), it_(core.begin()) {}
-
-	void Reset() override {
-		it_ = core_.begin();
-	}
-	size_t Total() override {
-		return core_.size();
-	}
-	Slice<uint8_t> Read() override {
-		if (it_ == core_.end()) {
-			return {};
-		}
-		auto& key = it_->first;
-		++it_;
-		return {reinterpret_cast<const uint8_t*>(&key), sizeof(K)};
-	}
-
-private:
-	const std::unordered_map<K,V>& core_;
-	typename std::unordered_map<K,V>::const_iterator it_;
-};
-
-template <typename V>
-class _MapKeyReader<std::string, V> : public KeyReader {
-public:
-	explicit _MapKeyReader(const std::unordered_map<std::string,V>& core)
-			: core_(core), it_(core.begin()) {}
-
-	void Reset() override {
-		it_ = core_.begin();
-	}
-	size_t Total() override {
-		return core_.size();
-	}
-	Slice<uint8_t> Read() override {
-		if (it_ == core_.end()) {
-			return {};
-		}
-		auto& key = it_->first;
-		++it_;
-		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
-	}
-
-private:
-	const std::unordered_map<std::string,V>& core_;
-	typename std::unordered_map<std::string,V>::const_iterator it_;
-};
-
 template <typename Key, typename Val>
 class MapEX final {
 private:
@@ -300,6 +256,44 @@ private:
 		return {view.data(), view.size()};
 	}
 
+	template <typename K, typename V>
+	class MapKeyReader : public KeyReader {
+	public:
+		explicit MapKeyReader(const std::vector<const std::pair<const K,V>*>& core) : core_(core) {}
+		void Reset() override { idx_ = 0; }
+		size_t Total() override { return core_.size(); }
+		Slice<uint8_t> Read() override {
+			if (idx_ >= core_.size()) {
+				return {};
+			}
+			auto pair = core_[idx_++];
+			return {reinterpret_cast<const uint8_t*>(&pair->first), sizeof(Key)};
+		}
+
+	private:
+		const std::vector<const std::pair<const K,V>*>& core_;
+		size_t idx_ = 0;
+	};
+
+	template <typename V>
+	class MapKeyReader<const std::string, V> : public KeyReader {
+	public:
+		explicit MapKeyReader(const std::vector<const std::pair<std::string,V>*>& core) : core_(core) {}
+		void Reset() override { idx_ = 0; }
+		size_t Total() override { return core_.size(); }
+		Slice<uint8_t> Read() override {
+			if (idx_ >= core_.size()) {
+				return {};
+			}
+			auto pair = core_[idx_++];
+			return {reinterpret_cast<const uint8_t*>(&pair->first.data()), pair->first.size()};
+		}
+
+	private:
+		const std::vector<const std::pair<const std::string,V>*>& core_;
+		size_t idx_ = 0;
+	};
+
 public:
 	MapEX() = default;
 	MapEX(const uint32_t* data, const uint32_t* end) {
@@ -314,24 +308,44 @@ public:
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
 		return MapT<Key,typename Unwrapper<Val>::Type>::Detect(ptr, end);
 	}
-	bool Serialize(Data* out, const uint32_t* end=nullptr) const {
-		_MapKeyReader<KeyEX,ValEX> reader(core_);
+	bool Serialize(Buffer* buf, const uint32_t* end=nullptr) const {
+		std::vector<const std::pair<const KeyEX,ValEX>*> memo;
+		memo.reserve(this->size());
+		for (auto& p : core_) {
+			memo.push_back(&p);
+		}
+		MapKeyReader<KeyEX,ValEX> reader(memo);
 		auto index = PerfectHash::Build(reader, true);
 		if (!index) {
 			return false;
 		}
-		std::vector<Data> keys(core_.size());
-		std::vector<Data> values(core_.size());
 		reader.Reset();
-		for (auto& pair : core_) {
+		std::vector<const std::pair<const KeyEX,ValEX>*> book(memo.size());
+		for (unsigned i = 0; i < memo.size(); i++) {
 			auto key = reader.Read();
 			auto pos = index.Locate(key.data(), key.size());
-			if (!::protocache::Serialize(pair.first, &keys[pos])
-				|| !::protocache::Serialize(pair.second, end, &values[pos])) {
+			assert(pos < book.size());
+			book[pos] = memo[i];
+		}
+
+		std::vector<Buffer::Seg> keys(book.size());
+		std::vector<Buffer::Seg> values(book.size());
+		auto tail = buf->Size();
+		auto last = tail;
+		for (int i = static_cast<int>(book.size())-1; i >= 0; i--) {
+			auto pair = book[i];
+			if (!::protocache::Serialize(pair->second, end, buf)) {
 				return false;
 			}
+			values[i] = Segment(last, buf->Size());
+			last = buf->Size();
+			if (!::protocache::Serialize(pair->first, buf)) {
+				return false;
+			}
+			keys[i] = Segment(last, buf->Size());
+			last = buf->Size();
 		}
-		return ::protocache::SerializeMap(index.Data(), keys, values, out);
+		return ::protocache::SerializeMap(index.Data(), keys, values, *buf, tail);
 	}
 
 	size_t size() const noexcept { return core_.size(); }
@@ -374,6 +388,63 @@ private:
 		out.assign(view.data(), view.size());
 	}
 
+	bool SerializeField(unsigned id, const uint32_t* end, const std::string& field, Buffer* buf) const {
+		if (!_accessed.test(id)) {
+			buf->Put(DetectField<Slice<char>>(*this, id, end));
+			return true;
+		} else if (field.empty()) {
+			return true;
+		}
+		return ::protocache::Serialize(field, buf);
+	}
+
+	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Buffer* buf) const {
+		if (!_accessed.test(id)) {
+			buf->Put(DetectField<T>(*this, id, end));
+			return true;
+		} else if (field == 0) {
+			return true;
+		}
+		return ::protocache::Serialize(field, buf);
+	}
+
+	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
+	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Buffer* buf) const {
+		auto pos = buf->Size();
+		if (!_accessed.test(id)) {
+			buf->Put(DetectField<typename Unwrapper<T>::Type>(*this, id, end));
+		} else if (!::protocache::Serialize(field, end, buf)) {
+			return false;
+		}
+		if (buf->Size() - pos == 1) {
+			buf->Shrink(1);
+		}
+		return true;
+	}
+
+	template <typename T>
+	bool SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Buffer* buf) const {
+		if (!_accessed.test(id)) {
+			buf->Put(DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end));
+			return true;
+		} else if (field.empty()) {
+			return true;
+		}
+		return ::protocache::Serialize(field, end, buf);
+	}
+
+	template <typename K, typename V>
+	bool SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Buffer* buf) const {
+		if (!_accessed.test(id)) {
+			buf->Put(DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end));
+			return true;
+		} else if (field.empty()) {
+			return true;
+		}
+		return ::protocache::Serialize(field, end, buf);
+	}
+
 public:
 	MessageEX() = default;
 	MessageEX(const uint32_t* ptr, const uint32_t* end) : Message(ptr, end) {}
@@ -395,77 +466,13 @@ public:
 		return field;
 	}
 
-	bool SerializeField(unsigned id, const uint32_t* end, const std::string& field, Data& data, Slice<uint32_t>& view) const {
-		if (!_accessed.test(id)) {
-			view = DetectField<Slice<char>>(*this, id, end);
-			return true;
-		} else if (field.empty()) {
-			view = {};
-			return true;
-		} else if (!::protocache::Serialize(field, &data)) {
-			return false;
-		}
-		view = Slice<uint32_t>(data);
-		return true;
-	}
-
-	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
-	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data, Slice<uint32_t>& view) const {
-		if (!_accessed.test(id)) {
-			view = DetectField<T>(*this, id, end);
-			return true;
-		} else if (field == 0) {
-			view = {};
-			return true;
-		} else if (!::protocache::Serialize(field, &data)) {
-			return false;
-		}
-		view = Slice<uint32_t>(data);
-		return true;
-	}
-
-	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
-	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Data& data, Slice<uint32_t>& view) const {
-		if (!_accessed.test(id)) {
-			view = DetectField<typename Unwrapper<T>::Type>(*this, id, end);
-			return true;
-		} else if (!::protocache::Serialize(field, end, &data)) {
-			return false;
-		} else if (data.size() == 1) {
-			data.clear();
-		}
-		view = Slice<uint32_t>(data);
-		return true;
-	}
-
-	template <typename T>
-	bool SerializeField(unsigned id, const uint32_t* end, const ArrayEX<T>& field, Data& data, Slice<uint32_t>& view) const {
-		if (!_accessed.test(id)) {
-			view = DetectField<ArrayT<typename Unwrapper<T>::Type>>(*this, id, end);
-			return true;
-		} else if (field.empty()) {
-			view = {};
-			return true;
-		} else if (!::protocache::Serialize(field, end, &data)) {
-			return false;
-		}
-		view = Slice<uint32_t>(data);
-		return true;
-	}
-
-	template <typename K, typename V>
-	bool SerializeField(unsigned id, const uint32_t* end, const MapEX<K,V>& field, Data& data, Slice<uint32_t>& view) const {
-		if (!_accessed.test(id)) {
-			view = DetectField<MapT<K,typename Unwrapper<V>::Type>>(*this, id, end);
-			return true;
-		} else if (field.empty()) {
-			view = {};
-			return true;
-		} else if (!::protocache::Serialize(field, end, &data)) {
-			return false;
-		}
-		view = Slice<uint32_t>(data);
-		return true;
+	template<typename T>
+	bool SerializeField(unsigned id, const uint32_t* end, const T& field,
+						Buffer* buf, Buffer::Seg& seg) const {
+		auto pos = buf->Size();
+		auto done = SerializeField(id, end, field, buf);
+		seg = Segment(pos, buf->Size());
+		return done;
 	}
 };
 
