@@ -5,6 +5,7 @@
 #include <iostream>
 #include "common.h"
 
+
 int main() {
 	BenchmarkProtobuf();
 	BenchmarkProtobufReflect();
@@ -15,10 +16,10 @@ int main() {
 
 	BenchmarkProtoCacheEX();
 	std::cout << "========serialize========" << std::endl;
-	BenchmarkProtobufSerialize();
+	BenchmarkProtobufSerialize(false);
+	BenchmarkProtobufSerialize(true);
 	BenchmarkProtoCacheSerialize(true);
 	BenchmarkProtoCacheSerialize(false);
-	BenchmarkProtoCacheSerializeReflect();
 
 	std::cout << "========compress========" << std::endl;
 	BenchmarkCompress("pb", "test.pb");

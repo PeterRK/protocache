@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+option cc_enable_arenas = true;
+
+package twitter;
+
+
+message Url {
+	string url = 1;
+	repeated Url urls = 2;
+	string expanded_url = 3;
+	string display_url = 4;
+	repeated int32 indices = 5;
+}
+
+message Entities {
+	Url url = 1;
+	repeated Url urls = 2;
+
+	message UserMentions {
+		string screen_name = 1;
+		string name = 2;
+		int64 id = 3;
+		string id_str = 4;
+		repeated int32 indices = 5;
+	}
+	repeated UserMentions user_mentions = 3;
+
+	message Description {
+		repeated Url urls = 1;
+	}
+	Description description = 4;
+
+	message Media {
+		int64 id = 1;
+		string id_str = 2;
+		repeated int32 indices = 3;
+		string media_url = 4;
+		string media_url_https = 5;
+		string url = 6;
+		string display_url = 7;
+		string expanded_url = 8;
+		string type = 9;
+
+		message Sizes {
+			int32 w = 1;
+			int32 h = 2;
+			string resize = 3;
+		}
+		map<string,Sizes> sizes = 10;
+
+		int64 source_status_id = 11;
+		int64 source_status_id_str = 12;
+	}
+	repeated Media media = 5;
+}
+
+message User {
+	int64 id = 1;
+	string id_str = 2;
+	string name = 3;
+	string screen_name = 4;
+	string location = 5;
+	string description = 6;
+	Entities entities = 7;
+//	bool protected = 8;
+	int32 followers_count = 9;
+	int32 friends_count = 10;
+	int32 listed_count = 11;
+	string created_at = 12;
+	int32 favourites_count = 13;
+	int32 utc_offset = 14;
+	string time_zone = 15;
+	bool geo_enabled = 16;
+	bool verified = 17;
+	int32 statuses_count = 18;
+	string lang = 19;
+	bool contributors_enabled = 20;
+	bool is_translator = 21;
+	bool is_translation_enabled = 22;
+	string profile_background_color = 23;
+	string profile_background_image_url = 24;
+	string profile_background_image_url_https = 25;
+	bool profile_background_tile = 26;
+	string profile_image_url = 27;
+	string profile_image_url_https = 28;
+	string profile_banner_url = 29;
+	string profile_link_color = 30;
+	string profile_sidebar_border_color = 31;
+	string profile_sidebar_fill_color = 32;
+	string profile_text_color = 33;
+	bool profile_use_background_image = 34;
+	bool default_profile = 35;
+	bool default_profile_image = 36;
+	bool following = 37;
+	bool follow_request_sent = 38;
+	bool notifications = 39;
+}
+
+message Status {
+	message Metadata {
+		string result_type = 1;
+		string iso_language_code = 2;
+	}
+	Metadata metadata = 1;
+
+	string created_at = 2;
+	int64 id = 3;
+	int64 id_str = 4;
+	string text = 5;
+	string source = 6;
+	bool truncated = 7;
+	int64 in_reply_to_status_id = 8;
+	int64 in_reply_to_status_id_str = 9;
+	int64 in_reply_to_user_id = 10;
+	int64 in_reply_to_user_id_str = 11;
+	string in_reply_to_screen_name = 12;
+	User user = 13;
+	Status retweeted_status = 14;
+	int32 retweet_count = 15;
+	int32 favorite_count = 16;
+	repeated Entities entities = 17;
+	bool favorited = 18;
+	bool retweeted = 19;
+	bool possibly_sensitive = 20;
+	string lang = 21;
+}
+
+message Root {
+	repeated Status statuses = 1;
+
+	message SearchMetadata {
+		double completed_in = 1;
+		int64 max_id = 2;
+		int64 max_id_str = 3;
+		string next_results = 4;
+		string query = 5;
+		string refresh_url = 6;
+		int32 count = 7;
+		int32 since_id = 8;
+		int32 since_id_str = 9;
+	}
+	SearchMetadata search_metadata = 2;
+}

@@ -7,6 +7,7 @@
 #include "protocache/extension/utils.h"
 #include <google/protobuf/reflection.h>
 #include "test.pb.h"
+#include "twitter.pb.h"
 #include "common.h"
 
 struct Junk1 : public Junk {
@@ -267,7 +268,7 @@ int BenchmarkProtobufReflect() {
 	return 0;
 }
 
-int BenchmarkProtobufSerialize() {
+int BenchmarkProtobufSerialize(bool flat) {
 	std::string raw;
 	if (!protocache::LoadFile("test.pb", &raw)) {
 		puts("fail to load test.pb");
@@ -282,23 +283,32 @@ int BenchmarkProtobufSerialize() {
 
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
-	for (size_t i = 0; i < kLoop; i++) {
-		cnt += root->SerializeAsString().size();
+	if (flat) {
+		for (size_t i = 0; i < kLoop; i++) {
+			protocache::Data data;
+			protocache::Serialize(*root, &data);
+			cnt += data.size();
+		}
+		auto delta_ms = DeltaMs(start);
+		printf("protocache-reflect: %ldms %x\n", delta_ms, cnt);
+	} else {
+		for (size_t i = 0; i < kLoop; i++) {
+			cnt += root->SerializeAsString().size();
+		}
+		auto delta_ms = DeltaMs(start);
+		printf("protobuf: %ldms %x\n", delta_ms, cnt);
 	}
-	auto delta_ms = DeltaMs(start);
-
-	printf("protobuf: %ldms %x\n", delta_ms, cnt);
 	return 0;
 }
 
-int BenchmarkProtoCacheSerializeReflect() {
+int BenchmarkTwitterSerializePB(bool flat) {
 	std::string raw;
-	if (!protocache::LoadFile("test.pb", &raw)) {
-		puts("fail to load test.pb");
+	if (!protocache::LoadFile("twitter.pb", &raw)) {
+		puts("fail to load twitter.pb");
 		return -1;
 	}
 	google::protobuf::Arena arena;
-	google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+	google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::twitter::Root>(&arena);
 	if (!root->ParseFromString(raw)) {
 		puts("fail to deserialize");
 		return -2;
@@ -306,13 +316,20 @@ int BenchmarkProtoCacheSerializeReflect() {
 
 	unsigned cnt = 0;
 	auto start = std::chrono::steady_clock::now();
-	for (size_t i = 0; i < kLoop; i++) {
-		protocache::Data data;
-		protocache::Serialize(*root, &data);
-		cnt += data.size();
+	if (flat) {
+		for (size_t i = 0; i < kSmallLoop; i++) {
+			protocache::Data data;
+			protocache::Serialize(*root, &data);
+			cnt += data.size();
+		}
+		auto delta_ms = DeltaMs(start);
+		printf("protocache-twitter: %ldms %x\n", delta_ms, cnt);
+	} else {
+		for (size_t i = 0; i < kSmallLoop; i++) {
+			cnt += root->SerializeAsString().size();
+		}
+		auto delta_ms = DeltaMs(start);
+		printf("protobuf-twitter: %ldms %x\n", delta_ms, cnt);
 	}
-	auto delta_ms = DeltaMs(start);
-
-	printf("protocache-reflect: %ldms %x\n", delta_ms, cnt);
 	return 0;
 }

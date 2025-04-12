@@ -7,6 +7,7 @@
 #include "protocache/extension/reflection.h"
 #include "test.pc.h"
 #include "test.pc-ex.h"
+#include "twitter.pc-ex.h"
 #include "common.h"
 
 static inline uint32_t JunkHash(const protocache::Slice<char>& data) {
@@ -481,5 +482,156 @@ int BenchmarkCompress(const char* name, const std::string& filepath) {
 	}
 	delta_ms = DeltaMs(start);
 	printf("%s-decompress: %ldms\n", name, delta_ms);
+	return 0;
+}
+
+static void Touch(::ex::twitter::Url& url) {
+	url.url();
+	for (auto& u : url.urls()) {
+		Touch(*u);
+	}
+	url.expanded_url();
+	url.display_url();
+	url.indices();
+}
+
+static void Touch(::ex::twitter::Entities& entries) {
+	Touch(*entries.url());
+	for (auto& u : entries.urls()) {
+		Touch(*u);
+	}
+	for (auto& m : entries.user_mentions()) {
+		m->screen_name();
+		m->name();
+		m->id();
+		m->id_str();
+		m->indices();
+	}
+	for (auto& u : entries.description()->urls()) {
+		Touch(*u);
+	}
+	for (auto& m : entries.media()) {
+		m->id();
+		m->id_str();
+		m->indices();
+		m->media_url();
+		m->media_url_https();
+		m->url();
+		m->display_url();;
+		m->expanded_url();
+		m->type();
+		for (auto& p : m->sizes()) {
+			p.second->w();
+			p.second->h();
+			p.second->resize();
+		}
+		m->source_status_id();
+		m->source_status_id_str();;
+	}
+}
+
+static void Touch(::ex::twitter::Status& status) {
+	status.metadata()->result_type();
+	status.metadata()->iso_language_code();
+	status.created_at();
+	status.id();
+	status.id_str();
+	status.text();
+	status.source();
+	status.truncated();
+	status.in_reply_to_status_id();
+	status.in_reply_to_status_id_str();
+	status.in_reply_to_user_id();
+	status.in_reply_to_user_id_str();
+	status.in_reply_to_screen_name();
+
+	status.user()->id();
+	status.user()->id_str();
+	status.user()->name();
+	status.user()->screen_name();
+	status.user()->location();
+	status.user()->description();
+	Touch(*status.user()->entities());
+
+	status.user()->followers_count();
+	status.user()->friends_count();
+	status.user()->listed_count();
+	status.user()->created_at();
+	status.user()->favourites_count();
+	status.user()->utc_offset();
+	status.user()->time_zone();
+	status.user()->geo_enabled();
+	status.user()->verified();
+	status.user()->statuses_count();
+	status.user()->lang();
+	status.user()->contributors_enabled();
+	status.user()->is_translator();
+	status.user()->is_translation_enabled();
+	status.user()->profile_background_color();
+	status.user()->profile_background_image_url();
+	status.user()->profile_background_image_url_https();
+	status.user()->profile_background_tile();
+	status.user()->profile_image_url();
+	status.user()->profile_image_url_https();
+	status.user()->profile_banner_url();
+	status.user()->profile_link_color();
+	status.user()->profile_sidebar_border_color();
+	status.user()->profile_sidebar_fill_color();
+	status.user()->profile_text_color();
+	status.user()->profile_use_background_image();
+	status.user()->default_profile();
+	status.user()->default_profile_image();
+	status.user()->following();
+	status.user()->follow_request_sent();
+	status.user()->notifications();
+	if (status.HasField(::twitter::Status::_::retweeted_status)) {
+		Touch(*status.retweeted_status());
+	}
+	status.retweet_count();
+	status.favorite_count();
+	for (auto& entries : status.entities()) {
+		Touch(*entries);
+	}
+	status.favorited();
+	status.retweeted();
+	status.possibly_sensitive();
+	status.lang();
+}
+
+static void Touch(::ex::twitter::Root::SearchMetadata& meta) {
+	meta.completed_in();
+	meta.max_id();
+	meta.max_id_str();
+	meta.next_results();
+	meta.query();
+	meta.refresh_url();
+	meta.count();
+	meta.since_id();
+	meta.since_id_str();
+}
+
+int BenchmarkTwitterSerializePC() {
+	std::string raw;
+	if (!protocache::LoadFile("twitter.pc", &raw)) {
+		puts("fail to load twitter.pc");
+		return -1;
+	}
+	::ex::twitter::Root root(reinterpret_cast<const uint32_t*>(raw.data()));
+
+	for (auto& status : root.statuses()) {
+		Touch(*status);
+	}
+	Touch(*root.search_metadata());
+
+	unsigned cnt = 0;
+	auto start = std::chrono::steady_clock::now();
+	for (size_t i = 0; i < kSmallLoop; i++) {
+		protocache::Data data;
+		root.Serialize(&data);
+		cnt += data.size();
+	}
+	auto delta_ms = DeltaMs(start);
+
+	printf("pcex-twitter: %ldms %x\n", delta_ms, cnt);
 	return 0;
 }

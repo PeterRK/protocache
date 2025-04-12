@@ -57,6 +57,9 @@ You can create protocache binary by serializing a protobuf message with protocac
 |:-------|----:|----:|----:|
 | Serialize | 555ns | 397 ~ 2254ns | 7243ns |
 | Decode + Traverse + Dealloc | 1941ns | 1134ns | 154ns |
+| Serialize (twitter.proto) | 217us | 324us | 756us |
+
+Test full serialization with a complicated twitter.proto. Performance gap is smaller than that in simple case.
 
 ## Reflection
 ```cpp

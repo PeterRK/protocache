@@ -43,6 +43,7 @@ static inline long DeltaMs(TraceTimePoint start, TraceTimePoint finish = std::ch
 }
 
 constexpr size_t kLoop = 1000000;
+constexpr size_t kSmallLoop = 1000;
 
 extern int BenchmarkProtobuf();
 extern int BenchmarkProtobufReflect();
@@ -51,11 +52,11 @@ extern int BenchmarkProtoCacheReflect();
 extern int BenchmarkFlatBuffers();
 extern int BenchmarkFlatBuffersReflect();
 
-extern int BenchmarkProtobufSerialize();
-extern int BenchmarkProtoCacheSerializeReflect();
 extern int BenchmarkProtoCacheEX();
+extern int BenchmarkProtobufSerialize(bool flat=false);
 extern int BenchmarkProtoCacheSerialize(bool partly=false);
 
 extern int BenchmarkCompress(const char* name, const std::string& filepath);
 
-
+extern int BenchmarkTwitterSerializePB(bool flat=false);
+extern int BenchmarkTwitterSerializePC();
