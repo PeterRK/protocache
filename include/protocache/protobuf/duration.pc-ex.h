@@ -34,11 +34,7 @@ struct Duration final {
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::nanos, end, _nanos, buf, parts[_::nanos])) return false;
 		if (!__view__.SerializeField(_::seconds, end, _seconds, buf, parts[_::seconds])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	int64_t& seconds(const uint32_t* end=nullptr) { return __view__.GetField(_::seconds, end, _seconds); }

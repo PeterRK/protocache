@@ -136,11 +136,7 @@ public:
 				return false;
 			}
 		}
-		if (!SerializeArray(elements, buf, last)) {
-			return false;
-		}
-		unit = Segment(last, buf.Size());
-		return true;
+		return SerializeArray(elements, buf, last, unit);
 	}
 };
 
@@ -154,7 +150,11 @@ struct ScalarArrayEX : public BaseArrayEX<T> {
 	bool Serialize(Buffer& buf, Unit& unit, const uint32_t*) const {
 		static_assert(sizeof(T) == 4 || sizeof(T) == 8, "");
 		constexpr unsigned m = sizeof(T) / 4;
-		if (m*this->size() >= (1U << 30U)) {
+		if (this->size() == 0) {
+			unit.len = 1;
+			unit.data[0] = m;
+			return true;
+		} else if (m*this->size() >= (1U << 30U)) {
 			return false;
 		}
 		auto last = buf.Size();
@@ -348,11 +348,7 @@ public:
 				return false;
 			}
 		}
-		if (!::protocache::SerializeMap(index.Data(), keys, values, buf, last)) {
-			return false;
-		}
-		unit = Segment(last, buf.Size());
-		return true;
+		return ::protocache::SerializeMap(index.Data(), keys, values, buf, last, unit);
 	}
 
 	size_t size() const noexcept { return core_.size(); }
@@ -455,10 +451,13 @@ public:
 		} else if (!::protocache::Serialize(field, end, buf, unit)) {
 			return false;
 		}
-		assert(unit.len == 0);
-		if (unit.seg.len == 1) {
-			unit.seg.len = 0;
-			buf.Shrink(1);
+		if (unit.size() == 1) {
+			if (unit.len == 0) {
+				unit.seg.len = 0;
+				buf.Shrink(1);
+			} else {
+				unit.len = 0;
+			}
 		}
 		return true;
 	}

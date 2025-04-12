@@ -64,9 +64,9 @@ static inline Unit Segment(size_t last, size_t now) {
 	return out;
 }
 
-extern bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last);
-extern bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last);
+extern bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit& unit);
+extern bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit& unit);
 extern bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
-						 std::vector<Unit>& values, Buffer& buf, size_t last);
+						 std::vector<Unit>& values, Buffer& buf, size_t last, Unit& unit);
 } // protocache
 #endif //PROTOCACHE_SERIALIZE_H_

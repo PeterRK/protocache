@@ -677,11 +677,7 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		oss << "\t\tif (!__view__.SerializeField(_::"
 			<< one->name() << ", end, _" << one->name() << ", buf, parts[_::" << one->name() << "])) return false;\n";
 	}
-	oss << "\t\tif (!protocache::SerializeMessage(parts, buf, last)) {\n"
-		<< "\t\t\treturn false;\n"
-		<< "\t\t}\n"
-		<< "\t\tunit = protocache::Segment(last, buf.Size());\n"
-		<< "\t\treturn true;\n"
+	oss << "\t\treturn protocache::SerializeMessage(parts, buf, last, unit);\n"
 		<< "\t}\n\n";
 
 	std::vector<std::string> types(fields.size());

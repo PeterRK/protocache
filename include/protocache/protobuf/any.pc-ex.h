@@ -34,11 +34,7 @@ struct Any final {
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		if (!__view__.SerializeField(_::type_url, end, _type_url, buf, parts[_::type_url])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	std::string& type_url(const uint32_t* end=nullptr) { return __view__.GetField(_::type_url, end, _type_url); }

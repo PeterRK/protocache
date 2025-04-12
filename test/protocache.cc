@@ -84,7 +84,7 @@ TEST(PtotoCache, Basic) {
 	auto data = buffer.View();
 	ASSERT_EQ(195, data.size());
 	auto end = data.data() + data.size();
-	auto& root = *protocache::Message(data.data()).Cast<test::Main>();
+	auto& root = *protocache::Message(data).Cast<test::Main>();
 	ASSERT_FALSE(!root);
 
 	ASSERT_EQ(-999, root.i32(end));
@@ -326,7 +326,7 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_TRUE(protocache::Serialize(*message, &buffer));
 	auto data = buffer.View();
 	auto end = data.data() + data.size();
-	protocache::Message unit(data.data(), end);
+	protocache::Message unit(data);
 
 	it = root->fields.find("f32");
 	ASSERT_NE(it, root->fields.end());
@@ -340,9 +340,7 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
 	auto data = buffer.View();
 	ASSERT_FALSE(data.empty());
-
-	protocache::Slice<uint32_t> view(data);
-	::ex::test::Main root(view);
+	::ex::test::Main root(data);
 
 	ASSERT_EQ(-999, root.i32());
 	ASSERT_EQ(1234, root.u32());
@@ -444,9 +442,7 @@ TEST(PtotoCacheEX, Serialize) {
 	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
 	auto data = buffer.View();
 	auto end = data.data() + data.size();
-
-	protocache::Slice<uint32_t> view1(data);
-	::ex::test::Main ex(view1);
+	::ex::test::Main ex(data);
 
 	ex.objectv();
 	ex.strv(end)[0] = "xyz";
@@ -461,9 +457,7 @@ TEST(PtotoCacheEX, Serialize) {
 	auto modified = buf.View();
 	ASSERT_EQ(data.size(), modified.size());
 	end = modified.data() + modified.size();
-
-	protocache::Slice<uint32_t> view2(modified);
-	::ex::test::Main root(view2);
+	::ex::test::Main root(modified);
 
 	ASSERT_EQ(root.str(end), "Hello World!");
 	ASSERT_EQ(root.data(end), "abc123!?$*&()'-=@~");

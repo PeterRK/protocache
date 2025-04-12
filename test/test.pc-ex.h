@@ -38,11 +38,7 @@ struct Small final {
 		if (!__view__.SerializeField(_::str, end, _str, buf, parts[_::str])) return false;
 		if (!__view__.SerializeField(_::flag, end, _flag, buf, parts[_::flag])) return false;
 		if (!__view__.SerializeField(_::i32, end, _i32, buf, parts[_::i32])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	int32_t& i32(const uint32_t* end=nullptr) { return __view__.GetField(_::i32, end, _i32); }
@@ -124,11 +120,7 @@ struct Main final {
 		if (!__view__.SerializeField(_::i64, end, _i64, buf, parts[_::i64])) return false;
 		if (!__view__.SerializeField(_::u32, end, _u32, buf, parts[_::u32])) return false;
 		if (!__view__.SerializeField(_::i32, end, _i32, buf, parts[_::i32])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	int32_t& i32(const uint32_t* end=nullptr) { return __view__.GetField(_::i32, end, _i32); }
@@ -220,11 +212,7 @@ struct CyclicA final {
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::cyclic, end, _cyclic, buf, parts[_::cyclic])) return false;
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	int32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -260,11 +248,7 @@ struct CyclicB final {
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::cyclic, end, _cyclic, buf, parts[_::cyclic])) return false;
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		if (!protocache::SerializeMessage(parts, buf, last)) {
-			return false;
-		}
-		unit = protocache::Segment(last, buf.Size());
-		return true;
+		return protocache::SerializeMessage(parts, buf, last, unit);
 	}
 
 	int32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -302,11 +286,7 @@ struct Deprecated final {
 			std::vector<protocache::Unit> parts(1, {0,0});
 			auto last = buf.Size();
 			if (!__view__.SerializeField(_::val, end, _val, buf, parts[_::val])) return false;
-			if (!protocache::SerializeMessage(parts, buf, last)) {
-				return false;
-			}
-			unit = protocache::Segment(last, buf.Size());
-			return true;
+			return protocache::SerializeMessage(parts, buf, last, unit);
 		}
 
 		int32_t& val(const uint32_t* end=nullptr) { return __view__.GetField(_::val, end, _val); }

@@ -127,9 +127,10 @@ static inline void Mark(const Unit& unit, Buffer& buf, unsigned m) {
 	}
 }
 
-bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last) {
+bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit& unit) {
 	if (elements.empty()) {
-		buf.Put(1U);
+		unit.len = 1;
+		unit.data[0] = 1U;
 		return true;
 	}
 
@@ -148,16 +149,18 @@ bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last) {
 		Mark(elements[i], buf, m);
 	}
 	buf.Put((elements.size() << 2U) | m);
+	unit = Segment(last, buf.Size());
 	return true;
 }
 
 bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
-				  std::vector<Unit>& values, Buffer& buf, size_t last) {
+				  std::vector<Unit>& values, Buffer& buf, size_t last, Unit& unit) {
 	if (keys.size() != values.size()) {
 		return false;
 	}
 	if (keys.empty()) {
-		buf.Put(5U << 28U);
+		unit.len = 1;
+		unit.data[0] = 5U << 28U;
 		return true;
 	}
 
@@ -186,22 +189,23 @@ bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
 	head[index_size-1] = 0;
 	memcpy(head, index.data(), index.size());
 	*head |= (m1<<30U) | (m2<<28U);
+	unit = Segment(last, buf.Size());
 	return true;
 }
 
-bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
+bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit& unit) {
 	if (fields.empty()) {
 		return false;
 	}
 	auto tail = buf.AtSize(last);
 	size_t size = 0;
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
-		auto& unit = fields[i];
-		if (unit.len == 0) {
-			size += unit.seg.len;
-			Pick(unit, buf, tail, 3);
+		auto& field = fields[i];
+		if (field.len == 0) {
+			size += field.seg.len;
+			Pick(field, buf, tail, 3);
 		} else {
-			size += unit.len;
+			size += field.len;
 		}
 	}
 	if (size >= (1U<<30U)) {
@@ -211,7 +215,8 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
 		fields.pop_back();
 	}
 	if (fields.empty()) {
-		buf.Put(0U);
+		unit.len = 1;
+		unit.data[0] = 0U;
 		return true;
 	}
 	auto section = (fields.size() + 12) / 25;
@@ -221,16 +226,16 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
 
 	buf.Shrink(tail - buf.Head());
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
-		auto& unit = fields[i];
-		if (unit.len == 0) {
-			if (unit.seg.len != 0) {
-				buf.Put(Offset(buf.Size()+1 - unit.seg.pos));
+		auto& field = fields[i];
+		if (field.len == 0) {
+			if (field.seg.len != 0) {
+				buf.Put(Offset(buf.Size() + 1 - field.seg.pos));
 			}
 		} else {
-			assert(unit.len < 4);
-			auto cell = buf.Expand(unit.len);
-			for (unsigned j = 0; j < unit.len; j++) {
-				cell[j] = unit.data[j];
+			assert(field.len < 4);
+			auto cell = buf.Expand(field.len);
+			for (unsigned j = 0; j < field.len; j++) {
+				cell[j] = field.data[j];
 			}
 		}
 	}
@@ -239,16 +244,16 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
 	*head = section;
 	uint32_t cnt = 0;
 	for (unsigned i = 0; i < std::min(12UL, fields.size()); i++) {
-		auto& unit = fields[i];
-		if (unit.len == 0) {
-			if (unit.seg.len != 0) {
+		auto& field = fields[i];
+		if (field.len == 0) {
+			if (field.seg.len != 0) {
 				*head |= 1U << (8U+i*2U);
 				cnt += 1;
 			}
 		} else {
-			assert(unit.len < 4);
-			*head |= unit.len << (8U+i*2U);
-			cnt += unit.len;
+			assert(field.len < 4);
+			*head |= field.len << (8U + i * 2U);
+			cnt += field.len;
 		}
 	}
 	auto blk = reinterpret_cast<uint64_t*>(head+1);
@@ -259,19 +264,20 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
 		auto next = std::min(i + 25, static_cast<unsigned>(fields.size()));
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
 		for (unsigned j = 0; i < next; j+=2) {
-			auto& unit = fields[i++];
-			if (unit.len == 0) {
-				if (unit.seg.len != 0) {
+			auto& field = fields[i++];
+			if (field.len == 0) {
+				if (field.seg.len != 0) {
 					mark |= 1ULL << j;
 					cnt += 1;
 				}
 			} else {
-				mark |= static_cast<uint64_t>(unit.len) << j;
-				cnt += unit.len;
+				mark |= static_cast<uint64_t>(field.len) << j;
+				cnt += field.len;
 			}
 		}
 		*blk++ = mark;
 	}
+	unit = Segment(last, buf.Size());
 	return true;
 }
 
