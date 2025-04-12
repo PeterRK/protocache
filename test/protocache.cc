@@ -42,7 +42,7 @@ TEST(PtotoCache, Empty) {
 	ASSERT_TRUE(!protocache::FieldT<protocache::Message>(field).Get());
 }
 
-static protocache::Data SerializeByProtobuf() {
+static protocache::Data SerializeByProtobuf(const std::string& json) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
 	if (!protocache::ParseProtoFile("test.proto", &file, &err)) {
@@ -70,8 +70,8 @@ static protocache::Data SerializeByProtobuf() {
 	}
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 
-	if (!protocache::LoadJson("test.json", message.get())) {
-		std::cerr << "fail to load json" << std::endl;
+	if (!protocache::LoadJson(json, message.get())) {
+		std::cerr << "fail to load json: " << json << std::endl;
 		return {};
 	}
 	protocache::Data out;
@@ -83,7 +83,7 @@ static protocache::Data SerializeByProtobuf() {
 
 
 TEST(PtotoCache, Basic) {
-	auto data = SerializeByProtobuf();
+	auto data = SerializeByProtobuf("test.json");
 	ASSERT_EQ(195, data.size());
 	auto end = data.data() + data.size();
 	auto& root = *protocache::Message(data.data()).Cast<test::Main>();
@@ -217,6 +217,14 @@ TEST(PtotoCache, Basic) {
 	ASSERT_EQ(vec[1], 52);
 }
 
+TEST(PtotoCache, Alias) {
+	auto data = SerializeByProtobuf("test-alias.json");
+	ASSERT_EQ(data.size(), 12);
+	ASSERT_EQ(data[4], 0xd);
+	ASSERT_EQ(data[5], 1);
+	ASSERT_EQ(data[6], 1);
+}
+
 TEST(PtotoCache, Reflection) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
@@ -327,7 +335,7 @@ TEST(PtotoCache, Reflection) {
 }
 
 TEST(PtotoCacheEX, Basic) {
-	auto data = SerializeByProtobuf();
+	auto data = SerializeByProtobuf("test.json");
 	ASSERT_FALSE(data.empty());
 
 	protocache::Slice<uint32_t> view(data);
@@ -428,8 +436,22 @@ TEST(PtotoCacheEX, Basic) {
 	::ex::test::CyclicA cyclic;
 }
 
+TEST(PtotoCacheEX, Alias) {
+	::ex::test::Main root;
+	root.object()->i32() = 0;
+	auto& matrix = root.matrix();
+	matrix.resize(3);
+	matrix[2].resize(3);
+	protocache::Data data;
+	ASSERT_TRUE(root.Serialize(&data));
+	ASSERT_EQ(data.size(), 12);
+	ASSERT_EQ(data[4], 0xd);
+	ASSERT_EQ(data[5], 1);
+	ASSERT_EQ(data[6], 1);
+}
+
 TEST(PtotoCacheEX, Serialize) {
-	auto data = SerializeByProtobuf();
+	auto data = SerializeByProtobuf("test.json");
 	ASSERT_FALSE(data.empty());
 	auto end = data.data() + data.size();
 
@@ -484,7 +506,7 @@ TEST(PtotoCacheEX, Serialize) {
 }
 
 TEST(Compress, All) {
-	auto data = SerializeByProtobuf();
+	auto data = SerializeByProtobuf("test.json");
 	ASSERT_FALSE(data.empty());
 
 	protocache::Slice<uint8_t> view(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4);

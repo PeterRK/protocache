@@ -323,12 +323,25 @@ bool Serialize(const google::protobuf::Message& message, Data* out) {
 			}
 			if (!SerializeField(message, field, &unit)) {
 				return false;
+			} else if (unit.size() == 1 &&
+				field->type() == google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE) {
+				unit.clear();	// skip empty message field
 			}
 		}
 	}
 
 	if (fields.size() == 1 && fields[0]->name() == "_") {
+		if (!fields[0]->is_repeated()) {
+			return false;
+		}
 		*out = parts.front();	// trim message wrapper
+		if (out->empty()) {
+			if (fields[0]->is_map()) {
+				out->push_back(5U << 28U);
+			} else {
+				out->push_back(1U);
+			}
+		}
 		return true;
 	}
 	return SerializeMessage(parts, out);
