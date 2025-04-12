@@ -206,8 +206,6 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto)
 	return oss.str();
 }
 
-
-
 static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	std::ostringstream oss;
@@ -658,6 +656,9 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< proto.name() << "(data.begin(), data.end()) {}\n"
 		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
 		<< "\t\treturn " << cxx_ns << "Detect(ptr, end);\n"
+		<< "\t}\n"
+		<< "\tbool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {\n"
+		<< "\t\treturn __view__.HasField(id, end);\n"
 		<< "\t}\n"
 		<< "\tbool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {\n"
 		<< "\t\tauto clean_head = __view__.CleanHead();\n"

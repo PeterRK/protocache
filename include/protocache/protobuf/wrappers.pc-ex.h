@@ -26,6 +26,9 @@ struct DoubleValue final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::DoubleValue::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -53,6 +56,9 @@ struct FloatValue final {
 	explicit FloatValue(const protocache::Slice<uint32_t>& data) : FloatValue(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::FloatValue::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
@@ -82,6 +88,9 @@ struct Int64Value final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::Int64Value::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -109,6 +118,9 @@ struct UInt64Value final {
 	explicit UInt64Value(const protocache::Slice<uint32_t>& data) : UInt64Value(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::UInt64Value::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
@@ -138,6 +150,9 @@ struct Int32Value final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::Int32Value::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -165,6 +180,9 @@ struct UInt32Value final {
 	explicit UInt32Value(const protocache::Slice<uint32_t>& data) : UInt32Value(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::UInt32Value::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
@@ -194,6 +212,9 @@ struct BoolValue final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::BoolValue::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -222,6 +243,9 @@ struct StringValue final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::StringValue::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -249,6 +273,9 @@ struct BytesValue final {
 	explicit BytesValue(const protocache::Slice<uint32_t>& data) : BytesValue(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::BytesValue::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();

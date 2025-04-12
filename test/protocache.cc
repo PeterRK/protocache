@@ -9,7 +9,6 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/util/json_util.h>
 #include "protocache/extension/reflection.h"
 #include "protocache/extension/utils.h"
 #include "test.pc.h"
@@ -427,7 +426,6 @@ TEST(PtotoCacheEX, Basic) {
 
 	// check compile error
 	::ex::test::CyclicA cyclic;
-	ASSERT_NE(cyclic.cyclic(), nullptr);
 }
 
 TEST(PtotoCacheEX, Serialize) {

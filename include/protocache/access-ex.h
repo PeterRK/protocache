@@ -384,6 +384,7 @@ public:
 			return nullptr;
 		}
 	}
+	using Message::HasField;
 
 	template <typename T>
 	T& GetField(unsigned id, const uint32_t* end, T& field) {

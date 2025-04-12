@@ -18,6 +18,9 @@ struct Any final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::google::protobuf::Any::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {

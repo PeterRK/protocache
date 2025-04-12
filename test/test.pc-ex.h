@@ -21,6 +21,9 @@ struct Small final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::test::Small::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -70,6 +73,9 @@ struct Main final {
 	explicit Main(const protocache::Slice<uint32_t>& data) : Main(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::test::Main::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
@@ -186,6 +192,9 @@ struct CyclicA final {
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::test::CyclicA::Detect(ptr, end);
 	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
+	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
@@ -216,6 +225,9 @@ struct CyclicB final {
 	explicit CyclicB(const protocache::Slice<uint32_t>& data) : CyclicB(data.begin(), data.end()) {}
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		return ::test::CyclicB::Detect(ptr, end);
+	}
+	bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 		auto clean_head = __view__.CleanHead();
@@ -250,6 +262,9 @@ struct Deprecated final {
 		explicit Valid(const protocache::Slice<uint32_t>& data) : Valid(data.begin(), data.end()) {}
 		static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 			return ::test::Deprecated::Valid::Detect(ptr, end);
+		}
+		bool HasField(unsigned id, const uint32_t* end=nullptr) const noexcept {
+			return __view__.HasField(id, end);
 		}
 		bool Serialize(protocache::Data* out, const uint32_t* end=nullptr) const {
 			auto clean_head = __view__.CleanHead();
