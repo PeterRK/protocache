@@ -22,16 +22,23 @@ struct Duration final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(2, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(2, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::nanos, end, _nanos, buf, parts[_::nanos])) return false;
 		if (!__view__.SerializeField(_::seconds, end, _seconds, buf, parts[_::seconds])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	int64_t& seconds(const uint32_t* end=nullptr) { return __view__.GetField(_::seconds, end, _seconds); }

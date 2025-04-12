@@ -661,20 +661,27 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\treturn __view__.HasField(id, end);\n"
 		<< "\t}\n"
 		<< "\tbool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {\n"
+		<< "\t\tprotocache::Unit dummy;\n"
+		<< "\t\treturn Serialize(*buf, dummy, end);\n"
+		<< "\t}\n"
+		<< "\tbool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {\n"
 		<< "\t\tauto clean_head = __view__.CleanHead();\n"
 		<< "\t\tif (clean_head != nullptr) {\n"
-		<< "\t\t\tbuf->Put(Detect(clean_head, end));\n"
-		<< "\t\t\treturn true;\n"
+		<< "\t\t\treturn protocache::Copy(Detect(clean_head, end), buf, unit);\n"
 		<< "\t\t}\n"
-		<< "\t\tstd::vector<protocache::Buffer::Seg> parts(" << max_id << ", {0,0});\n"
-		<< "\t\tauto tail = buf->Size();\n";
+		<< "\t\tstd::vector<protocache::Unit> parts(" << max_id << ", {0,0});\n"
+		<< "\t\tauto last = buf.Size();\n";
 
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
 		auto one = fields[i];
 		oss << "\t\tif (!__view__.SerializeField(_::"
 			<< one->name() << ", end, _" << one->name() << ", buf, parts[_::" << one->name() << "])) return false;\n";
 	}
-	oss << "\t\treturn protocache::SerializeMessage(parts, *buf, tail);\n"
+	oss << "\t\tif (!protocache::SerializeMessage(parts, buf, last)) {\n"
+		<< "\t\t\treturn false;\n"
+		<< "\t\t}\n"
+		<< "\t\tunit = protocache::Segment(last, buf.Size());\n"
+		<< "\t\treturn true;\n"
 		<< "\t}\n\n";
 
 	std::vector<std::string> types(fields.size());

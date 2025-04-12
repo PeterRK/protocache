@@ -30,15 +30,22 @@ struct DoubleValue final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	double& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -60,15 +67,22 @@ struct FloatValue final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	float& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -90,15 +104,22 @@ struct Int64Value final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	int64_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -120,15 +141,22 @@ struct UInt64Value final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	uint64_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -150,15 +178,22 @@ struct Int32Value final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	int32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -180,15 +215,22 @@ struct UInt32Value final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	uint32_t& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -210,15 +252,22 @@ struct BoolValue final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	bool& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -240,15 +289,22 @@ struct StringValue final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	std::string& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }
@@ -270,15 +326,22 @@ struct BytesValue final {
 		return __view__.HasField(id, end);
 	}
 	bool Serialize(protocache::Buffer* buf, const uint32_t* end=nullptr) const {
+		protocache::Unit dummy;
+		return Serialize(*buf, dummy, end);
+	}
+	bool Serialize(protocache::Buffer& buf, protocache::Unit& unit, const uint32_t* end) const {
 		auto clean_head = __view__.CleanHead();
 		if (clean_head != nullptr) {
-			buf->Put(Detect(clean_head, end));
-			return true;
+			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Buffer::Seg> parts(1, {0,0});
-		auto tail = buf->Size();
+		std::vector<protocache::Unit> parts(1, {0,0});
+		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
-		return protocache::SerializeMessage(parts, *buf, tail);
+		if (!protocache::SerializeMessage(parts, buf, last)) {
+			return false;
+		}
+		unit = protocache::Segment(last, buf.Size());
+		return true;
 	}
 
 	std::string& value(const uint32_t* end=nullptr) { return __view__.GetField(_::value, end, _value); }

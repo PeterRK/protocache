@@ -436,21 +436,6 @@ TEST(PtotoCacheEX, Basic) {
 	::ex::test::CyclicA cyclic;
 }
 
-TEST(PtotoCacheEX, Alias) {
-	::ex::test::Main root;
-	root.object()->i32() = 0;
-	auto& matrix = root.matrix();
-	matrix.resize(3);
-	matrix[2].resize(3);
-	protocache::Buffer buf;
-	ASSERT_TRUE(root.Serialize(&buf));
-	auto view = buf.View();
-	ASSERT_EQ(view.size(), 12);
-	ASSERT_EQ(view[4], 0xd);
-	ASSERT_EQ(view[5], 1);
-	ASSERT_EQ(view[6], 1);
-}
-
 TEST(PtotoCacheEX, Serialize) {
 	auto data = SerializeByProtobuf("test.json");
 	ASSERT_FALSE(data.empty());
@@ -505,6 +490,21 @@ TEST(PtotoCacheEX, Serialize) {
 	ASSERT_EQ(vec4.size(), 2);
 	ASSERT_EQ(vec4[0], 51);
 	ASSERT_EQ(vec4[1], 52);
+}
+
+TEST(PtotoCacheEX, Alias) {
+	::ex::test::Main root;
+	root.object()->i32() = 0;
+	auto& matrix = root.matrix();
+	matrix.resize(3);
+	matrix[2].resize(3);
+	protocache::Buffer buf;
+	ASSERT_TRUE(root.Serialize(&buf));
+	auto view = buf.View();
+	ASSERT_EQ(view.size(), 12);
+	ASSERT_EQ(view[4], 0xd);
+	ASSERT_EQ(view[5], 1);
+	ASSERT_EQ(view[6], 1);
 }
 
 TEST(Compress, All) {

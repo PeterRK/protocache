@@ -24,7 +24,7 @@ static inline uint32_t Offset(uint32_t off) noexcept {
 	return (off<<2U) | 3U;
 }
 
-bool Serialize(const Slice<char>& str, Buffer* buf) {
+bool Serialize(const Slice<char>& str, Buffer& buf, Unit& unit) {
 	if (str.size() >= (1U << 30U)) {
 		return false;
 	}
@@ -32,34 +32,49 @@ bool Serialize(const Slice<char>& str, Buffer* buf) {
 	uint8_t header[5];
 	auto sz = WriteVarInt(header, mark);
 	auto size = WordSize(sz+str.size());
-	auto dest = buf->Expand(size);
+
+	auto last = buf.Size();
+	auto dest = unit.data;
+	if (size == 1) {
+		unit.len = 1;
+	} else {
+		unit.len = 0;
+		dest = buf.Expand(size);
+	}
 	dest[size-1] = 0;
 	auto p = reinterpret_cast<uint8_t*>(dest);
 	for (unsigned i = 0; i < sz; i++) {
 		*p++ = header[i];
 	}
 	memcpy(p, str.data(), str.size());
+	if (unit.len == 0) {
+		unit = Segment(last, buf.Size());
+	}
 	return true;
 }
 
-static size_t BestArraySize(const std::vector<Buffer::Seg>& elements, unsigned& m) {
+static size_t BestArraySize(const std::vector<Unit>& elements, unsigned& m) {
 	size_t sizes[3] = {0, 0, 0};
 	for (auto& one : elements) {
 		sizes[0] += 1;
 		sizes[1] += 2;
 		sizes[2] += 3;
-		if (one.len <= 1) {
+		auto len = one.len;
+		if (len == 0) {
+			len = one.seg.len;
+		}
+		if (len <= 1) {
 			continue;
 		}
-		sizes[0] += one.len;
-		if (one.len <= 2) {
+		sizes[0] += len;
+		if (len <= 2) {
 			continue;
 		}
-		sizes[1] += one.len;
-		if (one.len <= 3) {
+		sizes[1] += len;
+		if (len <= 3) {
 			continue;
 		}
-		sizes[2] += one.len;
+		sizes[2] += len;
 	}
 	unsigned mode = 0;
 	for (unsigned i = 1; i < 3; i++) {
@@ -71,48 +86,48 @@ static size_t BestArraySize(const std::vector<Buffer::Seg>& elements, unsigned& 
 	return sizes[mode];
 }
 
-static inline Part Pick(Buffer& buf, uint32_t*& tail, unsigned m, const Buffer::Seg& seg) {
-	Part out;
-	if (seg.len <= m) {
-		out.len = seg.len;
-		auto src = buf.AtSize(seg.pos);
-		for (unsigned j = 0; j < seg.len; j++) {
-			out.data[j] = src[j];
+static inline void Pick(Unit& unit, Buffer& buf, uint32_t*& tail, unsigned m) {
+	if (unit.len != 0) {
+		return;
+	}
+	if (unit.seg.len <= m) {
+		unit.len = unit.seg.len;
+		auto src = buf.AtSize(unit.seg.pos);
+		for (unsigned j = 0; j < unit.len; j++) {
+			unit.data[j] = src[j];
 		}
-	} else {
-		out.len = 0;
-		out.seg = seg;
-		auto src = buf.AtSize(seg.end());
+	} else {	// move
+		auto src = buf.AtSize(unit.seg.end());
 		if (tail > src) {
-			for (unsigned j = 0; j < seg.len; j++) {
+			for (unsigned j = 0; j < unit.seg.len; j++) {
 				*--tail = *--src;
 			}
-			out.seg.pos -= tail - src;
+			unit.seg.pos -= tail - src;
 		} else {
-			tail -= seg.len;
+			tail -= unit.seg.len;
 		}
 	}
-	return out;
 }
 
-static inline void Mark(const Part& part, Buffer& buf, unsigned m) {
+static inline void Mark(const Unit& unit, Buffer& buf, unsigned m) {
 	auto cell = buf.Expand(m);
-	if (part.len == 0) {
-		*cell = Offset(buf.Size() - part.seg.pos);
+	if (unit.len == 0) {
+		*cell = Offset(buf.Size() - unit.seg.pos);
 		for (unsigned i = 1; i < m; i++) {
 			cell[i] = 0;
 		}
 	} else {
-		for (unsigned i = 0; i < part.len; i++) {
-			cell[i] = part.data[i];
+		assert(unit.len < 4);
+		for (unsigned i = 0; i < unit.len; i++) {
+			cell[i] = unit.data[i];
 		}
-		for (unsigned i = part.len; i < m; i++) {
+		for (unsigned i = unit.len; i < m; i++) {
 			cell[i] = 0;
 		}
 	}
 }
 
-bool SerializeArray(const std::vector<Buffer::Seg>& elements, Buffer& buf, size_t end) {
+bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last) {
 	if (elements.empty()) {
 		buf.Put(1U);
 		return true;
@@ -124,26 +139,20 @@ bool SerializeArray(const std::vector<Buffer::Seg>& elements, Buffer& buf, size_
 		return false;
 	}
 
-	std::vector<Part> parts(elements.size());
-	auto tail = buf.AtSize(end);
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		auto& one = elements[i];
-		if (one.len == 0) {
-			return false;
-		}
-		parts[i] = Pick(buf, tail, m, one);
+	auto tail = buf.AtSize(last);
+	for (int i = static_cast<int>(elements.size())-1; i >= 0; i--) {
+		Pick(elements[i], buf, tail, m);
 	}
 	buf.Shrink(tail - buf.Head());
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		Mark(parts[i], buf, m);
+	for (int i = static_cast<int>(elements.size())-1; i >= 0; i--) {
+		Mark(elements[i], buf, m);
 	}
-	uint32_t head = (elements.size() << 2U) | m;
-	buf.Put(head);
+	buf.Put((elements.size() << 2U) | m);
 	return true;
 }
 
-bool SerializeMap(const Slice<uint8_t>& index, const std::vector<Buffer::Seg>& keys,
-				  const std::vector<Buffer::Seg>& values, Buffer& buf, size_t end) {
+bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
+				  std::vector<Unit>& values, Buffer& buf, size_t last) {
 	if (keys.size() != values.size()) {
 		return false;
 	}
@@ -163,25 +172,15 @@ bool SerializeMap(const Slice<uint8_t>& index, const std::vector<Buffer::Seg>& k
 		return false;
 	}
 
-	struct KvPart {
-		Part key;
-		Part val;
-	};
-	std::vector<KvPart> parts(keys.size());
-	auto tail = buf.AtSize(end);
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		auto& key = keys[i];
-		auto& val = values[i];
-		if (key.len == 0 || val.len == 0) {
-			return false;
-		}
-		parts[i].val = Pick(buf, tail, m2, val);
-		parts[i].key = Pick(buf, tail, m1, key);
+	auto tail = buf.AtSize(last);
+	for (int i = static_cast<int>(keys.size())-1; i >= 0; i--) {
+		Pick(values[i], buf, tail, m2);
+		Pick(keys[i], buf, tail, m1);
 	}
 	buf.Shrink(tail - buf.Head());
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		Mark(parts[i].val, buf, m2);
-		Mark(parts[i].key, buf, m1);
+	for (int i = static_cast<int>(keys.size())-1; i >= 0; i--) {
+		Mark(values[i], buf, m2);
+		Mark(keys[i], buf, m1);
 	}
 	auto head = buf.Expand(index_size);
 	head[index_size-1] = 0;
@@ -190,47 +189,48 @@ bool SerializeMap(const Slice<uint8_t>& index, const std::vector<Buffer::Seg>& k
 	return true;
 }
 
-bool SerializeMessage(const std::vector<Buffer::Seg>& fields, Buffer& buf, size_t end) {
+bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last) {
 	if (fields.empty()) {
 		return false;
 	}
-	std::vector<Part> parts(fields.size());
-	auto tail = buf.AtSize(end);
+	auto tail = buf.AtSize(last);
 	size_t size = 0;
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		auto& one = fields[i];
-		auto& part = parts[i];
-		if (one.len == 0) {
-			part.len = 4;	// skip
-			continue;
+	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
+		auto& unit = fields[i];
+		if (unit.len == 0) {
+			size += unit.seg.len;
+			Pick(unit, buf, tail, 3);
+		} else {
+			size += unit.len;
 		}
-		size += one.len;
-		part = Pick(buf, tail, 3, one);
 	}
 	if (size >= (1U<<30U)) {
 		return false;
 	}
-	while (!parts.empty() && parts.back().len > 3) {
-		parts.pop_back();
+	while (!fields.empty() && fields.back().size() == 0) {
+		fields.pop_back();
 	}
-	if (parts.empty()) {
+	if (fields.empty()) {
 		buf.Put(0U);
 		return true;
 	}
-	auto section = (parts.size() + 12) / 25;
+	auto section = (fields.size() + 12) / 25;
 	if (section > 0xff) {
 		return false;
 	}
 
 	buf.Shrink(tail - buf.Head());
-	for (int i = static_cast<int>(parts.size())-1; i >= 0; i--) {
-		auto& part = parts[i];
-		if (part.len == 0) {
-			buf.Put(Offset(buf.Size()+1 - part.seg.pos));
-		} else if (part.len < 4) {
-			auto cell = buf.Expand(part.len);
-			for (unsigned j = 0; j < part.len; j++) {
-				cell[j] = part.data[j];
+	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
+		auto& unit = fields[i];
+		if (unit.len == 0) {
+			if (unit.seg.len != 0) {
+				buf.Put(Offset(buf.Size()+1 - unit.seg.pos));
+			}
+		} else {
+			assert(unit.len < 4);
+			auto cell = buf.Expand(unit.len);
+			for (unsigned j = 0; j < unit.len; j++) {
+				cell[j] = unit.data[j];
 			}
 		}
 	}
@@ -238,31 +238,36 @@ bool SerializeMessage(const std::vector<Buffer::Seg>& fields, Buffer& buf, size_
 	auto head = buf.Expand(1 + section*2);
 	*head = section;
 	uint32_t cnt = 0;
-	for (unsigned i = 0; i < std::min(12UL, parts.size()); i++) {
-		auto& part = parts[i];
-		if (part.len == 0) {
-			*head |= 1U << (8U+i*2U);
-			cnt += 1;
-		} else if (part.len < 4) {
-			*head |= part.len << (8U+i*2U);
-			cnt += part.len;
+	for (unsigned i = 0; i < std::min(12UL, fields.size()); i++) {
+		auto& unit = fields[i];
+		if (unit.len == 0) {
+			if (unit.seg.len != 0) {
+				*head |= 1U << (8U+i*2U);
+				cnt += 1;
+			}
+		} else {
+			assert(unit.len < 4);
+			*head |= unit.len << (8U+i*2U);
+			cnt += unit.len;
 		}
 	}
 	auto blk = reinterpret_cast<uint64_t*>(head+1);
-	for (unsigned i = 12; i < parts.size(); ) {
+	for (unsigned i = 12; i < fields.size(); ) {
 		if (cnt >= (1U<<14U)) {
 			return false;
 		}
-		auto next = std::min(i + 25, static_cast<unsigned>(parts.size()));
+		auto next = std::min(i + 25, static_cast<unsigned>(fields.size()));
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
 		for (unsigned j = 0; i < next; j+=2) {
-			auto& part = parts[i++];
-			if (part.len == 0) {
-				mark |= 1ULL << j;
-				cnt += 1;
-			} else if (part.len < 4) {
-				mark |= static_cast<uint64_t>(part.len) << j;
-				cnt += part.len;
+			auto& unit = fields[i++];
+			if (unit.len == 0) {
+				if (unit.seg.len != 0) {
+					mark |= 1ULL << j;
+					cnt += 1;
+				}
+			} else {
+				mark |= static_cast<uint64_t>(unit.len) << j;
+				cnt += unit.len;
 			}
 		}
 		*blk++ = mark;

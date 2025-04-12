@@ -144,35 +144,14 @@ public:
 		off_ = size_;
 	}
 
-	void Put(bool v) noexcept {
-		*Expand(1) = static_cast<uint32_t>(v);
-	}
-	void Put(int32_t v) noexcept {
-		*reinterpret_cast<int32_t*>(Expand(1)) = v;
-	}
 	void Put(uint32_t v) noexcept {
 		*Expand(1) = v;
-	}
-	void Put(float v) noexcept {
-		*reinterpret_cast<float*>(Expand(1)) = v;
-	}
-	void Put(int64_t v) noexcept {
-		*reinterpret_cast<int64_t*>(Expand(2)) = v;
-	}
-	void Put(uint64_t v) noexcept {
-		*reinterpret_cast<uint64_t*>(Expand(2)) = v;
-	}
-	void Put(double v) noexcept {
-		*reinterpret_cast<double*>(Expand(2)) = v;
 	}
 	void Put(const Slice<uint32_t>& data) noexcept {
 		auto dest = Expand(data.size());
 		for (size_t i = 0; i < data.size(); i++) {
 			dest[i] = data[i];
 		}
-	}
-	void Put(const Data& data) noexcept {
-		Put(Slice<uint32_t>(data));
 	}
 
 	uint32_t* Expand(size_t delta) {
