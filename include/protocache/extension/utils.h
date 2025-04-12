@@ -21,20 +21,7 @@ extern bool LoadJson(const std::string& path, google::protobuf::Message* message
 extern bool DumpJson(const google::protobuf::Message& message, const std::string& path);
 
 extern bool Serialize(const google::protobuf::Message& message, Buffer* buf);
-static inline bool Serialize(const google::protobuf::Message& message, Data* out) {
-	Buffer buf;
-	if (!Serialize(message, &buf)) {
-		return false;
-	}
-	auto view = buf.View();
-	out->assign(view.data(), view.size());
-	return true;
-}
-
 extern bool Deserialize(const Slice<uint32_t>& raw, google::protobuf::Message* message);
-static inline bool Deserialize(const Data& raw, google::protobuf::Message* message) {
-	return Deserialize(protocache::Slice<uint32_t>(raw), message);
-}
 
 } // protocache
 #endif //PROTOCACHE_EXT_UTILS_H_

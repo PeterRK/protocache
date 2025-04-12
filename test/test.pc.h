@@ -34,7 +34,7 @@ public:
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
 		if (!view) return {};
-		protocache::Message core(ptr);
+		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
 		t = protocache::DetectField<protocache::Slice<char>>(core, _::str, end);
 		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
@@ -111,7 +111,7 @@ public:
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
 		if (!view) return {};
-		protocache::Message core(ptr);
+		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
 		t = protocache::DetectField<::test::ArrMap::ALIAS>(core, _::arrays, end);
 		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
@@ -255,7 +255,7 @@ public:
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
 		if (!view) return {};
-		protocache::Message core(ptr);
+		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
 		t = protocache::DetectField<const ::test::CyclicB*>(core, _::cyclic, end);
 		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
@@ -285,7 +285,7 @@ public:
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
 		if (!view) return {};
-		protocache::Message core(ptr);
+		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
 		t = protocache::DetectField<const ::test::CyclicA*>(core, _::cyclic, end);
 		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
@@ -317,7 +317,7 @@ struct Deprecated final {
 		static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 			auto view = protocache::Message::Detect(ptr, end);
 			if (!view) return {};
-			protocache::Message core(ptr);
+			protocache::Message core(ptr, end);
 			protocache::Slice<uint32_t> t;
 			return view;
 		}

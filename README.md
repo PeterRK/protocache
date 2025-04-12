@@ -34,19 +34,19 @@ A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-
 
 ## APIs
 ```cpp
-protocache::Data data;
-ASSERT_TRUE(protocache::Serialize(pb_message, &data));
+protocache::Buffer buf1;
+ASSERT_TRUE(protocache::Serialize(pb_message, &buf1));
 
 // =========basic api=========
-auto& root = protocache::Message(data.data()).Cast<test::Main>();
+auto& root = protocache::Message(buf1.View()).Cast<test::Main>();
 ASSERT_FALSE(!root);
 
 // =========extra api=========
-::ex::test::Main ex_root(data.data());
+::ex::test::Main ex_root(buf1.View());
 
-protocache::Data copy;
-ASSERT_TRUE(ex_root.Serialize(&copy));
-ASSERT_EQ(data.size(), copy.size());
+protocache::Buffer buf2;
+ASSERT_TRUE(ex_root.Serialize(&buf2));
+ASSERT_EQ(buf1.Size(), buf2.Size());
 
 // deserialize to pb
 protocache::Deserialize(data, &pb_mirror);

@@ -294,7 +294,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		<< "\tstatic protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {\n"
 		<< "\t\tauto view = protocache::Message::Detect(ptr, end);\n"
 		<< "\t\tif (!view) return {};\n"
-		<< "\t\tprotocache::Message core(ptr);\n"
+		<< "\t\tprotocache::Message core(ptr, end);\n"
 		<< "\t\tprotocache::Slice<uint32_t> t;\n";
 
 	auto get_map_type = [](const ::google::protobuf::DescriptorProto* unit)->std::string{

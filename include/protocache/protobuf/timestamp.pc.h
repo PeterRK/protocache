@@ -24,7 +24,7 @@ public:
 	static protocache::Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) {
 		auto view = protocache::Message::Detect(ptr, end);
 		if (!view) return {};
-		protocache::Message core(ptr);
+		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
 		return view;
 	}

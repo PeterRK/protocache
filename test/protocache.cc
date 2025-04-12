@@ -42,48 +42,46 @@ TEST(PtotoCache, Empty) {
 	ASSERT_TRUE(!protocache::FieldT<protocache::Message>(field).Get());
 }
 
-static protocache::Data SerializeByProtobuf(const std::string& json) {
+static bool SerializeByProtobuf(const std::string& json, protocache::Buffer& buf) {
 	std::string err;
 	google::protobuf::FileDescriptorProto file;
 	if (!protocache::ParseProtoFile("test.proto", &file, &err)) {
 		std::cerr << "fail to parse proto: " << err << std::endl;
-		return {};
+		return false;
 	}
 
 	google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
 	if (pool.BuildFile(file) == nullptr) {
 		std::cerr << "fail to prepare protobuf pool" << std::endl;
-		return {};
+		return false;
 	}
 
 	auto descriptor = pool.FindMessageTypeByName("test.Main");
 	if (descriptor == nullptr) {
 		std::cerr << "fail to get root" << std::endl;
-		return {};
+		return false;
 	}
 
 	google::protobuf::DynamicMessageFactory factory(&pool);
 	auto prototype = factory.GetPrototype(descriptor);
 	if (prototype == nullptr) {
 		std::cerr << "fail to create protobuf" << std::endl;
-		return {};
+		return false;
 	}
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 
 	if (!protocache::LoadJson(json, message.get())) {
 		std::cerr << "fail to load json: " << json << std::endl;
-		return {};
+		return false;
 	}
-	protocache::Data out;
-	if (!protocache::Serialize(*message, &out)) {
-		return {};
-	}
-	return out;
+	return protocache::Serialize(*message, &buf);
 }
 
 
 TEST(PtotoCache, Basic) {
-	auto data = SerializeByProtobuf("test.json");
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
+	auto data = buffer.View();
 	ASSERT_EQ(195, data.size());
 	auto end = data.data() + data.size();
 	auto& root = *protocache::Message(data.data()).Cast<test::Main>();
@@ -218,7 +216,9 @@ TEST(PtotoCache, Basic) {
 }
 
 TEST(PtotoCache, Alias) {
-	auto data = SerializeByProtobuf("test-alias.json");
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test-alias.json", buffer));
+	auto data = buffer.View();
 	ASSERT_EQ(data.size(), 12);
 	ASSERT_EQ(data[4], 0xd);
 	ASSERT_EQ(data[5], 1);
@@ -322,8 +322,9 @@ TEST(PtotoCache, Reflection) {
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 
 	ASSERT_TRUE(protocache::LoadJson("test.json", message.get()));
-	protocache::Data data;
-	ASSERT_TRUE(protocache::Serialize(*message, &data));
+	protocache::Buffer buffer;
+	ASSERT_TRUE(protocache::Serialize(*message, &buffer));
+	auto data = buffer.View();
 	auto end = data.data() + data.size();
 	protocache::Message unit(data.data(), end);
 
@@ -335,7 +336,9 @@ TEST(PtotoCache, Reflection) {
 }
 
 TEST(PtotoCacheEX, Basic) {
-	auto data = SerializeByProtobuf("test.json");
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
+	auto data = buffer.View();
 	ASSERT_FALSE(data.empty());
 
 	protocache::Slice<uint32_t> view(data);
@@ -437,8 +440,9 @@ TEST(PtotoCacheEX, Basic) {
 }
 
 TEST(PtotoCacheEX, Serialize) {
-	auto data = SerializeByProtobuf("test.json");
-	ASSERT_FALSE(data.empty());
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
+	auto data = buffer.View();
 	auto end = data.data() + data.size();
 
 	protocache::Slice<uint32_t> view1(data);
@@ -508,8 +512,9 @@ TEST(PtotoCacheEX, Alias) {
 }
 
 TEST(Compress, All) {
-	auto data = SerializeByProtobuf("test.json");
-	ASSERT_FALSE(data.empty());
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
+	auto data = buffer.View();
 
 	protocache::Slice<uint8_t> view(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4);
 	std::string cooked;

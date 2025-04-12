@@ -131,6 +131,7 @@ static inline unsigned Count64(uint64_t v) noexcept {
 class Message {
 public:
 	Message() noexcept : ptr_(&s_empty) {};
+	explicit Message(const Slice<uint32_t>& data) : Message(data.data(), data.end()) {}
 	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(&s_empty) {
 		if (ptr == nullptr) {
 			return;

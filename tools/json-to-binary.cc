@@ -58,17 +58,18 @@ int main(int argc, char* argv[]) {
 		return 2;
 	}
 	if (FLAGS_flat) {
-		protocache::Data data;
-		if (!protocache::Serialize(*message, &data)) {
+		protocache::Buffer buf;
+		if (!protocache::Serialize(*message, &buf)) {
 			std::cerr << "fail to serialize" << std::endl;
 			return -4;
 		}
+		auto view = buf.View();
 		if (FLAGS_compress) {
 			std::string cooked;
-			protocache::Compress(reinterpret_cast<const uint8_t*>(data.data()), data.size()*4U, &cooked);
+			protocache::Compress(reinterpret_cast<const uint8_t*>(view.data()), view.size()*4U, &cooked);
 			output.write(cooked.data(), cooked.size());
 		} else {
-			output.write(reinterpret_cast<const char*>(data.data()), data.size()*4U);
+			output.write(reinterpret_cast<const char*>(view.data()), view.size()*4U);
 		}
 	} else {
 		auto data = message->SerializePartialAsString();

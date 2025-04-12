@@ -77,8 +77,6 @@ static inline bool operator!=(const std::string& a, const Slice<char>& b) noexce
 	return b != a;
 }
 
-using Data = std::basic_string<uint32_t>;
-
 static inline constexpr size_t WordSize(size_t sz) noexcept {
 	return (sz+3)/4;
 }
@@ -128,9 +126,6 @@ public:
 	Slice<uint32_t> View() const noexcept {
 		return {data_.get()+off_, Size()};
 	};
-	Data Export() const noexcept {
-		return {data_.get()+off_, Size()};
-	}
 	size_t Size() const noexcept {
 		return size_ - off_;
 	}
