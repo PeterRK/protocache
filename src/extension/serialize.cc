@@ -246,7 +246,7 @@ static bool SerializeMapField(const google::protobuf::Message& message,
 	}
 #undef CREATE_KEY_READER
 
-	auto index = PerfectHash::Build(*reader, true);
+	auto index = PerfectHashObject::Build(*reader, true);
 	if (!index) {
 		return false;
 	}

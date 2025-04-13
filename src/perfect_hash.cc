@@ -13,6 +13,70 @@
 
 namespace protocache {
 
+
+//Robison
+class Divisor final {
+private:
+	uint32_t val_ = 0;
+	uint32_t fac_ = 0;
+	uint32_t tip_ = 0;
+	unsigned sft_ = 0;
+
+public:
+	uint32_t value() const noexcept { return val_; }
+	Divisor() noexcept = default;
+	explicit Divisor(uint32_t n) noexcept { *this = n; }
+
+	Divisor& operator=(uint32_t n) noexcept {
+		val_ = n;
+		fac_ = 0;
+		sft_ = 0;
+		tip_ = 0;
+		if (n == 0) {
+			return *this;
+		}
+		sft_ = 31;
+		constexpr uint32_t one = 1;
+		auto m = one << sft_;
+		for (; m > n; m >>= 1U) {
+			sft_--;
+		}
+		constexpr uint32_t zero = 0;
+		fac_ = ~zero;
+		tip_ = ~zero;
+		if (m == n) {
+			return *this;
+		}
+		fac_ = (((uint64_t)m) << 32) / n;
+		uint32_t r = fac_ * n + n;
+		if (r <= m) {
+			fac_ += 1;
+			tip_ = 0;
+		} else {
+			tip_ = fac_;
+		}
+		return *this;
+	}
+
+	uint32_t Div(uint32_t m) const noexcept {
+		uint32_t t = (fac_ * (uint64_t)m + tip_) >> 32;
+		return t >> sft_;
+	}
+
+	uint32_t Mod(uint32_t m) const noexcept {
+		uint32_t t = (fac_ * (uint64_t)m + tip_) >> 32;
+		return m - val_ * (t >> sft_);
+	}
+};
+
+static inline uint32_t operator/(uint32_t m, const Divisor& d) noexcept {
+	return d.Div(m);
+}
+
+static inline uint32_t operator%(uint32_t m, const Divisor& d) noexcept {
+	return d.Mod(m);
+}
+
 static inline unsigned Bit2(const uint8_t* vec, size_t pos) noexcept {
 	return (vec[pos>>2] >> ((pos&3)<<1)) & 3;
 }
@@ -111,10 +175,33 @@ uint32_t PerfectHash::Locate(const uint8_t* key, unsigned key_len) const noexcep
 			code.u32[1] % section_ + section_,
 			code.u32[2] % section_ + section_ * 2,
 	};
+	return Locate(slots);
+}
+
+uint32_t PerfectHashObject::Locate(const uint8_t* key, unsigned key_len) const noexcept {
+	if (buffer_ == nullptr) {
+		return UINT32_MAX;
+	}
+	auto header = reinterpret_cast<const Header*>(data_);
+	if (RealSize(header->size) < 2) {
+		return 0;
+	}
+	auto& m = *reinterpret_cast<Divisor*>(buffer_.get());
+	auto code = Hash128(key, key_len, header->seed);
+	uint32_t slots[3] = {
+			code.u32[0] % m,
+			code.u32[1] % m + m.value(),
+			code.u32[2] % m + m.value() * 2,
+	};
+	return PerfectHash::Locate(slots);
+}
+
+uint32_t PerfectHash::Locate(uint32_t slots[]) const noexcept {
+	auto header = reinterpret_cast<const Header*>(data_);
 	auto bitmap = data_ + sizeof(Header);
 	auto table = bitmap + BitmapSize(section_);
 	auto m = Bit2(bitmap,slots[0]) +
-			Bit2(bitmap,slots[1]) + Bit2(bitmap,slots[2]);
+			 Bit2(bitmap,slots[1]) + Bit2(bitmap,slots[2]);
 
 	auto slot = slots[m % 3];
 	uint32_t a = slot >> 5;
@@ -137,6 +224,7 @@ uint32_t PerfectHash::Locate(const uint8_t* key, unsigned key_len) const noexcep
 template <typename Word>
 struct Vertex {
 	Word slot;
+	Word prev;
 	Word next;
 };
 
@@ -147,53 +235,52 @@ template <typename Word>
 struct Graph {
 	Edge<Word>* edges = nullptr;
 	Word* nodes = nullptr;
-	uint8_t* sizes = nullptr;
 };
 
 template <typename Word>
-static int CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32_t n) noexcept {
-	auto m = Section(n);
-	auto slot_cnt = m * 3;
+static bool CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32_t n, const Divisor& m) noexcept {
+	constexpr Word kEnd = ~0;
+	assert(m.value() == Section(n));
+	auto slot_cnt = m.value() * 3;
 	source.Reset();
 	memset(g.nodes, ~0, slot_cnt*sizeof(Word));
-	memset(g.sizes, 0, slot_cnt);
 	for (uint32_t i = 0; i < n; i++) {
 		auto key = source.Read();
 		if (!key) {
-			return -1;
+			return false;
 		}
 		auto code = Hash128(key.data(), key.size(), seed);
 		uint32_t slots[3] = {
 				code.u32[0] % m,
-				code.u32[1] % m + m,
-				code.u32[2] % m + m * 2,
+				code.u32[1] % m + m.value(),
+				code.u32[2] % m + m.value() * 2,
 		};
 		auto& edge = g.edges[i];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
 			v.slot = slots[j];
+			v.prev = kEnd;
 			v.next = g.nodes[v.slot];
 			g.nodes[v.slot] = i;
-			if (++g.sizes[v.slot] > 50) {
-				return 1;
+			if (v.next != kEnd) {
+				g.edges[v.next][j].prev = i;
 			}
 		}
 	}
-
-	return 0;
+	return true;
 }
 
 template <typename Word>
 static bool TearGraph(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book) noexcept {
-	constexpr Word END = ~0;
+	constexpr Word kEnd = ~0;
 	memset(book, 0, (n+7)/8);
 	uint32_t tail = 0;
 	for (uint32_t i = n; i > 0;) {
 		auto &edge = g.edges[--i];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
-			if (g.sizes[v.slot] == 1 && TestAndSetBit(book, i)) {
-				assert(g.nodes[v.slot] == i);
+			if (v.prev == kEnd && v.next == kEnd
+				&& TestAndSetBit(book, i)) {
 				free[tail++] = i;
 			}
 		}
@@ -202,17 +289,19 @@ static bool TearGraph(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book) no
 		auto curr = free[head];
 		auto& edge = g.edges[curr];
 		for (unsigned j = 0; j < 3; j++) {
-			auto& v = edge[j];
-			auto p = &g.nodes[v.slot];
-			while (*p != curr) {
-				assert(*p != END);
-				p = &g.edges[*p][j].next;
+			auto& v = edge[j];	// may be last one
+			Word i = kEnd;
+			if (v.prev != kEnd) {
+				i = v.prev;
+				g.edges[i][j].next = v.next;
 			}
-			*p = v.next;
-			v.next = END;
-			auto i = g.nodes[v.slot];
-			auto& size = g.sizes[v.slot];
-			if (--size == 1 && TestAndSetBit(book, i)) {
+			if (v.next != kEnd) {
+				i = v.next;
+				g.edges[i][j].prev = v.prev;
+			}
+			auto& u = g.edges[i][j];
+			if (i != kEnd && u.prev == kEnd && u.next == kEnd
+				&& TestAndSetBit(book, i)) {
 				free[tail++] = i;
 			}
 		}
@@ -248,23 +337,6 @@ static void Mapping(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book, uint
 			assert(false);
 		}
 	}
-}
-
-template <typename Word>
-static int Build(KeyReader& source, uint32_t n, uint32_t seed,
-				  Graph<Word>& g, Word free[], uint8_t* book, uint8_t* bitmap) noexcept {
-#ifndef NDEBUG
-	printf("try with seed %08x\n", seed);
-#endif
-	auto ret = CreateGraph(source, seed, g, n);
-	if (ret != 0) {
-		return ret;
-	}
-	if (!TearGraph(g, n,free, book)) {
-		return 1;
-	}
-	Mapping(g, n,free, book, bitmap);
-	return 0;
 }
 
 static inline bool operator==(const V128& a, const V128& b) noexcept {
@@ -328,9 +400,12 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	if (bmsz > 8) {
 	  bytes += (bmsz/8) * sizeof(Word);
 	}
-	std::unique_ptr<uint8_t[]> out(new uint8_t[bytes]);
-	auto header = reinterpret_cast<Header*>(out.get());
-	auto bitmap = out.get() + sizeof(Header);
+	std::unique_ptr<uint8_t[]> out(new uint8_t[bytes+sizeof(Divisor)]);
+	auto& divisor = *reinterpret_cast<Divisor*>(out.get());
+	divisor = section;
+	auto data = out.get() + sizeof(Divisor);
+	auto header = reinterpret_cast<Header*>(data);
+	auto bitmap = data + sizeof(Header);
 	auto table = reinterpret_cast<Word*>(bitmap + bmsz);
 	header->size = total;
 
@@ -338,7 +413,7 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 
 	auto tmp_sz = sizeof(Edge<Word>)*total;
 	tmp_sz += sizeof(Word)*total;
-	tmp_sz += sizeof(Word)*slot_cnt + slot_cnt;
+	tmp_sz += sizeof(Word)*slot_cnt;
 	tmp_sz += (slot_cnt+7)/8;
 	std::unique_ptr<uint8_t[]> temp(new uint8_t[tmp_sz]);
 
@@ -350,24 +425,31 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	pt += sizeof(Word)*total;
 	graph.nodes = reinterpret_cast<Word*>(pt);
 	pt += sizeof(Word)*slot_cnt;
-	graph.sizes = pt;
-	pt += slot_cnt;
 	auto book = pt;
 
 	constexpr unsigned FIRST_TRIES = sizeof(Word) == 1? 8U : 4U;
 	constexpr unsigned SECOND_TRIES = sizeof(Word) == 1? 32U : 12U;
 
+	auto build = [&source, n = header->size, &graph,
+				  free, book, bitmap, &divisor](uint32_t seed)->bool {
+#ifndef NDEBUG
+			printf("try with seed %08x\n", seed);
+#endif
+		if (!CreateGraph(source, seed, graph, n, divisor)
+			|| !TearGraph(graph, n, free, book)) {
+			return false;
+		}
+		Mapping(graph, n, free, book, bitmap);
+		return true;
+	};
+
 	XorShift rand32(GetSeed());
 	for (unsigned i = 0; i < FIRST_TRIES; i++) {
 		header->seed = rand32.Next();
-		auto ret = Build(source, header->size, header->seed, graph, free, book, bitmap);
-		if (ret == 0) {
+		if (build(header->seed)) {
 			goto L_done;
-		} else if (ret < 0) {
-			return nullptr;
 		}
 	}
-
 	if (!no_check) {
 		V128* space = nullptr;
 		if (tmp_sz / sizeof(V128) > header->size*2U) {
@@ -377,14 +459,10 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 			return nullptr;
 		}
 	}
-
 	for (unsigned i = 0; i < SECOND_TRIES; i++) {
 		header->seed = rand32.Next();
-		auto ret = Build(source, header->size, header->seed, graph, free, book, bitmap);
-		if (ret == 0) {
+		if (build(header->seed)) {
 			goto L_done;
-		} else if (ret < 0) {
-			return nullptr;
 		}
 	}
 	return nullptr;
@@ -402,8 +480,8 @@ L_done:
 	return out;
 }
 
-PerfectHash PerfectHash::Build(KeyReader& source, bool no_check) {
-	PerfectHash out;
+PerfectHashObject PerfectHashObject::Build(KeyReader& source, bool no_check) {
+	PerfectHashObject out;
 	auto total = source.Total();
 	if (total >= (1U << 28U)) {
 		return out;
@@ -415,15 +493,16 @@ PerfectHash PerfectHash::Build(KeyReader& source, bool no_check) {
 	} else if (total > 1) {
 		out.buffer_ = ::protocache::Build<uint8_t>(source, out.data_size_, no_check);
 	} else {
-		out.buffer_.reset(new uint8_t[4]);
-		*reinterpret_cast<uint32_t*>(out.buffer_.get()) = total;
+		out.buffer_.reset(new uint8_t[4+sizeof(Divisor)]);
+		*reinterpret_cast<Divisor*>(out.buffer_.get()) = 0;
+		*reinterpret_cast<uint32_t*>(out.buffer_.get()+sizeof(Divisor)) = total;
 		out.data_size_ = 4;
 	}
 	if (out.buffer_ != nullptr) {
-		out.data_ = out.buffer_.get();
+		out.data_ = out.buffer_.get()+sizeof(Divisor);
 	}
 	if (out.data_size_ > sizeof(Header)) {
-		auto header = reinterpret_cast<const Header*>(out.buffer_.get());
+		auto header = reinterpret_cast<const Header*>(out.buffer_.get()+sizeof(Divisor));
 		out.section_ = Section(header->size);
 	}
 	return out;

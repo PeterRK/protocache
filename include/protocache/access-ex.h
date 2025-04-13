@@ -325,7 +325,7 @@ public:
 			memo.push_back(&p);
 		}
 		MapKeyReader<KeyEX,ValEX> reader(memo);
-		auto index = PerfectHash::Build(reader, true);
+		auto index = PerfectHashObject::Build(reader, true);
 		if (!index) {
 			return false;
 		}

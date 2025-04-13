@@ -35,7 +35,7 @@ static void DoTest(unsigned size) {
 	}
 	StrKeyReader reader(keys);
 
-	auto table = protocache::PerfectHash::Build(reader);
+	auto table = protocache::PerfectHashObject::Build(reader);
 	ASSERT_FALSE(!table);
 
 	std::vector<bool> mark(keys.size());

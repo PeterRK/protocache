@@ -28,53 +28,34 @@ public:
 		return data_ == nullptr;
 	}
 	PerfectHash() noexcept = default;
-	PerfectHash(const PerfectHash& other) : section_(other.section_), data_size_(other.data_size_) {
-		if (buffer_ == nullptr) {
-			data_ = other.data_;
-		} else {
-			buffer_.reset(new uint8_t[data_size_]);
-			memcpy(buffer_.get(), other.buffer_.get(), data_size_);
-			data_ = buffer_.get();
-		}
-	}
-	PerfectHash(PerfectHash&& other) noexcept :
-			section_(other.section_), data_size_(other.data_size_),
-			data_(other.data_), buffer_(std::move(other.buffer_)) {
-		other.section_ = 0;
-		other.data_size_ = 0;
-		other.data_ = nullptr;
-	}
-
-	PerfectHash& operator=(const PerfectHash& other) {
-		if (&other != this) {
-			this->~PerfectHash();
-			new(this)PerfectHash(other);
-		}
-		return *this;
-	}
-	PerfectHash& operator=(PerfectHash&& other) noexcept {
-		if (&other != this) {
-			this->~PerfectHash();
-			new(this)PerfectHash(std::move(other));
-		}
-		return *this;
-	}
-	PerfectHash(const uint8_t* data, uint32_t size=0) noexcept;
+	explicit PerfectHash(const uint8_t* data, uint32_t size=0) noexcept;
 
 	Slice<uint8_t> Data() const noexcept {
 		return {data_, data_size_};
 	}
-
 	uint32_t Size() const noexcept;
+
 	uint32_t Locate(const uint8_t* key, unsigned key_len) const noexcept;
 
-	static PerfectHash Build(KeyReader& source, bool no_check=false);
-
-private:
+protected:
 	uint32_t section_ = 0;
 	uint32_t data_size_ = 0;
 	const uint8_t* data_ = nullptr;
+
+	uint32_t Locate(uint32_t slots[]) const noexcept;
+};
+
+class PerfectHashObject final : public PerfectHash {
+public:
+	PerfectHashObject(PerfectHashObject&&) = default;
+	PerfectHashObject& operator=(PerfectHashObject&&) = default;
+
+	uint32_t Locate(const uint8_t* key, unsigned key_len) const noexcept;
+
+	static PerfectHashObject Build(KeyReader& source, bool no_check=false);
+private:
 	std::unique_ptr<uint8_t[]> buffer_;
+	PerfectHashObject() noexcept = default;
 };
 
 } //protocache
