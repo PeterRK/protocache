@@ -669,7 +669,7 @@ static std::string GenMessageEX(const std::string& ns, const ::google::protobuf:
 		<< "\t\tif (clean_head != nullptr) {\n"
 		<< "\t\t\treturn protocache::Copy(Detect(clean_head, end), buf, unit);\n"
 		<< "\t\t}\n"
-		<< "\t\tstd::vector<protocache::Unit> parts(" << max_id << ", {0,0});\n"
+		<< "\t\tstd::vector<protocache::Unit> parts(" << max_id << ");\n"
 		<< "\t\tauto last = buf.Size();\n";
 
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {

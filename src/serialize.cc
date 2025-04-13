@@ -4,9 +4,11 @@
 
 #include <cstring>
 #include <vector>
-#include <string>
 #include "protocache/perfect_hash.h"
 #include "protocache/serialize.h"
+#if defined(__i386__) || defined(__x86_64__)
+#include <immintrin.h>
+#endif
 
 namespace protocache {
 
@@ -92,14 +94,31 @@ static inline void Pick(Unit& unit, Buffer& buf, uint32_t*& tail, unsigned m) {
 	}
 	if (unit.seg.len <= m) {
 		unit.len = unit.seg.len;
-		auto src = buf.AtSize(unit.seg.pos);
+		auto src = buf.At(unit.seg.pos);
 		for (unsigned j = 0; j < unit.len; j++) {
 			unit.data[j] = src[j];
 		}
 	} else {	// move
-		auto src = buf.AtSize(unit.seg.end());
+		auto src = buf.At(unit.seg.end());
 		if (tail > src) {
-			for (unsigned j = 0; j < unit.seg.len; j++) {
+			auto head = tail - unit.seg.len;
+#ifdef __AVX__
+//			while (tail >= head + 8) {
+//				tail -= 8;
+//				src -= 8;
+//				auto v = _mm256_lddqu_si256(reinterpret_cast<__m256i const*>(src));
+//				_mm256_storeu_si256(reinterpret_cast<__m256i*>(tail), v);
+//			}
+#endif	// SSE is fast enough
+#ifdef __SSE3__
+			while (tail >= head + 4) {
+				tail -= 4;
+				src -= 4;
+				auto v = _mm_lddqu_si128(reinterpret_cast<__m128i const*>(src));
+				_mm_storeu_si128(reinterpret_cast<__m128i*>(tail), v);
+			}
+#endif
+			while (tail != head) {
 				*--tail = *--src;
 			}
 			unit.seg.pos -= tail - src;
@@ -140,7 +159,7 @@ bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit&
 		return false;
 	}
 
-	auto tail = buf.AtSize(last);
+	auto tail = buf.At(last);
 	for (int i = static_cast<int>(elements.size())-1; i >= 0; i--) {
 		Pick(elements[i], buf, tail, m);
 	}
@@ -175,7 +194,7 @@ bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
 		return false;
 	}
 
-	auto tail = buf.AtSize(last);
+	auto tail = buf.At(last);
 	for (int i = static_cast<int>(keys.size())-1; i >= 0; i--) {
 		Pick(values[i], buf, tail, m2);
 		Pick(keys[i], buf, tail, m1);
@@ -197,7 +216,7 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	if (fields.empty()) {
 		return false;
 	}
-	auto tail = buf.AtSize(last);
+	auto tail = buf.At(last);
 	size_t size = 0;
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
 		auto& field = fields[i];

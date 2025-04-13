@@ -30,7 +30,7 @@ struct Any final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(2, {0,0});
+		std::vector<protocache::Unit> parts(2);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		if (!__view__.SerializeField(_::type_url, end, _type_url, buf, parts[_::type_url])) return false;

@@ -101,12 +101,6 @@ static inline bool Decompress(const std::string& src, std::string* out) {
 
 class Buffer final {
 public:
-	struct Seg {
-		size_t pos;
-		size_t len;
-		size_t end() const noexcept { return pos-len; }
-	};
-
 	Buffer() = default;
 	Buffer(const Buffer&) = delete;
 	Buffer(Buffer &&other) noexcept:
@@ -129,7 +123,7 @@ public:
 	size_t Size() const noexcept {
 		return size_ - off_;
 	}
-	uint32_t* AtSize(size_t size) noexcept {
+	uint32_t* At(size_t size) noexcept {
 		return data_.get() + size_ - size;
 	}
 	uint32_t* Head() const noexcept {

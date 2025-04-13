@@ -33,7 +33,7 @@ struct Small final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(4, {0,0});
+		std::vector<protocache::Unit> parts(4);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::str, end, _str, buf, parts[_::str])) return false;
 		if (!__view__.SerializeField(_::flag, end, _flag, buf, parts[_::flag])) return false;
@@ -88,7 +88,7 @@ struct Main final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(30, {0,0});
+		std::vector<protocache::Unit> parts(30);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::arrays, end, _arrays, buf, parts[_::arrays])) return false;
 		if (!__view__.SerializeField(_::vector, end, _vector, buf, parts[_::vector])) return false;
@@ -208,7 +208,7 @@ struct CyclicA final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(2, {0,0});
+		std::vector<protocache::Unit> parts(2);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::cyclic, end, _cyclic, buf, parts[_::cyclic])) return false;
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
@@ -244,7 +244,7 @@ struct CyclicB final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(2, {0,0});
+		std::vector<protocache::Unit> parts(2);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::cyclic, end, _cyclic, buf, parts[_::cyclic])) return false;
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
@@ -283,7 +283,7 @@ struct Deprecated final {
 			if (clean_head != nullptr) {
 				return protocache::Copy(Detect(clean_head, end), buf, unit);
 			}
-			std::vector<protocache::Unit> parts(1, {0,0});
+			std::vector<protocache::Unit> parts(1);
 			auto last = buf.Size();
 			if (!__view__.SerializeField(_::val, end, _val, buf, parts[_::val])) return false;
 			return protocache::SerializeMessage(parts, buf, last, unit);

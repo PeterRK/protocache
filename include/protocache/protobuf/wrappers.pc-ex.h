@@ -38,7 +38,7 @@ struct DoubleValue final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -71,7 +71,7 @@ struct FloatValue final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -104,7 +104,7 @@ struct Int64Value final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -137,7 +137,7 @@ struct UInt64Value final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -170,7 +170,7 @@ struct Int32Value final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -203,7 +203,7 @@ struct UInt32Value final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -236,7 +236,7 @@ struct BoolValue final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -269,7 +269,7 @@ struct StringValue final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);
@@ -302,7 +302,7 @@ struct BytesValue final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(1, {0,0});
+		std::vector<protocache::Unit> parts(1);
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::value, end, _value, buf, parts[_::value])) return false;
 		return protocache::SerializeMessage(parts, buf, last, unit);

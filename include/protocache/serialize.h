@@ -18,10 +18,16 @@
 namespace protocache {
 
 struct Unit {
+	struct Seg {
+		uint32_t pos;
+		uint32_t len;
+		uint32_t end() const noexcept { return pos-len; }
+	};
+
 	unsigned len = 0;
 	union {
 		uint32_t data[3];
-		Buffer::Seg seg = {0, 0};
+		Seg seg = {0, 0};
 	};
 	unsigned size() const noexcept {
 		if (len == 0) {
@@ -30,6 +36,14 @@ struct Unit {
 		return len;
 	}
 };
+
+static inline Unit Segment(size_t last, size_t now) {
+	Unit out;
+	out.len = 0;
+	out.seg.pos = now;
+	out.seg.len = now - last;
+	return out;
+}
 
 template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
 static inline bool Serialize(T v, Buffer& buf, Unit& unit) {
@@ -54,14 +68,6 @@ static inline bool Serialize(const Slice<bool>& data, Buffer& buf, Unit& unit) {
 }
 static inline bool Serialize(const std::string& str, Buffer& buf, Unit& unit) {
 	return Serialize(Slice<char>(str), buf, unit);
-}
-
-static inline Unit Segment(size_t last, size_t now) {
-	Unit out;
-	out.len = 0;
-	out.seg.pos = now;
-	out.seg.len = now - last;
-	return out;
 }
 
 extern bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit& unit);
