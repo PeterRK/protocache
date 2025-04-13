@@ -8,7 +8,6 @@ Alternative flat binary format for [Protobuf schema](https://protobuf.dev/progra
 | Decode + Traverse + Dealloc | 1941ns | 154ns | **83ns** |
 | Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns |
 | Compressed size | 566B | 571B | 856B |
-| Compression ratio | 0.99 | 0.73 | 0.66 |
 | Compress | 257ns | 401ns | 763ns |
 | Decompress | 107ns | 250ns | 561ns |
 
@@ -55,9 +54,9 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize | 542ns | 459 ~ 2375ns | 6738ns |
-| Decode + Traverse + Dealloc | 1941ns | 1134ns | 154ns |
-| Serialize (twitter.proto) | 214us | 182us | 538us |
+| Serialize | **542ns** | 459 ~ 2375ns | 6738ns |
+| Decode + Traverse + Dealloc | 1941ns | 1134ns | **154ns** |
+| Serialize (twitter.proto) | 214us | **182us** | 538us |
 
 Test full serialization with a complicated twitter.proto. Performance gap is smaller than that in simple case.
 
