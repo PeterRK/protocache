@@ -146,25 +146,9 @@ public:
 	uint32_t* Expand(size_t delta) {
 		if (off_ >= delta) {
 			off_ -= delta;
-			return Head();
+		} else {
+			DoExpand(delta);
 		}
-		if (data_ == nullptr) {
-			size_ = std::max(delta, 8UL);
-			data_.reset(new uint32_t[size_]);
-			off_ = size_ - delta;
-			return Head();
-		}
-		auto size = size_ * 2;
-		if (size_ >= 256*1024) {
-			size = size_ * 3 / 2;
-		}
-		size = std::max(size, size_+delta);
-		std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
-		auto off = size - Size();
-		memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
-		data_ = std::move(data);
-		size_ = size;
-		off_ = off - delta;
 		return Head();
 	}
 
@@ -174,21 +158,18 @@ public:
 	}
 
 	void Reserve(size_t size) {
-		if (size <= size_) {
-			return;
+		if (size > size_) {
+			DoReserve(size);
 		}
-		std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
-		auto off = size - Size();
-		memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
-		data_ = std::move(data);
-		size_ = size;
-		off_ = off;
 	}
 
 private:
 	std::unique_ptr<uint32_t[]> data_;
 	size_t size_ = 0;
 	size_t off_ = 0;
+
+	void DoExpand(size_t delta);
+	void DoReserve(size_t size);
 };
 
 } // protocache

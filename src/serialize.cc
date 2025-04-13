@@ -218,13 +218,18 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	}
 	auto tail = buf.At(last);
 	size_t size = 0;
+	unsigned body_size = 0;
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
 		auto& field = fields[i];
+		Pick(field, buf, tail, 3);
 		if (field.len == 0) {
-			size += field.seg.len;
-			Pick(field, buf, tail, 3);
+			if (field.seg.len != 0) {
+				size += field.seg.len;
+				body_size += 1;
+			}
 		} else {
 			size += field.len;
+			body_size += field.len;
 		}
 	}
 	if (size >= (1U<<30U)) {
@@ -244,20 +249,15 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	}
 
 	buf.Shrink(tail - buf.Head());
-	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
-		auto& field = fields[i];
-		if (field.len == 0) {
-			if (field.seg.len != 0) {
-				buf.Put(Offset(buf.Size() + 1 - field.seg.pos));
-			}
-		} else {
-			assert(field.len < 4);
-			auto cell = buf.Expand(field.len);
-			for (unsigned j = 0; j < field.len; j++) {
-				cell[j] = field.data[j];
-			}
+	auto body = buf.Expand(body_size);
+	auto pos = buf.Size();
+
+	auto copy = [&body, &pos](const Unit& field) {
+		for (unsigned j = 0; j < field.len; j++) {
+			*body++ = field.data[j];
 		}
-	}
+		pos -= field.len;
+	};
 
 	auto head = buf.Expand(1 + section*2);
 	*head = section;
@@ -268,11 +268,13 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 			if (field.seg.len != 0) {
 				*head |= 1U << (8U+i*2U);
 				cnt += 1;
+				*body++ = Offset((pos--) - field.seg.pos);
 			}
 		} else {
 			assert(field.len < 4);
 			*head |= field.len << (8U + i * 2U);
 			cnt += field.len;
+			copy(field);
 		}
 	}
 	auto blk = reinterpret_cast<uint64_t*>(head+1);
@@ -288,10 +290,12 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 				if (field.seg.len != 0) {
 					mark |= 1ULL << j;
 					cnt += 1;
+					*body++ = Offset((pos--) - field.seg.pos);
 				}
 			} else {
 				mark |= static_cast<uint64_t>(field.len) << j;
 				cnt += field.len;
+				copy(field);
 			}
 		}
 		*blk++ = mark;

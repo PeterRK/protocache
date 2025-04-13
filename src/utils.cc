@@ -165,4 +165,33 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 	return dest == tail;
 }
 
+void Buffer::DoExpand(size_t delta) {
+	if (data_ == nullptr) {
+		size_ = std::max(delta, 8UL);
+		data_.reset(new uint32_t[size_]);
+		off_ = size_ - delta;
+		return;
+	}
+	auto size = size_ * 2;
+	if (size_ >= 256*1024) {
+		size = size_ * 3 / 2;
+	}
+	size = std::max(size, size_+delta);
+	std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
+	auto off = size - Size();
+	memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
+	data_ = std::move(data);
+	size_ = size;
+	off_ = off - delta;
+}
+
+void Buffer::DoReserve(size_t size) {
+	std::unique_ptr<uint32_t[]> data(new uint32_t[size]);
+	auto off = size - Size();
+	memcpy(data.get()+off, data_.get()+off_, Size()*sizeof(uint32_t));
+	data_ = std::move(data);
+	size_ = size;
+	off_ = off;
+}
+
 } // protocache
