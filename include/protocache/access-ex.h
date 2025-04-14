@@ -461,7 +461,7 @@ public:
 		} else if (field == 0) {
 			return MarkNil(unit);
 		}
-		return ::protocache::Serialize(field, buf, unit) && Fold(buf, unit);
+		return ::protocache::Serialize(field, buf, unit);	// scalar is always folded
 	}
 
 	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
