@@ -72,7 +72,7 @@ ASSERT_TRUE(pool.Register(file));
 auto descriptor = pool.Find("test.Main");
 ASSERT_NE(descriptor, nullptr);
 ```
-The reflection apis are simliar to protobuf's. An example can be found in the [test](test/protocache.cc).
+The reflection apis are simliar to protobuf's. An example can be found in the [test](test/protocache.cc). If you don't need reflection including the basic serialize API, linking protocache-lite instead of protocache library to avoid dependency on protobuf may be a good idea.
 
 ## Other Implements
 | Language | Source |
