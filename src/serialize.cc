@@ -216,20 +216,18 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	if (fields.empty()) {
 		return false;
 	}
-	auto tail = buf.At(last);
+	//auto tail = buf.At(last);
 	size_t size = 0;
 	unsigned body_size = 0;
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
 		auto& field = fields[i];
 		//Pick(field, buf, tail, 3);
-		if (field.len == 0) {
-			if (field.seg.len != 0) {
-				size += field.seg.len;
-				body_size += 1;
-			}
-		} else {
+		if (field.len != 0) {
 			size += field.len;
 			body_size += field.len;
+		} else if (field.seg.len != 0) {
+			size += field.seg.len;
+			body_size += 1;
 		}
 	}
 	if (size >= (1U<<30U)) {
@@ -264,17 +262,15 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	uint32_t cnt = 0;
 	for (unsigned i = 0; i < std::min(12UL, fields.size()); i++) {
 		auto& field = fields[i];
-		if (field.len == 0) {
-			if (field.seg.len != 0) {
-				*head |= 1U << (8U+i*2U);
-				cnt += 1;
-				*body++ = Offset((pos--) - field.seg.pos);
-			}
-		} else {
+		if (field.len != 0) {
 			assert(field.len < 4);
 			*head |= field.len << (8U + i * 2U);
 			cnt += field.len;
 			copy(field);
+		} else if (field.seg.len != 0) {
+			*head |= 1U << (8U+i*2U);
+			cnt += 1;
+			*body++ = Offset((pos--) - field.seg.pos);
 		}
 	}
 	auto blk = reinterpret_cast<uint64_t*>(head+1);
@@ -286,16 +282,14 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 		auto mark = static_cast<uint64_t>(cnt) << 50U;
 		for (unsigned j = 0; i < next; j+=2) {
 			auto& field = fields[i++];
-			if (field.len == 0) {
-				if (field.seg.len != 0) {
-					mark |= 1ULL << j;
-					cnt += 1;
-					*body++ = Offset((pos--) - field.seg.pos);
-				}
-			} else {
+			if (field.len != 0) {
 				mark |= static_cast<uint64_t>(field.len) << j;
 				cnt += field.len;
 				copy(field);
+			} else if (field.seg.len != 0) {
+				mark |= 1ULL << j;
+				cnt += 1;
+				*body++ = Offset((pos--) - field.seg.pos);
 			}
 		}
 		*blk++ = mark;
