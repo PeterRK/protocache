@@ -412,15 +412,7 @@ private:
 	}
 
 	static bool Fold(Buffer& buf, Unit& unit) {
-		if (unit.len == 0 && unit.seg.len != 0 && unit.seg.len < 4) {
-			unit.len = unit.seg.len;
-			assert(unit.seg.pos == buf.Size());
-			auto src = buf.Head();
-			for (unsigned i = 0; i < unit.len; i++) {
-				unit.data[i] = src[i];
-			}
-			buf.Shrink(unit.len);
-		}
+		FoldField(buf, unit);
 		return true;
 	}
 

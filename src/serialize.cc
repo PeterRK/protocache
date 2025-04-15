@@ -221,7 +221,7 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	unsigned body_size = 0;
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
 		auto& field = fields[i];
-		Pick(field, buf, tail, 3);
+		//Pick(field, buf, tail, 3);
 		if (field.len == 0) {
 			if (field.seg.len != 0) {
 				size += field.seg.len;
@@ -248,7 +248,7 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 		return false;
 	}
 
-	buf.Shrink(tail - buf.Head());
+	//buf.Shrink(tail - buf.Head());
 	auto body = buf.Expand(body_size);
 	auto pos = buf.Size();
 

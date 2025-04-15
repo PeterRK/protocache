@@ -16,15 +16,39 @@
 
 namespace protocache {
 
-bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit);
+bool Serialize(const google::protobuf::Message& message, Buffer& buf_, Unit& unit);
+
+class SerializeContext final {
+public:
+	explicit SerializeContext(Buffer& buf) : buf_(buf) {}
+
+	bool Serialize(const google::protobuf::Message& message, Unit& unit);
+
+private:
+	std::string tmp_str_;
+	Buffer& buf_;
+
+	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	bool SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit);
+
+	bool SerializeField(const google::protobuf::Message& message,
+						const google::protobuf::FieldDescriptor* field, Unit& unit);
+
+	bool SerializeArrayField(const google::protobuf::Message& message,
+							 const google::protobuf::FieldDescriptor* field, Unit& unit);
+
+	bool SerializeMapField(const google::protobuf::Message& message,
+						   const google::protobuf::FieldDescriptor* field, Unit& unit);
+};
 
 bool Serialize(const google::protobuf::Message& message, Buffer* buf) {
 	Unit dummy;
-	return Serialize(message, *buf,dummy);
+	SerializeContext ctx(*buf);
+	return ctx.Serialize(message, dummy);
 }
 
-template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
-static bool SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Buffer& buf, Unit& unit) {
+template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type>
+bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit) {
 	static_assert(sizeof(T) == 4 || sizeof(T) == 8, "");
 	constexpr unsigned m = sizeof(T) / 4;
 	if (array.size() == 0) {
@@ -34,19 +58,19 @@ static bool SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, B
 	} else if (m*array.size() >= (1U << 30U)) {
 		return false;
 	}
-	auto last = buf.Size();
+	auto last = buf_.Size();
 	for (int i = array.size()-1; i >= 0; i--) {
-		*reinterpret_cast<T*>(buf.Expand(m)) = array.Get(i);
+		*reinterpret_cast<T*>(buf_.Expand(m)) = array.Get(i);
 	}
-	buf.Put((array.size() << 2U) | m);
-	unit = Segment(last, buf.Size());
+	buf_.Put((array.size() << 2U) | m);
+	unit = Segment(last, buf_.Size());
 	return true;
 }
 
-static bool SerializeArrayField(const google::protobuf::Message& message,
-								const google::protobuf::FieldDescriptor* field, Buffer& buf, Unit& unit) {
+bool SerializeContext::SerializeArrayField(const google::protobuf::Message& message,
+										   const google::protobuf::FieldDescriptor* field, Unit& unit) {
 	assert(field->is_repeated());
-	auto last = buf.Size();
+	auto last = buf_.Size();
 	auto reflection = message.GetReflection();
 	switch (field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE:
@@ -54,43 +78,44 @@ static bool SerializeArrayField(const google::protobuf::Message& message,
 			auto n = reflection->FieldSize(message, field);
 			std::vector<Unit> elements(n);
 			for (int i = n-1; i >= 0; i--) {
-				if (!Serialize(reflection->GetRepeatedMessage(message, field, i), buf, elements[i])) {
+				if (!Serialize(reflection->GetRepeatedMessage(message, field, i), elements[i])) {
 					return false;
 				}
 			}
-			return SerializeArray(elements, buf, last, unit);
+			return ::protocache::SerializeArray(elements, buf_, last, unit);
 		}
 		case google::protobuf::FieldDescriptor::Type::TYPE_BYTES:
 		case google::protobuf::FieldDescriptor::Type::TYPE_STRING:
 		{
 			auto n = reflection->FieldSize(message, field);
 			std::vector<Unit> elements(n);
-			std::string tmp;
 			for (int i = n-1; i >= 0; i--) {
-				if (!Serialize(reflection->GetRepeatedStringReference(message, field, i, &tmp), buf, elements[i])) {
+				if (!::protocache::Serialize(
+						reflection->GetRepeatedStringReference(message, field, i, &tmp_str_),
+						buf_, elements[i])) {
 					return false;
 				}
 			}
-			return SerializeArray(elements, buf, last, unit);
+			return ::protocache::SerializeArray(elements, buf_, last, unit);
 		}
 		case google::protobuf::FieldDescriptor::Type::TYPE_DOUBLE:
-			return SerializeArray(reflection->GetRepeatedFieldRef<double>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<double>(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FLOAT:
-			return SerializeArray(reflection->GetRepeatedFieldRef<float>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<float>(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			return SerializeArray(reflection->GetRepeatedFieldRef<uint64_t>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<uint64_t>(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			return SerializeArray(reflection->GetRepeatedFieldRef<uint32_t>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<uint32_t>(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			return SerializeArray(reflection->GetRepeatedFieldRef<int64_t>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<int64_t>(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			return SerializeArray(reflection->GetRepeatedFieldRef<int32_t>(message, field), buf, unit);
+			return SerializeArray(reflection->GetRepeatedFieldRef<int32_t>(message, field), unit);
 
 		case google::protobuf::FieldDescriptor::Type::TYPE_BOOL:
 		{
@@ -99,7 +124,7 @@ static bool SerializeArrayField(const google::protobuf::Message& message,
 			for (int i = 0; i < n; i++) {
 				tmp[i] = reflection->GetRepeatedBool(message, field, i);
 			}
-			return Serialize(Slice<bool>(tmp), buf, unit);
+			return ::protocache::Serialize(Slice<bool>(tmp), buf_, unit);
 		}
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
 		{
@@ -108,10 +133,10 @@ static bool SerializeArrayField(const google::protobuf::Message& message,
 				return false;
 			}
 			for (int i = n-1; i >= 0; i--) {
-				*reinterpret_cast<int32_t *>(buf.Expand(1)) = reflection->GetRepeatedEnumValue(message, field, i);
+				*reinterpret_cast<int32_t *>(buf_.Expand(1)) = reflection->GetRepeatedEnumValue(message, field, i);
 			}
-			buf.Put((static_cast<uint32_t>(n) << 2U) | 1U);
-			unit = Segment(last, buf.Size());
+			buf_.Put((static_cast<uint32_t>(n) << 2U) | 1U);
+			unit = Segment(last, buf_.Size());
 			return true;
 		}
 		default:
@@ -119,37 +144,37 @@ static bool SerializeArrayField(const google::protobuf::Message& message,
 	}
 }
 
-static bool SerializeField(const google::protobuf::Message& message,
-						   const google::protobuf::FieldDescriptor* field, Buffer& buf, Unit& unit) {
+bool SerializeContext::SerializeField(const google::protobuf::Message& message,
+									  const google::protobuf::FieldDescriptor* field, Unit& unit) {
 	auto reflection = message.GetReflection();
 	switch (field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE:
-			return Serialize(reflection->GetMessage(message, field), buf, unit);
+			return Serialize(reflection->GetMessage(message, field), unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_BYTES:
 		case google::protobuf::FieldDescriptor::Type::TYPE_STRING:
-			return Serialize(reflection->GetString(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetStringReference(message, field, &tmp_str_), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_DOUBLE:
-			return Serialize(reflection->GetDouble(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetDouble(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FLOAT:
-			return Serialize(reflection->GetFloat(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetFloat(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			return Serialize(reflection->GetUInt64(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetUInt64(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			return Serialize(reflection->GetUInt32(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetUInt32(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			return Serialize(reflection->GetInt64(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetInt64(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			return Serialize(reflection->GetInt32(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetInt32(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_BOOL:
-			return Serialize(reflection->GetBool(message, field), buf, unit);
+			return ::protocache::Serialize(reflection->GetBool(message, field), buf_, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
-			return Serialize(static_cast<int32_t>(reflection->GetEnumValue(message, field)), buf, unit);
+			return ::protocache::Serialize(static_cast<int32_t>(reflection->GetEnumValue(message, field)), buf_, unit);
 		default:
 			return false;
 	}
@@ -203,8 +228,8 @@ private:
 	size_t idx_ = 0;
 };
 
-static bool SerializeMapField(const google::protobuf::Message& message,
-							  const google::protobuf::FieldDescriptor* field, Buffer& buf, Unit& unit) {
+bool SerializeContext::SerializeMapField(const google::protobuf::Message& message,
+										 const google::protobuf::FieldDescriptor* field, Unit& unit) {
 	assert(field->is_map());
 	auto key_field = field->message_type()->field(0);
 	auto value_field = field->message_type()->field(1);
@@ -259,19 +284,19 @@ static bool SerializeMapField(const google::protobuf::Message& message,
 		book[pos] = i;
 	}
 
-	auto last = buf.Size();
+	auto last = buf_.Size();
 	std::vector<Unit> keys(book.size());
 	std::vector<Unit> values(book.size());
 	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
 	for (int i = static_cast<int>(book.size())-1; i >= 0; i--) {
 		auto& pair = pairs.Get(book[i], tmp.get());
-		SerializeField(pair, value_field, buf, values[i]);
-		SerializeField(pair, key_field, buf, keys[i]);
+		SerializeField(pair, value_field, values[i]);
+		SerializeField(pair, key_field, keys[i]);
 	}
-	return SerializeMap(index.Data(), keys, values, buf, last, unit);
+	return SerializeMap(index.Data(), keys, values, buf_, last, unit);
 }
 
-bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit) {
+bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit& unit) {
 	auto descriptor = message.GetDescriptor();
 	auto field_count = descriptor->field_count();
 	if (field_count <= 0) {
@@ -301,7 +326,15 @@ bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit
 		fields[j] = field;
 	}
 
-	auto last = buf.Size();
+	bool alias = false;
+	if (fields.size() == 1 && fields.front()->name() == "_") {
+		if (!fields.front()->is_repeated()) {
+			return false;
+		}
+		alias = true;
+	}
+
+	auto last = buf_.Size();
 	std::vector<Unit> parts(fields.size());
 	auto reflection = message.GetReflection();
 	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
@@ -316,11 +349,11 @@ bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit
 				continue;
 			}
 			if (field->is_map()) {
-				if (!SerializeMapField(message, field, buf, part)) {
+				if (!SerializeMapField(message, field, part)) {
 					return false;
 				}
 			} else {
-				if (!SerializeArrayField(message, field, buf, part)) {
+				if (!SerializeArrayField(message, field, part)) {
 					return false;
 				}
 			}
@@ -328,25 +361,26 @@ bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit
 			if (!reflection->HasField(message, field)) {
 				continue;
 			}
-			if (!SerializeField(message, field, buf, part)) {
+			if (!SerializeField(message, field, part)) {
 				return false;
 			} else if (part.size() == 1 &&
 				field->type() == google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE) {
 				// skip empty message field
 				if (part.len == 0) {
 					part.seg.len = 0;
-					buf.Shrink(1);
+					buf_.Shrink(1);
 				} else {
 					part.len = 0;
 				}
 			}
 		}
+
+		if (!alias) {
+			FoldField(buf_, part);
+		}
 	}
 
-	if (fields.size() == 1 && fields.front()->name() == "_") {
-		if (!fields.front()->is_repeated()) {
-			return false;
-		}
+	if (alias) {
 		unit = parts.front();	// trim message wrapper
 		assert(unit.len == 0);
 		if (unit.seg.len == 0) {
@@ -359,7 +393,7 @@ bool Serialize(const google::protobuf::Message& message, Buffer& buf, Unit& unit
 		}
 		return true;
 	}
-	return SerializeMessage(parts, buf, last, unit);
+	return ::protocache::SerializeMessage(parts, buf_, last, unit);
 }
 
 } // protocache

@@ -45,6 +45,18 @@ static inline Unit Segment(size_t last, size_t now) {
 	return out;
 }
 
+static void FoldField(Buffer& buf, Unit& unit) {
+	if (unit.len == 0 && unit.seg.len != 0 && unit.seg.len < 4) {
+		unit.len = unit.seg.len;
+		assert(unit.seg.pos == buf.Size());
+		auto src = buf.Head();
+		for (unsigned i = 0; i < unit.len; i++) {
+			unit.data[i] = src[i];
+		}
+		buf.Shrink(unit.len);
+	}
+}
+
 template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
 static inline bool Serialize(T v, Buffer& buf, Unit& unit) {
 	unit.len = sizeof(T)/sizeof(uint32_t);
