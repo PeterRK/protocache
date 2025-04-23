@@ -219,10 +219,10 @@ TEST(PtotoCache, Alias) {
 	protocache::Buffer buffer;
 	ASSERT_TRUE(SerializeByProtobuf("test-alias.json", buffer));
 	auto data = buffer.View();
-	ASSERT_EQ(data.size(), 12);
-	ASSERT_EQ(data[4], 0xd);
-	ASSERT_EQ(data[5], 1);
+	ASSERT_EQ(data.size(), 17);
+	ASSERT_EQ(data[5], 0xd);
 	ASSERT_EQ(data[6], 1);
+	ASSERT_EQ(data[7], 1);
 }
 
 TEST(PtotoCache, Reflection) {

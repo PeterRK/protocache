@@ -63,6 +63,7 @@ message Main {
 	Vec2D matrix = 28;
 	repeated ArrMap vector = 29;
 	ArrMap arrays = 30;
+	repeated Mode modev = 32;
 }
 
 message CyclicA {

@@ -88,8 +88,9 @@ struct Main final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(30);
+		std::vector<protocache::Unit> parts(32);
 		auto last = buf.Size();
+		if (!__view__.SerializeField(_::modev, end, _modev, buf, parts[_::modev])) return false;
 		if (!__view__.SerializeField(_::arrays, end, _arrays, buf, parts[_::arrays])) return false;
 		if (!__view__.SerializeField(_::vector, end, _vector, buf, parts[_::vector])) return false;
 		if (!__view__.SerializeField(_::matrix, end, _matrix, buf, parts[_::matrix])) return false;
@@ -153,10 +154,11 @@ struct Main final {
 	::ex::test::Vec2D::ALIAS& matrix(const uint32_t* end=nullptr) { return __view__.GetField(_::matrix, end, _matrix); }
 	protocache::ArrayEX<::ex::test::ArrMap::ALIAS>& vector(const uint32_t* end=nullptr) { return __view__.GetField(_::vector, end, _vector); }
 	::ex::test::ArrMap::ALIAS& arrays(const uint32_t* end=nullptr) { return __view__.GetField(_::arrays, end, _arrays); }
+	protocache::ArrayEX<protocache::EnumValue>& modev(const uint32_t* end=nullptr) { return __view__.GetField(_::modev, end, _modev); }
 
 private:
 	using _ = ::test::Main::_;
-	protocache::MessageEX<30> __view__;
+	protocache::MessageEX<32> __view__;
 	int32_t _i32;
 	uint32_t _u32;
 	int64_t _i64;
@@ -187,6 +189,7 @@ private:
 	::ex::test::Vec2D::ALIAS _matrix;
 	protocache::ArrayEX<::ex::test::ArrMap::ALIAS> _vector;
 	::ex::test::ArrMap::ALIAS _arrays;
+	protocache::ArrayEX<protocache::EnumValue> _modev;
 };
 
 struct CyclicA final {

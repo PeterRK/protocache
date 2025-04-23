@@ -1,4 +1,5 @@
 {
+  "modev": ["MODE_A","MODE_B","MODE_C"],
   "matrix": {"_": [
     {},
     {"_": []},

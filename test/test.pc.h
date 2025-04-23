@@ -103,6 +103,7 @@ public:
 		static constexpr unsigned matrix = 27;
 		static constexpr unsigned vector = 28;
 		static constexpr unsigned arrays = 29;
+		static constexpr unsigned modev = 31;
 	};
 
 	bool operator!() const noexcept { return !protocache::Message::Cast(this); }
@@ -113,6 +114,8 @@ public:
 		if (!view) return {};
 		protocache::Message core(ptr, end);
 		protocache::Slice<uint32_t> t;
+		t = protocache::DetectField<protocache::ArrayT<protocache::EnumValue>>(core, _::modev, end);
+		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
 		t = protocache::DetectField<::test::ArrMap::ALIAS>(core, _::arrays, end);
 		if (t.end() > view.end()) return {view.data(), static_cast<size_t>(t.end()-view.data())};
 		t = protocache::DetectField<protocache::ArrayT<::test::ArrMap::ALIAS>>(core, _::vector, end);
@@ -237,6 +240,9 @@ public:
 	}
 	::test::ArrMap::ALIAS arrays(const uint32_t* end=nullptr) const noexcept {
 		return protocache::GetField<::test::ArrMap::ALIAS>(protocache::Message::Cast(this), _::arrays, end);
+	}
+	protocache::ArrayT<protocache::EnumValue> modev(const uint32_t* end=nullptr) const noexcept {
+		return protocache::GetField<protocache::ArrayT<protocache::EnumValue>>(protocache::Message::Cast(this), _::modev, end);
 	}
 };
 
