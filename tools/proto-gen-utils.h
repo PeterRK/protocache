@@ -68,6 +68,9 @@ static inline bool IsRepeated(const ::google::protobuf::FieldDescriptorProto& pr
 	return proto.label() == ::google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
 }
 
-static inline bool IsAlias(const ::google::protobuf::DescriptorProto& proto) {
+static inline bool IsAlias(const ::google::protobuf::DescriptorProto& proto, bool ext=false) {
+	if (ext) {
+		return proto.field_size() == 1 && (proto.field(0).name() == "_" || proto.field(0).name() == "_x_");
+	}
 	return proto.field_size() == 1 && proto.field(0).name() == "_";
 }

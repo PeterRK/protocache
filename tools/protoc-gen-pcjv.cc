@@ -38,7 +38,7 @@ static bool CollectAlias(const std::string& ns, const std::string& java_ns, cons
 			return false;
 		}
 	}
-	if (!IsAlias(proto)) {
+	if (!IsAlias(proto, true)) {
 		if (proto.field_size() == 1 && IsRepeated(proto.field(0))) {
 			std::cerr << fullname << " may be alias?" << std::endl;
 		}
@@ -194,7 +194,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	} else {
 		oss << "public final static class " << proto.name() << " extends ";
 	}
-	if (IsAlias(proto)) {
+	if (IsAlias(proto, true)) {
 		auto it = g_alias_book.find(fullname);
 		if (it == g_alias_book.end()) {
 			std::cerr << "alias lost: " << fullname << std::endl;
@@ -234,7 +234,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 
 	auto fields = FieldsInOrder(proto);
-	if (IsAlias(proto) || fields.empty()) {
+	if (IsAlias(proto, true) || fields.empty()) {
 		oss << "}\n";
 		return oss.str();
 	}
