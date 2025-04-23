@@ -241,27 +241,25 @@ template <typename Word>
 static bool CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32_t n, const Divisor& m) noexcept {
 	constexpr Word kEnd = ~0;
 	assert(m.value() == Section(n));
+	assert(m.value() <= kEnd && n <= kEnd);
 	auto slot_cnt = m.value() * 3;
 	source.Reset();
 	memset(g.nodes, ~0, slot_cnt*sizeof(Word));
+	uint32_t shift[3] = { 0, m.value(), m.value()*2 };
 	for (uint32_t i = 0; i < n; i++) {
 		auto key = source.Read();
 		if (!key) {
 			return false;
 		}
 		auto code = Hash128(key.data(), key.size(), seed);
-		uint32_t slots[3] = {
-				code.u32[0] % m,
-				code.u32[1] % m + m.value(),
-				code.u32[2] % m + m.value() * 2,
-		};
 		auto& edge = g.edges[i];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
-			v.slot = slots[j];
+			v.slot = code.u32[j] % m;
+			auto& head = g.nodes[v.slot + shift[j]];
 			v.prev = kEnd;
-			v.next = g.nodes[v.slot];
-			g.nodes[v.slot] = i;
+			v.next = head;
+			head = i;
 			if (v.next != kEnd) {
 				g.edges[v.next][j].prev = i;
 			}
@@ -313,14 +311,13 @@ template <typename Word>
 static void Mapping(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book, uint8_t* bitmap) noexcept {
 	auto m = Section(n);
 	memset(bitmap, ~0, BitmapSize(m));
-	m *= 3;
-	memset(book, 0, (m+7)/8);
+	memset(book, 0, (m*3+7)/8);
 	for (unsigned i = n; i > 0; ) {
 		auto idx = free[--i];
 		auto& edge = g.edges[idx];
-		auto a = edge[0].slot;
-		auto b = edge[1].slot;
-		auto c = edge[2].slot;
+		unsigned a = edge[0].slot;
+		unsigned b = edge[1].slot + m;
+		unsigned c = edge[2].slot + m*2;
 		if (TestAndSetBit(book, a)) {
 			SetBit(book, b);
 			SetBit(book, c);

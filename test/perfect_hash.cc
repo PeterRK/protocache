@@ -56,9 +56,11 @@ TEST(PerfectHash, Tiny) {
 
 TEST(PerfectHash, Small) {
 	DoTest(200);
+	DoTest(255);
 	DoTest(1000);
 }
 
 TEST(PerfectHash, Big) {
+	DoTest(65535);
 	DoTest(100000);
 }
