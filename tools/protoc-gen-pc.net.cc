@@ -246,7 +246,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				<< "\t}}\n";
 		} else if (primary) {
 			oss << "\tpublic " << raw_type << ' ' << ToPascal(field.name())
-				<< " { get { return _core_.Get" << boxed_type << "(_" << field.name() << "); } }\n";
+				<< " => _core_.Get" << boxed_type << "(_" << field.name() << ");\n";
 		} else {
 			oss << "\tprivate " << raw_type << "? " << field.name() << "_ = null;\n"
 				<< "\tpublic " << raw_type << ' ' << ToPascal(field.name()) << " { get {\n"
