@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cctype>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -73,4 +74,28 @@ static inline bool IsAlias(const ::google::protobuf::DescriptorProto& proto, boo
 		return proto.field_size() == 1 && (proto.field(0).name() == "_" || proto.field(0).name() == "_x_");
 	}
 	return proto.field_size() == 1 && proto.field(0).name() == "_";
+}
+
+static std::string ToPascal(const std::string& name) {
+	std::string out;
+	out.reserve(name.size());
+	bool word_end = true;
+	for (auto ch : name) {
+		if (ch == '_') {
+			word_end = true;
+			continue;
+		}
+		if (std::isalpha(ch)) {
+			if (word_end) {
+				out += std::toupper(ch);
+			} else {
+				out += ch;
+			}
+			word_end = false;
+		} else {
+			out += ch;
+			word_end = true;
+		}
+	}
+	return out;
 }

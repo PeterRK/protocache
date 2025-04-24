@@ -52,6 +52,9 @@ target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
 add_executable(protoc-gen-pcjv tools/protoc-gen-pcjv.cc)
 target_link_libraries(protoc-gen-pcjv protoc protobuf pthread)
 
+add_executable(protoc-gen-pc.net tools/protoc-gen-pc.net.cc)
+target_link_libraries(protoc-gen-pc.net protoc protobuf pthread)
+
 install(
     DIRECTORY "${CMAKE_SOURCE_DIR}/include/protocache"
     DESTINATION include
@@ -68,5 +71,5 @@ file(GLOB bench_src
     test/benchmark/*.cc
 )
 
-#add_executable(benchmark ${bench_src})
-#target_link_libraries(benchmark protocache protobuf flatbuffers pthread)
+add_executable(benchmark ${bench_src})
+target_link_libraries(benchmark protocache protobuf flatbuffers pthread)

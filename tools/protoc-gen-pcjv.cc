@@ -159,30 +159,6 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 	return out;
 }
 
-static std::string JavaFieldName(const std::string& name) {
-	std::string out;
-	out.reserve(name.size());
-	bool word_end = true;
-	for (auto ch : name) {
-		if (ch == '_') {
-			word_end = true;
-			continue;
-		}
-		if (std::isalpha(ch)) {
-			if (word_end) {
-				out += std::toupper(ch);
-			} else {
-				out += ch;
-			}
-			word_end = false;
-		} else {
-			out += ch;
-			word_end = true;
-		}
-	}
-	return out;
-}
-
 static std::string GenMessage(const std::string& ns, const ::google::protobuf::DescriptorProto& proto, const std::string* package = nullptr) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 
@@ -258,7 +234,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		if (IsRepeated(field)) {
 			oss << "\tprivate com.github.peterrk.protocache." << boxed_type << "Array _" << field.name() << " = null;\n"
 				<< "\tpublic com.github.peterrk.protocache." << boxed_type << "Array"
-				<< " get" << JavaFieldName(field.name()) << "() {\n"
+				<< " get" << ToPascal(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
 				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "Array(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
@@ -266,11 +242,11 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				<< "\t}\n";
 			to_clean.push_back(field.name());
 		} else if (primary) {
-			oss << "\tpublic " << raw_type << " get" << JavaFieldName(field.name())
+			oss << "\tpublic " << raw_type << " get" << ToPascal(field.name())
 				<< "() { return get" << boxed_type << "(FIELD_" << field.name() << "); }\n";
 		} else {
 			oss << "\tprivate " << raw_type << " _" << field.name() << " = null;\n"
-				<< "\tpublic " << raw_type << " get" << JavaFieldName(field.name()) << "() {\n"
+				<< "\tpublic " << raw_type << " get" << ToPascal(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
 				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
@@ -307,7 +283,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 					return {};
 				}
 				oss << "\tprivate " << java_type << " _" << one->name() << " = null;\n"
-					<< "\tpublic " << java_type << " get" << JavaFieldName(one->name()) << "() {\n"
+					<< "\tpublic " << java_type << " get" << ToPascal(one->name()) << "() {\n"
 					<< "\t\tif (_" << one->name() << " == null) {\n"
 					<< "\t\t\t_" << one->name() << " = getField(FIELD_" << one->name() << ", " << java_type << "::new);\n"
 					<< "\t\t}\n"
