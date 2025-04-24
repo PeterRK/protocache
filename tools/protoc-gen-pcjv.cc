@@ -75,10 +75,9 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto,
 		oss << "public final static class " << proto.name() << " {\n";
 	}
 	for (auto& value : proto.value()) {
-		if (value.options().deprecated()) {
-			continue;
+		if (!value.options().deprecated()) {
+			oss << "\tpublic static int " << value.name() << " = " << value.number() << ";\n";
 		}
-		oss << "\tpublic static int " << value.name() << " = " << value.number() << ";\n";
 	}
 	oss << "}\n";
 	return oss.str();
@@ -211,10 +210,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	oss << " {\n";
 
 	for (auto& one : proto.enum_type()) {
-		if (one.options().deprecated()) {
-			continue;
+		if (!one.options().deprecated()) {
+			oss << AddIndent(GenEnum(one));
 		}
-		oss << AddIndent(GenEnum(one));
 	}
 	std::unordered_map<std::string, const ::google::protobuf::DescriptorProto*> map_entries;
 	for (auto& one : proto.nested_type()) {
