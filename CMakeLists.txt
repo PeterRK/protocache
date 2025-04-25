@@ -71,5 +71,5 @@ file(GLOB bench_src
     test/benchmark/*.cc
 )
 
-add_executable(benchmark ${bench_src})
-target_link_libraries(benchmark protocache protobuf flatbuffers pthread)
+#add_executable(benchmark ${bench_src})
+#target_link_libraries(benchmark protocache protobuf flatbuffers pthread)

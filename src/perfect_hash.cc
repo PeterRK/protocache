@@ -58,23 +58,21 @@ public:
 		return *this;
 	}
 
-	uint32_t Div(uint32_t m) const noexcept {
-		uint32_t t = (fac_ * (uint64_t)m + tip_) >> 32;
-		return t >> sft_;
+	uint32_t div(uint32_t m) const noexcept {
+		return (fac_ * (uint64_t)m + tip_) >> (32 + sft_);
 	}
 
-	uint32_t Mod(uint32_t m) const noexcept {
-		uint32_t t = (fac_ * (uint64_t)m + tip_) >> 32;
-		return m - val_ * (t >> sft_);
+	uint32_t mod(uint32_t m) const noexcept {
+		return m - val_ * div(m);
 	}
 };
 
 static inline uint32_t operator/(uint32_t m, const Divisor& d) noexcept {
-	return d.Div(m);
+	return d.div(m);
 }
 
 static inline uint32_t operator%(uint32_t m, const Divisor& d) noexcept {
-	return d.Mod(m);
+	return d.mod(m);
 }
 
 static inline unsigned Bit2(const uint8_t* vec, size_t pos) noexcept {
