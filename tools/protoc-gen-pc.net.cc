@@ -129,22 +129,21 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 		if (key_type == nullptr) {
 			return {};
 		}
-		bool basic = false;
+		out.reserve(160);
+		out += key_type;
 		if (value_type == nullptr) {
 			value_type = BasicCsType(alias.value_type);
 			if (value_type == nullptr) {
 				return {};
 			}
-			basic = true;
+			out += "Dict<global::";
+			out += value_type;
+			out += "Value>";
+		} else {
+			out += "DictX<global::";
+			out += value_type;
+			out += '>';
 		}
-		out.reserve(160);
-		out += key_type;
-		out += "Dict<global::";
-		out += value_type;
-		if (basic) {
-			out += "Value";
-		}
-		out += '>';
 	}
 	return out;
 }
@@ -221,9 +220,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 	oss << "\n\tprivate global::ProtoCache.Message _core_;\n"
 		<< "\tpublic " << proto.name() << "() {}\n"
-		<< "\tpublic " << proto.name() << "(ReadOnlyMemory<byte> data) { Init(data); }\n"
-		<< "\tpublic bool HasField(int id) { return _core_.HasField(id); }\n"
-		<< "\tpublic override void Init(ReadOnlyMemory<byte> data) {\n"
+		<< "\tpublic " << proto.name() << "(byte[] data) => Init(new global::ProtoCache.DataView(data));\n"
+		<< "\tpublic bool HasField(int id) => _core_.HasField(id);\n"
+		<< "\tpublic override void Init(global::ProtoCache.DataView data) {\n"
 		<< "\t\t_core_.Init(data);\n";
 	for (auto one : fields) {
 		if (IsRepeated(*one)
