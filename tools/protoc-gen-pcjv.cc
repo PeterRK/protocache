@@ -221,9 +221,9 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		}
 		oss << "\tpublic static final int FIELD_" << one->name() << " = " << (one->number()-1) << ";\n";
 	}
-	oss << "\n\tpublic " << proto.name() << "(){}\n"
-		<< "\tpublic " << proto.name() << "(byte[] data){ this(data, 0); }\n"
-		<< "\tpublic " << proto.name() << "(byte[] data, int offset){ super(data, offset); }\n\n";
+	oss << "\n\tpublic " << proto.name() << "() {}\n"
+		<< "\tpublic " << proto.name() << "(byte[] data) { this(data, 0); }\n"
+		<< "\tpublic " << proto.name() << "(byte[] data, int offset) { super(data, offset); }\n\n";
 
 	std::vector<std::string> to_clean;
 	to_clean.reserve(proto.field_size());
