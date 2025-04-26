@@ -69,30 +69,30 @@ static bool CollectAlias(const std::string& ns, const std::string& cs_ns, const 
 static const char* BasicCsType(::google::protobuf::FieldDescriptorProto::Type type) {
 	switch (type) {
 		case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-			return "ProtoCache.Bytes";
+			return "Bytes";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-			return "ProtoCache.String";
+			return "String";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-			return "ProtoCache.Float64";
+			return "Float64";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-			return "ProtoCache.Float32";
+			return "Float32";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-			return "ProtoCache.UInt64";
+			return "UInt64";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-			return "ProtoCache.Int64";
+			return "Int64";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-			return "ProtoCache.UInt32";
+			return "UInt32";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-			return "ProtoCache.Int32";
+			return "Int32";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-			return "ProtoCache.Bool";
+			return "Bool";
 		default:
 			return nullptr;
 	}
@@ -121,6 +121,7 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 				return {};
 			}
 			out.reserve(64);
+			out += "ProtoCache.";
 			out += value_type;
 			out += "Array";
 		}
@@ -130,17 +131,18 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 			return {};
 		}
 		out.reserve(160);
+		out += "ProtoCache.";
 		out += key_type;
 		if (value_type == nullptr) {
 			value_type = BasicCsType(alias.value_type);
 			if (value_type == nullptr) {
 				return {};
 			}
-			out += "Dict<global::";
+			out += "Dict.";
 			out += value_type;
-			out += "Value>";
+			out += "Value";
 		} else {
-			out += "DictX<global::";
+			out += "Dict.ObjectValue<global::";
 			out += value_type;
 			out += '>';
 		}
@@ -180,7 +182,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		}
 		oss << cs_type;
 	} else {
-		oss << "ProtoCache.IUnit.Object";
+		oss << "ProtoCache.IUnit";
 	}
 	oss << " {\n";
 
@@ -206,8 +208,12 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 
 	auto fields = FieldsInOrder(proto);
-	if (IsAlias(proto, true) || fields.empty()) {
+	if (IsAlias(proto, true)) {
 		oss << "}\n\n";
+		return oss.str();
+	} else if (fields.empty()) {
+		oss << "\tpublic void Init(DataView data) => throw new NotImplementedException();\n"
+			<< "}\n\n";
 		return oss.str();
 	}
 
@@ -222,7 +228,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		<< "\tpublic " << proto.name() << "() {}\n"
 		<< "\tpublic " << proto.name() << "(byte[] data) => Init(new global::ProtoCache.DataView(data));\n"
 		<< "\tpublic bool HasField(int id) => _core_.HasField(id);\n"
-		<< "\tpublic override void Init(global::ProtoCache.DataView data) {\n"
+		<< "\tpublic void Init(global::ProtoCache.DataView data) {\n"
 		<< "\t\t_core_.Init(data);\n";
 	for (auto one : fields) {
 		if (IsRepeated(*one)
