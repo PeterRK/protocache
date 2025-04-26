@@ -86,28 +86,28 @@ static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto,
 static const char* BasicJavaType(::google::protobuf::FieldDescriptorProto::Type type) {
 	switch (type) {
 		case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-			return "com.github.peterrk.protocache.Bytes";
+			return "Bytes";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-			return "com.github.peterrk.protocache.Str";
+			return "String";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
-			return "com.github.peterrk.protocache.Float64";
+			return "Float64";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FLOAT:
-			return "com.github.peterrk.protocache.Float32";
+			return "Float32";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-			return "com.github.peterrk.protocache.Int64";
+			return "Int64";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
 		case ::google::protobuf::FieldDescriptorProto::TYPE_ENUM:
-			return "com.github.peterrk.protocache.Int32";
+			return "Int32";
 		case ::google::protobuf::FieldDescriptorProto::TYPE_BOOL:
-			return "com.github.peterrk.protocache.Bool";
+			return "Bool";
 		default:
 			return nullptr;
 	}
@@ -127,7 +127,7 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 	if (alias.key_type == TYPE_NONE) {
 		if (value_type != nullptr) {
 			out.reserve(128);
-			out += "com.github.peterrk.protocache.Array<";
+			out += "com.github.peterrk.protocache.ObjectArray<";
 			out += value_type;
 			out += '>';
 		} else {
@@ -136,6 +136,7 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 				return {};
 			}
 			out.reserve(64);
+			out += "com.github.peterrk.protocache.";
 			out += value_type;
 			out += "Array";
 		}
@@ -144,17 +145,22 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 		if (key_type == nullptr) {
 			return {};
 		}
+		out.reserve(160);
+		out += "com.github.peterrk.protocache.";
+		out += key_type;
+		out += "Dict.";
 		if (value_type == nullptr) {
 			value_type = BasicJavaType(alias.value_type);
 			if (value_type == nullptr) {
 				return {};
 			}
+			out += value_type;
+			out += "Value";
+		} else {
+			out += "ObjectValue<";
+			out += value_type;
+			out += '>';
 		}
-		out.reserve(160);
-		out += key_type;
-		out += "Dict<";
-		out += value_type;
-		out += '>';
 	}
 	return out;
 }
@@ -236,19 +242,19 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				<< "\tpublic com.github.peterrk.protocache." << boxed_type << "Array"
 				<< " get" << ToPascal(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
-				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "Array(FIELD_" << field.name() << ");\n"
+				<< "\t\t\t_" << field.name() << " = fetch" << boxed_type << "Array(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
 				<< "\t\treturn _" << field.name() << ";\n"
 				<< "\t}\n";
 			to_clean.push_back(field.name());
 		} else if (primary) {
 			oss << "\tpublic " << raw_type << " get" << ToPascal(field.name())
-				<< "() { return get" << boxed_type << "(FIELD_" << field.name() << "); }\n";
+				<< "() { return fetch" << boxed_type << "(FIELD_" << field.name() << "); }\n";
 		} else {
 			oss << "\tprivate " << raw_type << " _" << field.name() << " = null;\n"
 				<< "\tpublic " << raw_type << " get" << ToPascal(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
-				<< "\t\t\t_" << field.name() << " = get" << boxed_type << "(FIELD_" << field.name() << ");\n"
+				<< "\t\t\t_" << field.name() << " = fetch" << boxed_type << "(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
 				<< "\t\treturn _" << field.name() << ";\n"
 				<< "\t}\n";
@@ -285,7 +291,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				oss << "\tprivate " << java_type << " _" << one->name() << " = null;\n"
 					<< "\tpublic " << java_type << " get" << ToPascal(one->name()) << "() {\n"
 					<< "\t\tif (_" << one->name() << " == null) {\n"
-					<< "\t\t\t_" << one->name() << " = getField(FIELD_" << one->name() << ", " << java_type << "::new);\n"
+					<< "\t\t\t_" << one->name() << " = fetchObject(FIELD_" << one->name() << ", new " << java_type << "());\n"
 					<< "\t\t}\n"
 					<< "\t\treturn _" << one->name() << ";\n"
 					<< "\t}\n";
@@ -296,7 +302,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				handle_simple_field(*one, "byte[]", "Bytes", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-				handle_simple_field(*one, "String", "Str", false);
+				handle_simple_field(*one, "String", "String", false);
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_DOUBLE:
 				handle_simple_field(*one, "double", "Float64");
