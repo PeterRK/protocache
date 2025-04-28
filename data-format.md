@@ -30,6 +30,10 @@ The lowest 2 bits of array header marks the element size in words, while other b
 yyzzxx...x [index] key value key value key value ... [object...]
 ```
 Header of map is stored as a word. The 31-30bit of header means key size in word, the 29-28bit of header means value size in word, and the 27-0bit of header means numbers of key-value pairs. Key size and value size should not be 0. Map with more than one element will have an index stored before key-value pairs.
+```
+seed bitmap [offset table]
+```
+Index is based on [BDZ algorithm](https://cmph.sourceforge.net/bdz.html), which is stored as 4 byte seed, 8byte-aligned bitmap and offset table.
 
 ## Message
 ```
