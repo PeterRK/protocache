@@ -8,9 +8,6 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
-#ifdef __AVX2__
-#include <immintrin.h>
-#endif
 #include "protocache/perfect_hash.h"
 #include "hash.h"
 
@@ -68,25 +65,6 @@ public:
 	uint32_t mod(uint32_t m) const noexcept {
 		return m - val_ * div(m);
 	}
-
-#ifdef __AVX2__
-	V128 mod(const V128& m) const noexcept {
-		auto x = _mm256_zextsi128_si256(_mm_loadu_si128((const __m128i*)m.u32));
-		x = _mm256_permutevar8x32_epi32(x, _mm256_set_epi32(7,3,6,2,5,1,4,0));
-		auto y = _mm256_mul_epu32(x, _mm256_set1_epi64x(fac_));
-		y = _mm256_add_epi64(y, _mm256_set1_epi64x(tip_));
-		y = _mm256_srlv_epi64(y, _mm256_set1_epi64x(32 + sft_));
-		y = _mm256_mul_epu32(y, _mm256_set1_epi64x(val_));
-		auto t = _mm256_set_epi32(7,5,3,1,6,4,2,0);
-		x = _mm256_permutevar8x32_epi32(x, t);
-		y = _mm256_permutevar8x32_epi32(y, t);
-		auto z = _mm_sub_epi32(_mm256_castsi256_si128(x), _mm256_castsi256_si128(y));
-		V128 out;
-		_mm_storeu_si128((__m128i*)out.u32, z);
-		assert(out.u32[0] == mod(m.u32[0]) && out.u32[1] == mod(m.u32[1]) && out.u32[2] == mod(m.u32[2]) && out.u32[3] == mod(m.u32[3]));
-		return out;
-	}
-#endif
 };
 
 static inline uint32_t operator/(uint32_t m, const Divisor& d) noexcept {
@@ -96,12 +74,6 @@ static inline uint32_t operator/(uint32_t m, const Divisor& d) noexcept {
 static inline uint32_t operator%(uint32_t m, const Divisor& d) noexcept {
 	return d.mod(m);
 }
-
-#ifdef __AVX2__
-static inline V128 operator%(const V128& m, const Divisor& d) noexcept {
-	return d.mod(m);
-}
-#endif
 
 static inline unsigned Bit2(const uint8_t* vec, size_t pos) noexcept {
 	return (vec[pos>>2] >> ((pos&3)<<1)) & 3;
@@ -214,20 +186,11 @@ uint32_t PerfectHashObject::Locate(const uint8_t* key, unsigned key_len) const n
 	}
 	auto& m = *reinterpret_cast<Divisor*>(buffer_.get());
 	auto code = Hash128(key, key_len, header->seed);
-#ifdef __AVX2__
-	code = code % m;
-	uint32_t slots[3] = {
-			code.u32[0],
-			code.u32[1] + m.value(),
-			code.u32[2] + m.value() * 2,
-	};
-#else
 	uint32_t slots[3] = {
 			code.u32[0] % m,
 			code.u32[1] % m + m.value(),
 			code.u32[2] % m + m.value() * 2,
 	};
-#endif
 	return PerfectHash::Locate(slots);
 }
 
@@ -286,11 +249,11 @@ static bool CreateGraph(KeyReader& source, uint32_t seed, Graph<Word>& g, uint32
 		if (!key) {
 			return false;
 		}
-		auto code = Hash128(key.data(), key.size(), seed) % m;
+		auto code = Hash128(key.data(), key.size(), seed);
 		auto& edge = g.edges[i];
 		for (unsigned j = 0; j < 3; j++) {
 			auto& v = edge[j];
-			v.slot = code.u32[j];
+			v.slot = code.u32[j] % m;
 			auto& head = g.nodes[v.slot + shift[j]];
 			v.prev = kEnd;
 			v.next = head;
