@@ -8,9 +8,6 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
-#ifdef __AVX2__
-#include <immintrin.h>
-#endif
 #include "protocache/perfect_hash.h"
 #include "hash.h"
 
@@ -201,19 +198,8 @@ uint32_t PerfectHash::Locate(uint32_t slots[]) const noexcept {
 	auto header = reinterpret_cast<const Header*>(data_);
 	auto bitmap = data_ + sizeof(Header);
 	auto table = bitmap + BitmapSize(section_);
-
-#ifdef __AVX2__
-	auto idx = _mm_loadu_si128((const __m128i*)slots);
-	auto x = _mm256_mask_i32gather_epi64(_mm256_set1_epi64x(0), (const int64_t*)bitmap,
-										 _mm_srli_epi32(idx, 5), _mm256_set_epi64x(0,-1,-1,-1), 8);
-	auto y = _mm256_zextsi128_si256(_mm_slli_epi32(_mm_and_si128(idx, _mm_set1_epi32(31)),1));
-	y = _mm256_permutevar8x32_epi32(y, _mm256_set_epi32(7,3,6,2,5,1,4,0));
-	x = _mm256_and_si256(_mm256_srlv_epi64(x, y), _mm256_set1_epi64x(3));
-	auto m = _mm256_extract_epi64(x, 0) + _mm256_extract_epi64(x, 1) + _mm256_extract_epi64(x, 2);
-#else
 	auto m = Bit2(bitmap,slots[0]) +
 			 Bit2(bitmap,slots[1]) + Bit2(bitmap,slots[2]);
-#endif
 
 	auto slot = slots[m % 3];
 	uint32_t a = slot >> 5;
