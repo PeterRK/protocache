@@ -6,7 +6,7 @@ Alternative [flat binary format](data-format.md) for [Protobuf schema](https://p
 |:-------|----:|----:|----:|----:|
 | Wire format size | **574B** | 780B | 1296B | 1288B |
 | Decode + Traverse + Dealloc | 1941ns | 154ns | **83ns** | 558ns |
-| Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns | ? |
+| Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns | 7061ns |
 | Compressed size | 566B | 571B | 856B | 626B |
 | Compress | 257ns | 401ns | 763ns | - |
 | Decompress | 107ns | 250ns | 561ns | 641ns |

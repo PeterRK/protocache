@@ -1,7 +1,7 @@
 @0xdeadbeefdeadbeef;
 
-# using Cxx = import "/capnp/c++.capnp";
-# $Cxx.namespace("test::capn");
+using Cxx = import "/capnp/c++.capnp";
+$Cxx.namespace("test::capn");
 
 enum Mode {
 	modeA @0;

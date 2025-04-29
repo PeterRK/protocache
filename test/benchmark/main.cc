@@ -15,6 +15,8 @@ int main() {
 	BenchmarkFlatBuffersReflect();
 	BenchmarkCapnProto(false);
 	BenchmarkCapnProto(true);
+	BenchmarkCapnProtoReflect(false);
+	BenchmarkCapnProtoReflect(true);
 
 	BenchmarkProtoCacheEX();
 	std::cout << "========serialize========" << std::endl;

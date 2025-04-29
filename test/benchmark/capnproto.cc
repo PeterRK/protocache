@@ -229,34 +229,18 @@ void Junk4::Traverse(const ::test::capn::Main::Reader& root) {
 
 void Junk4::Traverse(const capnp::DynamicValue::Reader& value) {
 	switch (value.getType()) {
-		case capnp::DynamicValue::VOID:
-			break;
 		case capnp::DynamicValue::BOOL:
 			u32 += value.as<bool>();
 			break;
-		// no int32/uint32 ?
+		// FIXME: no int32/uint32/float ?
 		case capnp::DynamicValue::INT:
-		{
-			auto v = value.as<int64_t>();
-			if (v < -10000 || v > 10000) {
-				u64 += v;
-			} else {
-				u32 += v;
-			}
-		}
+			u64 += value.as<int64_t>();
 			break;
 		case capnp::DynamicValue::UINT:
-		{
-			auto v = value.as<uint64_t>();
-			if (v > 10000) {
-				u64 += v;
-			} else {
-				u32 += v;
-			}
-		}
+			u64 += value.as<uint64_t>();
 			break;
 		case capnp::DynamicValue::FLOAT:
-			std::cout << value.as<double>();
+			f64 += value.as<double>();
 			break;
 		case capnp::DynamicValue::TEXT:
 			u32 += JunkHash(value.as<capnp::Text>());
@@ -315,12 +299,7 @@ int BenchmarkCapnProto(bool packed) {
 }
 
 int BenchmarkCapnProtoReflect(bool packed) {
-	auto fs = kj::newDiskFilesystem();
-	capnp::SchemaParser parser;
-	auto schema = parser.parseFromDirectory(fs->getCurrent(),
-	       kj::Path::parse("test.capnp"), nullptr);
-
-	auto structSchema = schema.asStruct(); //FIXME: crash here. how to get StructSchema?
+	auto schema = capnp::Schema::from<test::capn::Main>().asStruct();
 
 	std::string raw;
 	if (!protocache::LoadFile(packed? "test.capn-packed.bin" : "test.capn.bin", &raw)) {
@@ -334,14 +313,14 @@ int BenchmarkCapnProtoReflect(bool packed) {
 		for (size_t i = 0; i < kLoop; i++) {
 			::kj::ArrayInputStream input(::kj::ArrayPtr<const uint8_t>(reinterpret_cast<const uint8_t*>(raw.data()), raw.size()));
 			::capnp::PackedMessageReader message(input);
-			auto root = message.getRoot<capnp::DynamicStruct>(structSchema);
+			auto root = message.getRoot<capnp::DynamicStruct>(schema);
 			junk.Traverse(root);
 		}
 	} else {
 		for (size_t i = 0; i < kLoop; i++) {
 			::kj::ArrayPtr<const capnp::word> view(reinterpret_cast<const capnp::word*>(raw.data()), raw.size()/sizeof(capnp::word));
 			::capnp::FlatArrayMessageReader message(view);
-			auto root = message.getRoot<capnp::DynamicStruct>(structSchema);
+			auto root = message.getRoot<capnp::DynamicStruct>(schema);
 			junk.Traverse(root);
 		}
 	}
