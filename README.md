@@ -2,16 +2,16 @@
 
 Alternative [flat binary format](data-format.md) for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead. FlatBuffers is fast but wastes space. ProtoCache takes balance of data size and read speed, so it's useful in data caching.
 
-|  | Protobuf | ProtoCache | FlatBuffers |
-|:-------|----:|----:|----:|
-| Wire format size | **574B** | 780B | 1296B |
-| Decode + Traverse + Dealloc | 1941ns | 154ns | **83ns** |
-| Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns |
-| Compressed size | 566B | 571B | 856B |
-| Compress | 257ns | 401ns | 763ns |
-| Decompress | 107ns | 250ns | 561ns |
+|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto |
+|:-------|----:|----:|----:|----:|
+| Wire format size | **574B** | 780B | 1296B | 1288B |
+| Decode + Traverse + Dealloc | 1941ns | 154ns | **83ns** | 558ns |
+| Decode + Traverse(reflection) + Dealloc | 6127ns | **323ns** | 478ns | ? |
+| Compressed size | 566B | 571B | 856B | 626B |
+| Compress | 257ns | 401ns | 763ns | - |
+| Decompress | 107ns | 250ns | 561ns | 641ns |
 
-A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. 
+A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. Because Cap'n Proto has a builtin compress/pack algorithm without explicit compress/decompress API, we take the time gap between access in plain and packed mode as decompress time.
 
 ## Difference to Protobuf
 Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named `_`, message with only one such field will be considered as an alias. Alias to array or map is useful. We can declare a 2D array like this.

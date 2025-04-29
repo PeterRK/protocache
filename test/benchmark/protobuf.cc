@@ -4,8 +4,8 @@
 
 #include <cstdio>
 #include <string>
-#include "protocache/extension/utils.h"
 #include <google/protobuf/reflection.h>
+#include "protocache/extension/utils.h"
 #include "test.pb.h"
 #include "twitter.pb.h"
 #include "common.h"

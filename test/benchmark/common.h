@@ -51,6 +51,8 @@ extern int BenchmarkProtoCache();
 extern int BenchmarkProtoCacheReflect();
 extern int BenchmarkFlatBuffers();
 extern int BenchmarkFlatBuffersReflect();
+extern int BenchmarkCapnProto(bool packed);
+extern int BenchmarkCapnProtoReflect(bool packed);
 
 extern int BenchmarkProtoCacheEX();
 extern int BenchmarkProtobufSerialize(bool flat=false);

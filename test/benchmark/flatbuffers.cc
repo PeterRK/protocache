@@ -3,9 +3,9 @@
 // license that can be found in the LICENSE file.
 
 #include <cstdio>
-#include "protocache/extension/utils.h"
 #include <flatbuffers/idl.h>
 #include <flatbuffers/reflection.h>
+#include "protocache/extension/utils.h"
 #include "test_generated.h"
 #include "common.h"
 

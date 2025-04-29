@@ -72,4 +72,4 @@ file(GLOB bench_src
 )
 
 #add_executable(benchmark ${bench_src})
-#target_link_libraries(benchmark protocache protobuf flatbuffers pthread)
+#target_link_libraries(benchmark protocache protobuf flatbuffers capnp kj pthread)
