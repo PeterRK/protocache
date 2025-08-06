@@ -111,6 +111,15 @@ private:
 	unsigned width_ = 0;
 };
 
+#if defined(__GNUC__) && defined(__POPCNT__)
+static inline unsigned Count32(uint32_t v) noexcept {
+	return __builtin_popcount(v & 0xaaaaaaaaU) + __builtin_popcount(v);
+}
+
+static inline unsigned Count64(uint64_t v) noexcept {
+	return __builtin_popcountll(v & 0xaaaaaaaaaaaaaaaaULL) + __builtin_popcountll(v);
+}
+#else
 static inline unsigned Count32(uint32_t v) noexcept {
 	v = (v&0x33333333U) + ((v>>2U)&0x33333333U);
 	v = v + (v>>4U);
@@ -127,6 +136,7 @@ static inline unsigned Count64(uint64_t v) noexcept {
 	v = v + (v >> 32U);
 	return v & 0xffU;
 }
+#endif
 
 class Message {
 public:
