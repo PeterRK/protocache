@@ -230,7 +230,7 @@ int BenchmarkProtobuf() {
 		junk.Traverse(root);
 #else
 		google::protobuf::Arena arena;
-		auto root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+		auto root = google::protobuf::Arena::Create<::test::Main>(&arena);
 		if (!root->ParseFromString(raw)) {
 			puts("fail to deserialize");
 			return -2;
@@ -255,7 +255,7 @@ int BenchmarkProtobufReflect() {
 	auto start = std::chrono::steady_clock::now();
 	for (size_t i = 0; i < kLoop; i++) {
 		google::protobuf::Arena arena;
-		google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+		google::protobuf::Message* root = google::protobuf::Arena::Create<::test::Main>(&arena);
 		if (!root->ParseFromString(raw)) {
 			puts("fail to deserialize");
 			return -2;
@@ -275,7 +275,7 @@ int BenchmarkProtobufSerialize(bool flat) {
 		return -1;
 	}
 	google::protobuf::Arena arena;
-	google::protobuf::Message* root = google::protobuf::Arena::CreateMessage<::test::Main>(&arena);
+	google::protobuf::Message* root = google::protobuf::Arena::Create<::test::Main>(&arena);
 	if (!root->ParseFromString(raw)) {
 		puts("fail to deserialize");
 		return -2;

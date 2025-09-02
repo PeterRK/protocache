@@ -391,7 +391,7 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 		if (field == nullptr) {
 			continue;
 		}
-		auto name = field->name().c_str();
+		//auto name = field->name().c_str();
 		auto& part = parts[i];
 		if (!SerializeField(message, field, part)) {
 			return false;
