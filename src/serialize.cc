@@ -216,6 +216,14 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	if (fields.empty()) {
 		return false;
 	}
+	while (!fields.empty() && fields.back().size() == 0) {
+		fields.pop_back();
+	}
+	if (fields.empty()) {
+		unit.len = 1;
+		unit.data[0] = 0U;
+		return true;
+	}
 	//auto tail = buf.At(last);
 	size_t size = 0;
 	unsigned body_size = 0;
@@ -233,22 +241,16 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 	if (size >= (1U<<30U)) {
 		return false;
 	}
-	while (!fields.empty() && fields.back().size() == 0) {
-		fields.pop_back();
-	}
-	if (fields.empty()) {
-		unit.len = 1;
-		unit.data[0] = 0U;
-		return true;
-	}
 	auto section = (fields.size() + 12) / 25;
 	if (section > 0xff) {
 		return false;
 	}
 
+	auto head_size = 1 + section*2;
 	//buf.Shrink(tail - buf.Head());
-	auto body = buf.Expand(body_size);
-	auto pos = buf.Size();
+	auto head = buf.Expand(head_size + body_size);
+	auto body = head + head_size;
+	auto pos = buf.Size() - head_size;
 
 	auto copy = [&body, &pos](const Unit& field) {
 		for (unsigned j = 0; j < field.len; j++) {
@@ -257,7 +259,6 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 		pos -= field.len;
 	};
 
-	auto head = buf.Expand(1 + section*2);
 	*head = section;
 	uint32_t cnt = 0;
 	for (unsigned i = 0; i < std::min(12UL, fields.size()); i++) {

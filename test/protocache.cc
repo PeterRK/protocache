@@ -238,7 +238,7 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_EQ(root->tags.size(), 1);
 	ASSERT_NE(root->tags.find("test_b"), root->tags.end());
 
-	file = google::protobuf::FileDescriptorProto(); // fail without rese
+	file = google::protobuf::FileDescriptorProto();
 	ASSERT_TRUE(protocache::ParseProtoFile("test.proto", &file, &err));
 
 	auto it = root->fields.find("f64");
@@ -333,6 +333,62 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_FALSE(it->second.repeated);
 	ASSERT_EQ(it->second.value, protocache::reflection::Field::TYPE_FLOAT);
 	ASSERT_EQ(-2.1f, protocache::GetField<float>(unit, it->second.id, end));
+}
+
+TEST(PtotoCache, BigObject) {
+	const int fields_cnt = 1000;
+	std::ostringstream oss;
+	oss << "syntax = \"proto3\";\n"
+		<< "message Object {\n";
+	for (int i = 1; i <= fields_cnt; i++) {
+		oss << "int32 i" << i << " = " << i << ";\n";
+	}
+	oss << "}\n";
+
+	google::protobuf::FileDescriptorProto file;
+	file.set_name("big-object.proto");
+	ASSERT_TRUE(protocache::ParseProto(oss.str(), &file));
+
+	google::protobuf::DescriptorPool pb_pool(google::protobuf::DescriptorPool::generated_pool());
+	ASSERT_NE (pb_pool.BuildFile(file), nullptr);
+
+	auto descriptor = pb_pool.FindMessageTypeByName("Object");
+	ASSERT_NE (descriptor, nullptr);
+
+	google::protobuf::DynamicMessageFactory factory(&pb_pool);
+	auto prototype = factory.GetPrototype(descriptor);
+	ASSERT_NE (prototype, nullptr);
+
+	std::unique_ptr<google::protobuf::Message> message(prototype->New());
+	auto reflection = message->GetReflection();
+	ASSERT_NE (reflection, nullptr);
+
+	char name[8];
+	for (int i = 1; i <= fields_cnt; i++) {
+		snprintf(name, sizeof(name), "i%d", i);
+		auto field = descriptor->FindFieldByName(name);
+		ASSERT_NE (field, nullptr);
+		reflection->SetInt32(message.get(), field, i);
+	}
+
+	protocache::reflection::DescriptorPool pool;
+	ASSERT_TRUE(pool.Register(file));
+	auto root = pool.Find("Object");
+	ASSERT_NE(root, nullptr);
+
+	protocache::Buffer buf;
+	ASSERT_TRUE(protocache::Serialize(*message, &buf));
+	auto view = buf.View();
+	auto end = view.data() + view.size();
+	protocache::Message unit(view.data(), end);
+
+	for (int i = 1; i <= fields_cnt; i++) {
+		snprintf(name, sizeof(name), "i%d", i);
+		auto it = root->fields.find(name);
+		ASSERT_NE(it, root->fields.end());
+		ASSERT_EQ(it->second.id, i-1);
+		ASSERT_EQ(protocache::GetField<int32_t>(unit, it->second.id, end), i);
+	}
 }
 
 TEST(PtotoCacheEX, Basic) {
