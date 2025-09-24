@@ -491,6 +491,8 @@ TEST(PtotoCacheEX, Basic) {
 
 	// check compile error
 	::ex::test::CyclicA cyclic;
+	ASSERT_FALSE(cyclic.HasField(::test::CyclicA::_::cyclic));
+	ASSERT_NE(cyclic.cyclic(), nullptr);
 }
 
 TEST(PtotoCacheEX, Serialize) {
