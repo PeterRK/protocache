@@ -470,7 +470,7 @@ public:
 
 	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
 	Iterator Find(T val, const uint32_t* end=nullptr) const noexcept {
-		auto pos = index_.Locate(reinterpret_cast<const uint8_t *>(val), sizeof(T));
+		auto pos = index_.Locate(reinterpret_cast<const uint8_t *>(&val), sizeof(T));
 		if (pos >= index_.Size()) {
 			return this->end();
 		}

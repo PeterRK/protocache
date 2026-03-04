@@ -179,6 +179,12 @@ TEST(PtotoCache, Basic) {
 	auto map2 = root.objects(end);
 	ASSERT_FALSE(!map2);
 	ASSERT_EQ(map2.Size(), 4);
+	auto mit2 = map2.Find(1, end);
+	ASSERT_NE(mit2, map2.end());
+	ASSERT_EQ((*mit2).Key(end), 1);
+	ASSERT_EQ((*mit2).Value(end)->i32(end), 1);
+	mit2 = map2.Find(5, end);
+	ASSERT_EQ(mit2, map2.end());
 	for (const auto& pair : map2) {
 		auto key = pair.Key(end);
 		ASSERT_NE(key, 0);
