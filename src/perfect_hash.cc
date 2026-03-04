@@ -425,16 +425,16 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	constexpr unsigned FIRST_TRIES = sizeof(Word) == 1? 8U : 4U;
 	constexpr unsigned SECOND_TRIES = sizeof(Word) == 1? 32U : 12U;
 
-	auto build = [&source, n = header->size, &graph,
+	auto build = [&source, total, &graph,
 				  free, book, bitmap, &divisor](uint32_t seed)->bool {
 #ifndef NDEBUG
 			printf("try with seed %08x\n", seed);
 #endif
-		if (!CreateGraph(source, seed, graph, n, divisor)
-			|| !TearGraph(graph, n, free, book)) {
+		if (!CreateGraph(source, seed, graph, total, divisor)
+			|| !TearGraph(graph, total, free, book)) {
 			return false;
 		}
-		Mapping(graph, n, free, book, bitmap);
+		Mapping(graph, total, free, book, bitmap);
 		return true;
 	};
 
