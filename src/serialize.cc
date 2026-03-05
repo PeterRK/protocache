@@ -220,8 +220,9 @@ bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit&
 		fields.pop_back();
 	}
 	if (fields.empty()) {
-		unit.len = 1;
-		unit.data[0] = 0U;
+		// top api will skip unit, don't embed data into it
+		buf.Put(0);
+		unit = Segment(last, buf.Size());
 		return true;
 	}
 	//auto tail = buf.At(last);

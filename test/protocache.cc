@@ -501,6 +501,16 @@ TEST(PtotoCacheEX, Basic) {
 	ASSERT_NE(cyclic.cyclic(), nullptr);
 }
 
+TEST(PtotoCache, Tiny) {
+	protocache::Buffer buffer;
+	ASSERT_TRUE(SerializeByProtobuf("test-empty.json", buffer));
+	ASSERT_EQ(1, buffer.Size());
+
+	buffer.Clear();
+	ASSERT_TRUE(SerializeByProtobuf("test-tiny.json", buffer));
+	ASSERT_EQ(2, buffer.Size());
+}
+
 TEST(PtotoCacheEX, Serialize) {
 	protocache::Buffer buffer;
 	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
@@ -560,13 +570,20 @@ TEST(PtotoCacheEX, Alias) {
 	auto& matrix = root.matrix();
 	matrix.resize(3);
 	matrix[2].resize(3);
-	protocache::Buffer buf;
-	ASSERT_TRUE(root.Serialize(&buf));
-	auto view = buf.View();
+	protocache::Buffer buffer;
+	ASSERT_TRUE(root.Serialize(&buffer));
+	auto view = buffer.View();
 	ASSERT_EQ(view.size(), 12);
 	ASSERT_EQ(view[4], 0xd);
 	ASSERT_EQ(view[5], 1);
 	ASSERT_EQ(view[6], 1);
+}
+
+TEST(PtotoCacheEX, Tiny) {
+	protocache::Buffer buffer;
+	::ex::test::Main root;
+	ASSERT_TRUE(root.Serialize(&buffer));
+	ASSERT_EQ(1, buffer.Size());
 }
 
 TEST(Compress, All) {
