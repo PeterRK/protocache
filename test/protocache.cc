@@ -77,7 +77,6 @@ static bool SerializeByProtobuf(const std::string& json, protocache::Buffer& buf
 	return protocache::Serialize(*message, &buf);
 }
 
-
 TEST(PtotoCache, Basic) {
 	protocache::Buffer buffer;
 	ASSERT_TRUE(SerializeByProtobuf("test.json", buffer));
@@ -650,4 +649,102 @@ TEST(Compress, All) {
 	std::string raw;
 	ASSERT_TRUE(protocache::Decompress(cooked, &raw));
 	ASSERT_EQ(protocache::SliceCast<char>(view), protocache::Slice<char>(raw));
+}
+
+static bool BuildDynamicSchema(const std::string& proto_src,
+							   const std::string& root_message,
+							   google::protobuf::DescriptorPool& pool,
+							   const google::protobuf::Descriptor** descriptor,
+							   std::string* err = nullptr) {
+	google::protobuf::FileDescriptorProto file;
+	if (!protocache::ParseProto(proto_src, &file, err)) {
+		return false;
+	}
+	if (file.name().empty()) {
+		file.set_name("coverage-dynamic.proto");
+	}
+	if (pool.BuildFile(file) == nullptr) {
+		return false;
+	}
+	*descriptor = pool.FindMessageTypeByName(root_message);
+	return *descriptor != nullptr;
+}
+
+TEST(PtotoCache, ExtensionUtilsFailurePaths) {
+	std::string err;
+	google::protobuf::FileDescriptorProto file;
+	ASSERT_FALSE(protocache::ParseProto("syntax = \"proto3\"; message {", &file, &err));
+	ASSERT_FALSE(protocache::ParseProtoFile("missing-file.proto", &file, &err));
+
+	google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
+	const google::protobuf::Descriptor* descriptor = nullptr;
+	ASSERT_TRUE(BuildDynamicSchema(
+			"syntax = \"proto3\";\n"
+			"package cov;\n"
+			"message Tiny {\n"
+			"  int32 id = 1;\n"
+			"}\n",
+			"cov.Tiny", pool, &descriptor, &err));
+	google::protobuf::DynamicMessageFactory factory(&pool);
+	auto prototype = factory.GetPrototype(descriptor);
+	ASSERT_NE(prototype, nullptr);
+	std::unique_ptr<google::protobuf::Message> message(prototype->New());
+	ASSERT_FALSE(protocache::LoadJson("missing-file.json", message.get()));
+
+	const std::string bad_json_path = "/tmp/protocache-bad-json-test.json";
+	{
+		std::ofstream out(bad_json_path);
+		ASSERT_TRUE(out.good());
+		out << "{this is not valid json}";
+	}
+	ASSERT_FALSE(protocache::LoadJson(bad_json_path, message.get()));
+}
+
+TEST(PtotoCache, SerializeRejectsUnsupportedShapes) {
+	std::string err;
+	{
+		google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
+		const google::protobuf::Descriptor* descriptor = nullptr;
+		ASSERT_TRUE(BuildDynamicSchema(
+				"syntax = \"proto3\";\n"
+				"package cov;\n"
+				"message Empty {}\n",
+				"cov.Empty", pool, &descriptor, &err));
+		google::protobuf::DynamicMessageFactory factory(&pool);
+		auto prototype = factory.GetPrototype(descriptor);
+		ASSERT_NE(prototype, nullptr);
+		std::unique_ptr<google::protobuf::Message> message(prototype->New());
+		protocache::Buffer buf;
+		ASSERT_FALSE(protocache::Serialize(*message, &buf));
+	}
+
+	{
+		google::protobuf::DescriptorPool pool(google::protobuf::DescriptorPool::generated_pool());
+		const google::protobuf::Descriptor* descriptor = nullptr;
+		ASSERT_TRUE(BuildDynamicSchema(
+				"syntax = \"proto3\";\n"
+				"package cov;\n"
+				"message BadMap {\n"
+				"  map<bool, int32> m = 1;\n"
+				"}\n",
+				"cov.BadMap", pool, &descriptor, &err));
+		google::protobuf::DynamicMessageFactory factory(&pool);
+		auto prototype = factory.GetPrototype(descriptor);
+		ASSERT_NE(prototype, nullptr);
+		std::unique_ptr<google::protobuf::Message> message(prototype->New());
+		auto* reflection = message->GetReflection();
+		ASSERT_NE(reflection, nullptr);
+		const auto* field = descriptor->FindFieldByName("m");
+		ASSERT_NE(field, nullptr);
+		auto* entry = reflection->AddMessage(message.get(), field);
+		ASSERT_NE(entry, nullptr);
+		const auto* key_field = field->message_type()->field(0);
+		const auto* value_field = field->message_type()->field(1);
+		auto* entry_reflection = entry->GetReflection();
+		entry_reflection->SetBool(entry, key_field, true);
+		entry_reflection->SetInt32(entry, value_field, 7);
+
+		protocache::Buffer buf;
+		ASSERT_FALSE(protocache::Serialize(*message, &buf));
+	}
 }
