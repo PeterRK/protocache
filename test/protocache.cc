@@ -521,6 +521,14 @@ TEST(PtotoCacheEX, Serialize) {
 	ex.objectv();
 	ex.strv(end)[0] = "xyz";
 	ex.matrix(end)[1][1] = 999;
+	auto& arrays = ex.arrays(end);
+	auto it = arrays.find("lv5");
+	ASSERT_NE(it, arrays.end());
+	it->second.emplace_back(53.0f);
+	::ex::test::ArrMap::Array::ALIAS inserted;
+	inserted.emplace_back(91.0f);
+	inserted.emplace_back(92.0f);
+	ASSERT_TRUE(arrays.emplace("lv9", std::move(inserted)).second);
 
 	for (auto& pair : ex.objects(end)) {
 		pair.second->i32(end) = pair.first + 1;
@@ -529,7 +537,7 @@ TEST(PtotoCacheEX, Serialize) {
 	protocache::Buffer buf;
 	ASSERT_TRUE(ex.Serialize(&buf));
 	auto modified = buf.View();
-	ASSERT_EQ(data.size(), modified.size());
+	ASSERT_GT(modified.size(), data.size());
 	end = modified.data() + modified.size();
 	::ex::test::Main root(modified);
 
@@ -559,9 +567,17 @@ TEST(PtotoCacheEX, Serialize) {
 	auto mit4 = root.arrays().find("lv5");
 	ASSERT_NE(mit4, root.arrays().end());
 	auto& vec4 = mit4->second;
-	ASSERT_EQ(vec4.size(), 2);
+	ASSERT_EQ(vec4.size(), 3);
 	ASSERT_EQ(vec4[0], 51);
 	ASSERT_EQ(vec4[1], 52);
+	ASSERT_EQ(vec4[2], 53.0f);
+
+	auto mit5 = root.arrays().find("lv9");
+	ASSERT_NE(mit5, root.arrays().end());
+	auto& vec5 = mit5->second;
+	ASSERT_EQ(vec5.size(), 2);
+	ASSERT_EQ(vec5[0], 91.0f);
+	ASSERT_EQ(vec5[1], 92.0f);
 }
 
 TEST(PtotoCacheEX, Alias) {
@@ -584,6 +600,40 @@ TEST(PtotoCacheEX, Tiny) {
 	::ex::test::Main root;
 	ASSERT_TRUE(root.Serialize(&buffer));
 	ASSERT_EQ(1, buffer.Size());
+}
+
+TEST(PtotoCacheEX, StringKeyMapStress) {
+	::ex::test::Main root;
+	auto& arrays = root.arrays();
+	std::vector<std::string> keys;
+	keys.reserve(64);
+	for (int i = 0; i < 64; i++) {
+		char suffix[16];
+		snprintf(suffix, sizeof(suffix), "%03d", i);
+		keys.emplace_back("very_long_key_prefix_to_disable_sso_" + std::string(suffix));
+
+		::ex::test::ArrMap::Array::ALIAS val;
+		val.emplace_back(static_cast<float>(i));
+		val.emplace_back(static_cast<float>(i) + 0.5f);
+		ASSERT_TRUE(arrays.emplace(keys.back(), std::move(val)).second);
+	}
+
+	protocache::Buffer buf;
+	ASSERT_TRUE(root.Serialize(&buf));
+	auto view = buf.View();
+	auto end = view.data() + view.size();
+	auto& basic = *protocache::Message(view).Cast<test::Main>();
+	auto map = basic.arrays(end);
+	ASSERT_FALSE(!map);
+
+	for (int i = 0; i < static_cast<int>(keys.size()); i++) {
+		auto it = map.Find(protocache::Slice<char>(keys[i]), end);
+		ASSERT_NE(it, map.end()) << "missing key: " << keys[i];
+		auto vec = (*it).Value(end);
+		ASSERT_EQ(2, vec.Size());
+		ASSERT_EQ(static_cast<float>(i), vec[0]);
+		ASSERT_EQ(static_cast<float>(i) + 0.5f, vec[1]);
+	}
 }
 
 TEST(Compress, All) {

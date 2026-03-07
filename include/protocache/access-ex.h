@@ -241,6 +241,15 @@ private:
 	using ConstIterator = typename std::unordered_map<KeyEX,ValEX>::const_iterator;
 	std::unordered_map<KeyEX,ValEX> core_;
 
+	template <typename K>
+	static Slice<uint8_t> ReadKeyBytes(const K& key, std::false_type) {
+		return {reinterpret_cast<const uint8_t*>(&key), sizeof(K)};
+	}
+
+	static Slice<uint8_t> ReadKeyBytes(const std::string& key, std::true_type) {
+		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
+	}
+
 	template <typename T>
 	static typename Adapter<T>::TypeEX Extract(Field field, const uint32_t* end, const T*) {
 		return FieldT<T>(field).Get(end);
@@ -276,29 +285,10 @@ private:
 			return {reinterpret_cast<const uint8_t*>(&pair->first), sizeof(Key)};
 		}
 
-	private:
-		const std::vector<const std::pair<const K,V>*>& core_;
-		size_t idx_ = 0;
-	};
-
-	template <typename V>
-	class MapKeyReader<const std::string, V> : public KeyReader {
-	public:
-		explicit MapKeyReader(const std::vector<const std::pair<std::string,V>*>& core) : core_(core) {}
-		void Reset() override { idx_ = 0; }
-		size_t Total() override { return core_.size(); }
-		Slice<uint8_t> Read() override {
-			if (idx_ >= core_.size()) {
-				return {};
-			}
-			auto pair = core_[idx_++];
-			return {reinterpret_cast<const uint8_t*>(&pair->first.data()), pair->first.size()};
-		}
-
-	private:
-		const std::vector<const std::pair<const std::string,V>*>& core_;
-		size_t idx_ = 0;
-	};
+		private:
+			const std::vector<const std::pair<const K,V>*>& core_;
+			size_t idx_ = 0;
+		};
 
 public:
 	MapEX() = default;
