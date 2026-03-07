@@ -68,7 +68,7 @@ public:
 	const TypeEX& front() const noexcept { return core_.front(); }
 	TypeEX& back() noexcept { return core_.back(); }
 	const TypeEX& back() const noexcept { return core_.back(); }
-	void pop_back() noexcept { core_.push_back(); }
+	void pop_back() noexcept { core_.pop_back(); }
 
 	template< class... Args >
 	void emplace_back(Args&&... args) {
