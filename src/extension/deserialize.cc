@@ -182,6 +182,7 @@ static bool DeserializeMap(const uint32_t* data, const uint32_t* end,
 }
 
 static bool Deserialize(const uint32_t* data, const uint32_t* end, google::protobuf::Message* out) {
+	out->Clear();
 	const auto* descriptor = out->GetDescriptor();
 	const auto field_count = descriptor->field_count();
 	if (field_count == 1) {
