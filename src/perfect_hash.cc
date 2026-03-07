@@ -132,6 +132,7 @@ struct Header {
 };
 
 PerfectHash::PerfectHash(const uint8_t* data, uint32_t size) noexcept {
+	// size == 0 means size is unknown, run unsafely
 	if (size != 0 && size < 4) {
 		return;
 	}

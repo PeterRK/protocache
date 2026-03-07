@@ -293,8 +293,10 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
 	for (int i = static_cast<int>(book.size())-1; i >= 0; i--) {
 		auto& pair = pairs.Get(book[i], tmp.get());
-		SerializeSimpleField(pair, value_field, values[i]);
-		SerializeSimpleField(pair, key_field, keys[i]);
+		if (!SerializeSimpleField(pair, value_field, values[i])
+			|| !SerializeSimpleField(pair, key_field, keys[i])) {
+			return false;
+		}
 	}
 	return SerializeMap(index.Data(), keys, values, buf_, last, unit);
 }
@@ -367,7 +369,7 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 		fields[j] = field;
 	}
 
-	if (fields.size() == 1 && fields.front()->name() == "_") {
+	if (fields.size() == 1 && fields.front() != nullptr && fields.front()->name() == "_") {
 		if (!fields.front()->is_repeated()
 			|| !SerializeField(message, fields.front(), unit)) {
 			return false;

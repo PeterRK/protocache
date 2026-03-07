@@ -28,6 +28,8 @@ public:
 		return data_ == nullptr;
 	}
 	PerfectHash() noexcept = default;
+
+	// size == 0 means size is unknown
 	explicit PerfectHash(const uint8_t* data, uint32_t size=0) noexcept;
 
 	Slice<uint8_t> Data() const noexcept {
