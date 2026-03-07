@@ -103,17 +103,23 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 	auto end = src + len;
 
 	unsigned size = 0;
-	for (unsigned sft = 0; sft < 32U; sft += 7U) {
-		if (src >= end) {
-			return false;
+	auto parse_size = [&size, &src, end]()->bool {
+		for (unsigned sft = 0; sft < 32U; sft += 7U) {
+			if (src >= end) {
+				return false;
+			}
+			uint8_t b = *src++;
+			if (b & 0x80U) {
+				size |= static_cast<unsigned>(b & 0x7fU) << sft;
+			} else {
+				size |= static_cast<unsigned>(b) << sft;
+				return true;
+			}
 		}
-		uint8_t b = *src++;
-		if (b & 0x80U) {
-			size |= static_cast<unsigned>(b & 0x7fU) << sft;
-		} else {
-			size |= static_cast<unsigned>(b) << sft;
-			break;
-		}
+		return false;
+	};
+	if (!parse_size()) {
+		return false;
 	}
 
 	out->resize(size);
