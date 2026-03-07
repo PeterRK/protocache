@@ -296,8 +296,11 @@ static bool TearGraph(Graph<Word>& g, uint32_t n, Word free[], uint8_t* book) no
 				i = v.next;
 				g.edges[i][j].prev = v.prev;
 			}
+			if (i == kEnd) {
+				continue;
+			}
 			auto& u = g.edges[i][j];
-			if (i != kEnd && u.prev == kEnd && u.next == kEnd
+			if (u.prev == kEnd && u.next == kEnd
 				&& TestAndSetBit(book, i)) {
 				free[tail++] = i;
 			}
