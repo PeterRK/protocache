@@ -318,7 +318,7 @@ public:
 
 	template<typename T>
 	Slice<T> Numbers() const noexcept {
-		static_assert(std::is_scalar<T>::value && sizeof(T) % 4 == 0, "");
+		static_assert(std::is_scalar_v<T> && sizeof(T) % 4 == 0, "");
 		if (width_ != WordSize(sizeof(T))) {
 			return {};
 		}
@@ -468,8 +468,9 @@ public:
 		return Find(key.data(), key.size(), end);
 	}
 
-	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	template<typename T>
 	Iterator Find(T val, const uint32_t* end=nullptr) const noexcept {
+		static_assert(std::is_scalar_v<T>, "T must be scalar");
 		auto pos = index_.Locate(reinterpret_cast<const uint8_t *>(&val), sizeof(T));
 		if (pos >= index_.Size()) {
 			return this->end();
@@ -637,7 +638,7 @@ public:
 		if (!view) {
 			return {};
 		}
-		static_assert(std::is_pointer<T>::value || !std::is_scalar<T>::value, "");
+			static_assert(std::is_pointer_v<T> || !std::is_scalar_v<T>, "");
 		Array core(ptr);
 		for (auto it = core.end(); it != core.begin();) {
 			FieldT<T> field(*--it);
@@ -699,7 +700,7 @@ private:
 template <typename T>
 class ScalarArray {
 public:
-	static_assert(std::is_scalar<T>::value, "");
+	static_assert(std::is_scalar_v<T>, "");
 	explicit ScalarArray(const Slice<T>& slice) : core_(slice) {}
 	const Slice<T>& Raw() const noexcept {
 		return core_;
@@ -801,20 +802,21 @@ public:
 		auto view =  Map::Detect(ptr, end);
 		if (!view) {
 			return {};
-		} else if (std::is_scalar<K>::value && !std::is_pointer<V>::value && std::is_scalar<V>::value) {
+		}
+		if constexpr (std::is_scalar_v<K> && !std::is_pointer_v<V> && std::is_scalar_v<V>) {
 			return view;
 		}
 		Map core(ptr);
 		for (auto it = core.end(); it != core.begin();) {
 			Pair pair(*--it);
 			Slice<uint32_t> t;
-			if (std::is_pointer<V>::value || !std::is_scalar<V>::value) {
+			if constexpr (std::is_pointer_v<V> || !std::is_scalar_v<V>) {
 				t = FieldT<V>(pair.Value()).Detect(end);
 				if (t.end() > view.end()) {
 					return {view.data(), static_cast<size_t>(t.end()-view.data())};
 				}
 			}
-			if (!std::is_scalar<K>::value) {
+			if constexpr (!std::is_scalar_v<K>) {
 				t = FieldT<K>(pair.Key()).Detect(end);
 				if (t.end() > view.end()) {
 					return {view.data(), static_cast<size_t>(t.end()-view.data())};

@@ -57,8 +57,9 @@ static void FoldField(Buffer& buf, Unit& unit) {
 	}
 }
 
-template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+template<typename T>
 static inline bool Serialize(T v, Buffer& buf, Unit& unit) {
+	static_assert(std::is_scalar_v<T>, "T must be scalar");
 	unit.len = sizeof(T)/sizeof(uint32_t);
 	*reinterpret_cast<T*>(unit.data) = v;
 	return true;

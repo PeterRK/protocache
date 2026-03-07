@@ -25,6 +25,33 @@ static std::string ToString(const Slice<char>& view) {
 	return std::string(view.data(), view.size());
 }
 
+template <typename T, auto Setter>
+static inline bool DeserializeSingleScalar(const Field& src, const uint32_t* end,
+										   const google::protobuf::FieldDescriptor* field,
+										   google::protobuf::Message* out) {
+	auto reflection = out->GetReflection();
+	(reflection->*Setter)(out, field, FieldT<T>(src).Get(end));
+	return true;
+}
+
+template <typename T, auto Adder>
+static inline bool DeserializeArrayScalar(const uint32_t* data, const uint32_t* end,
+										  const google::protobuf::FieldDescriptor* field,
+										  google::protobuf::Message* out) {
+	auto reflection = out->GetReflection();
+	for (auto one: ArrayT<T>(data, end)) {
+		(reflection->*Adder)(out, field, one);
+	}
+	return true;
+}
+
+template <typename T, auto Setter>
+static inline void SetMapKeyScalar(const Pair& pair, const google::protobuf::FieldDescriptor* key_field,
+								   const uint32_t* end, google::protobuf::Message* unit) {
+	auto reflection = unit->GetReflection();
+	(reflection->*Setter)(unit, key_field, FieldT<T>(pair.Key()).Get(end));
+}
+
 static bool DeserializeSingle(const Field& src, const uint32_t* end,
 							  const google::protobuf::FieldDescriptor* field, google::protobuf::Message* out) {
 	auto reflection = out->GetReflection();
@@ -37,35 +64,27 @@ static bool DeserializeSingle(const Field& src, const uint32_t* end,
 			reflection->SetString(out, field, ToString(FieldT<Slice<char>>(src).Get(end)));
 			return true;
 		case google::protobuf::FieldDescriptor::Type::TYPE_DOUBLE:
-			reflection->SetDouble(out, field, FieldT<double>(src).Get());
-			return true;
+			return DeserializeSingleScalar<double, &google::protobuf::Reflection::SetDouble>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FLOAT:
-			reflection->SetFloat(out, field, FieldT<float>(src).Get());
-			return true;
+			return DeserializeSingleScalar<float, &google::protobuf::Reflection::SetFloat>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			reflection->SetUInt64(out, field, FieldT<uint64_t>(src).Get());
-			return true;
+			return DeserializeSingleScalar<uint64_t, &google::protobuf::Reflection::SetUInt64>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			reflection->SetUInt32(out, field, FieldT<uint32_t>(src).Get());
-			return true;
+			return DeserializeSingleScalar<uint32_t, &google::protobuf::Reflection::SetUInt32>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			reflection->SetInt64(out, field, FieldT<int64_t>(src).Get());
-			return true;
+			return DeserializeSingleScalar<int64_t, &google::protobuf::Reflection::SetInt64>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			reflection->SetInt32(out, field, FieldT<int32_t>(src).Get());
-			return true;
+			return DeserializeSingleScalar<int32_t, &google::protobuf::Reflection::SetInt32>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_BOOL:
-			reflection->SetBool(out, field, FieldT<bool>(src).Get());
-			return true;
+			return DeserializeSingleScalar<bool, &google::protobuf::Reflection::SetBool>(src, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
-			reflection->SetEnumValue(out, field, FieldT<EnumValue>(src).Get());
-			return true;
+			return DeserializeSingleScalar<EnumValue, &google::protobuf::Reflection::SetEnumValue>(src, end, field, out);
 		default:
 			return false;
 	}
@@ -91,51 +110,27 @@ static bool DeserializeArray(const uint32_t* data, const uint32_t* end,
 			}
 			return true;
 		case google::protobuf::FieldDescriptor::Type::TYPE_DOUBLE:
-			for (auto one: ArrayT<double>(data, end)) {
-				reflection->AddDouble(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<double, &google::protobuf::Reflection::AddDouble>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FLOAT:
-			for (auto one: ArrayT<float>(data, end)) {
-				reflection->AddFloat(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<float, &google::protobuf::Reflection::AddFloat>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			for (auto one: ArrayT<uint64_t>(data, end)) {
-				reflection->AddUInt64(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<uint64_t, &google::protobuf::Reflection::AddUInt64>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			for (auto one: ArrayT<uint32_t>(data, end)) {
-				reflection->AddUInt32(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<uint32_t, &google::protobuf::Reflection::AddUInt32>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			for (auto one: ArrayT<int64_t>(data, end)) {
-				reflection->AddInt64(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<int64_t, &google::protobuf::Reflection::AddInt64>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			for (auto one: ArrayT<int32_t>(data, end)) {
-				reflection->AddInt32(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<int32_t, &google::protobuf::Reflection::AddInt32>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_BOOL:
-			for (auto one: ArrayT<bool>(data, end)) {
-				reflection->AddBool(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<bool, &google::protobuf::Reflection::AddBool>(data, end, field, out);
 		case google::protobuf::FieldDescriptor::Type::TYPE_ENUM:
-			for (auto one: ArrayT<EnumValue>(data, end)) {
-				reflection->AddEnumValue(out, field, one);
-			}
-			return true;
+			return DeserializeArrayScalar<EnumValue, &google::protobuf::Reflection::AddEnumValue>(data, end, field, out);
 		default:
 			return false;
 	}
@@ -160,21 +155,21 @@ static bool DeserializeMap(const uint32_t* data, const uint32_t* end,
 				break;
 			case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 			case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-				unit->GetReflection()->SetUInt64(unit, key_field, FieldT<uint64_t>(pair.Key()).Get());
+				SetMapKeyScalar<uint64_t, &google::protobuf::Reflection::SetUInt64>(pair, key_field, end, unit);
 				break;
 			case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 			case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-				unit->GetReflection()->SetUInt32(unit, key_field, FieldT<uint32_t>(pair.Key()).Get());
+				SetMapKeyScalar<uint32_t, &google::protobuf::Reflection::SetUInt32>(pair, key_field, end, unit);
 				break;
 			case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 			case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 			case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-				unit->GetReflection()->SetInt64(unit, key_field, FieldT<int64_t>(pair.Key()).Get());
+				SetMapKeyScalar<int64_t, &google::protobuf::Reflection::SetInt64>(pair, key_field, end, unit);
 				break;
 			case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 			case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 			case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-				unit->GetReflection()->SetInt32(unit, key_field, FieldT<int32_t>(pair.Key()).Get());
+				SetMapKeyScalar<int32_t, &google::protobuf::Reflection::SetInt32>(pair, key_field, end, unit);
 				break;
 			default:
 				return false;
@@ -187,11 +182,10 @@ static bool DeserializeMap(const uint32_t* data, const uint32_t* end,
 }
 
 static bool Deserialize(const uint32_t* data, const uint32_t* end, google::protobuf::Message* out) {
-	auto descriptor = out->GetDescriptor();
-	auto field_count = descriptor->field_count();
+	const auto* descriptor = out->GetDescriptor();
+	const auto field_count = descriptor->field_count();
 	if (field_count == 1) {
-		auto field = descriptor->field(0);
-		if (field->name() == "_" && field->number() == 1) {	// wrapper
+		if (const auto* field = descriptor->field(0); field->name() == "_" && field->number() == 1) {	// wrapper
 			if (!field->is_repeated()) {
 				return false;
 			} else if (field->is_map()) {
@@ -208,11 +202,11 @@ static bool Deserialize(const uint32_t* data, const uint32_t* end, google::proto
 	}
 
 	for (int i = 0; i < field_count; i++) {
-		auto field = descriptor->field(i);
+		const auto* field = descriptor->field(i);
 		if (field->options().deprecated()) {
 			continue;
 		}
-		auto id = field->number() - 1;
+		const auto id = field->number() - 1;
 		if (!src.HasField(id, end)) {
 			continue;
 		}

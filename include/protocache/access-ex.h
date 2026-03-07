@@ -112,7 +112,7 @@ private:
 
 	template <typename U>
 	static void Extract(const uint32_t* data, const uint32_t* end, std::unique_ptr<U>& out) {
-		out.reset(new U(data, end));
+		out = std::make_unique<U>(data, end);
 	}
 
 public:
@@ -120,7 +120,7 @@ public:
 	ArrayEX(const uint32_t* data, const uint32_t* end) {
 		auto view = Array(data, end);
 		this->core_.resize(view.Size());
-		for (unsigned i = 0; i < view.Size(); i++) {
+		for (size_t i = 0; i < this->core_.size(); i++) {
 			Extract(view[i].GetObject(end), end, this->core_[i]);
 		}
 	}
@@ -131,7 +131,7 @@ public:
 	bool Serialize(Buffer& buf, Unit& unit, const uint32_t* end) const {
 		std::vector<Unit> elements(this->size());
 		auto last = buf.Size();
-		for (int i = static_cast<int>(this->size())-1; i >= 0; i--) {
+		for (size_t i = this->size(); i-- > 0;) {
 			if (!::protocache::Serialize(this->core_[i], end, buf, elements[i])) {
 				return false;
 			}
@@ -140,10 +140,11 @@ public:
 	}
 };
 
-template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+template<typename T>
 struct ScalarArrayEX : public BaseArrayEX<T> {
 	ScalarArrayEX() = default;
 	ScalarArrayEX(const uint32_t* data, const uint32_t* end) {
+		static_assert(std::is_scalar_v<T>, "T must be scalar");
 		auto view = Array(data, end).Numbers<T>();
 		this->core_.assign(view.begin(), view.end());
 	};
@@ -158,7 +159,7 @@ struct ScalarArrayEX : public BaseArrayEX<T> {
 			return false;
 		}
 		auto last = buf.Size();
-		for (int i = static_cast<int>(this->size())-1; i >= 0; i--) {
+		for (size_t i = this->size(); i-- > 0;) {
 			*reinterpret_cast<T*>(buf.Expand(m)) = this->core_[i];
 		}
 		buf.Put((this->size() << 2U) | m);
@@ -241,49 +242,49 @@ private:
 	using ConstIterator = typename std::unordered_map<KeyEX,ValEX>::const_iterator;
 	std::unordered_map<KeyEX,ValEX> core_;
 
-	template <typename K>
-	static Slice<uint8_t> ReadKeyBytes(const K& key, std::false_type) {
-		return {reinterpret_cast<const uint8_t*>(&key), sizeof(K)};
-	}
+	template <typename T>
+	struct IsUniquePtr : std::false_type {};
 
-	static Slice<uint8_t> ReadKeyBytes(const std::string& key, std::true_type) {
-		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
-	}
+	template <typename U>
+	struct IsUniquePtr<std::unique_ptr<U>> : std::true_type {};
+
+		template <typename K>
+		static Slice<uint8_t> ReadKeyBytes(const K& key) {
+			if constexpr (std::is_same_v<K, std::string>) {
+				return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
+			} else {
+				return {reinterpret_cast<const uint8_t*>(&key), sizeof(K)};
+			}
+		}
 
 	template <typename T>
-	static typename Adapter<T>::TypeEX Extract(Field field, const uint32_t* end, const T*) {
-		return FieldT<T>(field).Get(end);
+	static typename Adapter<T>::TypeEX Extract(Field field, const uint32_t* end) {
+		if constexpr (std::is_same_v<T, Slice<char>> || std::is_same_v<T, Slice<uint8_t>>) {
+			auto view = FieldT<Slice<char>>(field).Get(end);
+			return {view.data(), view.size()};
+		} else if constexpr (IsUniquePtr<T>::value) {
+			using U = typename T::element_type;
+			auto out = std::make_unique<U>();
+			*out = FieldT<U>(field).Get(end);
+			return out;
+		} else {
+			return FieldT<T>(field).Get(end);
+		}
 	}
 
-	template <typename T>
-	static std::unique_ptr<T> Extract(Field field, const uint32_t* end, const std::unique_ptr<T>*) {
-		std::unique_ptr<T> out(new T);
-		*out = FieldT<T>(field).Get(end);
-		return out;
-	}
-
-	static std::string Extract(Field field, const uint32_t* end, const Slice<char>*) {
-		auto view = FieldT<Slice<char>>(field).Get(end);
-		return {view.data(), view.size()};
-	}
-	static std::string Extract(Field field, const uint32_t* end, const Slice<uint8_t>*) {
-		auto view = FieldT<Slice<char>>(field).Get(end);
-		return {view.data(), view.size()};
-	}
-
-	template <typename K, typename V>
-	class MapKeyReader : public KeyReader {
-	public:
-		explicit MapKeyReader(const std::vector<const std::pair<const K,V>*>& core) : core_(core) {}
-		void Reset() override { idx_ = 0; }
+		template <typename K, typename V>
+		class MapKeyReader : public KeyReader {
+		public:
+			explicit MapKeyReader(const std::vector<const std::pair<const K,V>*>& core) : core_(core) {}
+			void Reset() override { idx_ = 0; }
 		size_t Total() override { return core_.size(); }
 		Slice<uint8_t> Read() override {
-			if (idx_ >= core_.size()) {
-				return {};
+				if (idx_ >= core_.size()) {
+					return {};
+				}
+				auto pair = core_[idx_++];
+				return ReadKeyBytes(pair->first);
 			}
-			auto pair = core_[idx_++];
-			return {reinterpret_cast<const uint8_t*>(&pair->first), sizeof(Key)};
-		}
 
 		private:
 			const std::vector<const std::pair<const K,V>*>& core_;
@@ -296,8 +297,8 @@ public:
 		auto view = Map(data, end);
 		core_.reserve(view.Size());
 		for (auto pair : view) {
-			auto key = Extract(pair.Key(), end, (const Key*)nullptr);
-			auto val = Extract(pair.Value(), end, (const Val*)nullptr);
+			auto key = Extract<Key>(pair.Key(), end);
+			auto val = Extract<Val>(pair.Value(), end);
 			core_.emplace(std::move(key), std::move(val));
 		}
 	}
@@ -321,7 +322,7 @@ public:
 		}
 		reader.Reset();
 		std::vector<const std::pair<const KeyEX,ValEX>*> book(memo.size());
-		for (unsigned i = 0; i < memo.size(); i++) {
+		for (size_t i = 0; i < memo.size(); i++) {
 			auto key = reader.Read();
 			auto pos = index.Locate(key.data(), key.size());
 			assert(pos < book.size());
@@ -331,7 +332,7 @@ public:
 		std::vector<Unit> keys(book.size());
 		std::vector<Unit> values(book.size());
 		auto last = buf.Size();
-		for (int i = static_cast<int>(book.size())-1; i >= 0; i--) {
+		for (size_t i = book.size(); i-- > 0;) {
 			auto& pair = *book[i];
 			if (!::protocache::Serialize(pair.second, end, buf, values[i])
 				|| !::protocache::Serialize(pair.first, buf, keys[i])) {
@@ -386,7 +387,7 @@ private:
 
 	template <typename T>
 	void ExtractField(unsigned id, const uint32_t* end, std::unique_ptr<T>& out) {
-		out.reset(new T);
+		out = std::make_unique<T>();
 		*out = FieldT<T>(Message::GetField(id, end)).Get(end);
 	}
 
@@ -436,22 +437,21 @@ public:
 		return ::protocache::Serialize(field, buf, unit) && Fold(buf, unit);
 	}
 
-	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	template <typename T>
 	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Buffer& buf, Unit& unit) const {
-		if (!_accessed.test(id)) {
-			return Copy(DetectField<T>(*this, id, end), buf, unit, true);
-		} else if (field == 0) {
-			return MarkNil(unit);
-		}
-		return ::protocache::Serialize(field, buf, unit);	// scalar is always folded
-	}
-
-	template <typename T, typename std::enable_if<!std::is_scalar<T>::value, bool>::type = true>
-	bool SerializeField(unsigned id, const uint32_t* end, const T& field, Buffer& buf, Unit& unit) const {
-		if (!_accessed.test(id)) {
-			Copy(DetectField<typename Unwrapper<T>::Type>(*this, id, end), buf, unit, true);
-		} else if (!::protocache::Serialize(field, end, buf, unit)) {
-			return false;
+		if constexpr (std::is_scalar_v<T>) {
+			if (!_accessed.test(id)) {
+				return Copy(DetectField<T>(*this, id, end), buf, unit, true);
+			} else if (field == 0) {
+				return MarkNil(unit);
+			}
+			return ::protocache::Serialize(field, buf, unit);	// scalar is always folded
+		} else {
+			if (!_accessed.test(id)) {
+				Copy(DetectField<typename Unwrapper<T>::Type>(*this, id, end), buf, unit, true);
+			} else if (!::protocache::Serialize(field, end, buf, unit)) {
+				return false;
+			}
 		}
 		if (unit.size() == 1) {
 			if (unit.len == 0) {

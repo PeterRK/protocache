@@ -28,7 +28,7 @@ private:
 	std::string tmp_str_;
 	Buffer& buf_;
 
-	template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type = true>
+	template<typename T>
 	bool SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit);
 
 	bool SerializeSimpleField(const google::protobuf::Message& message,
@@ -50,8 +50,9 @@ bool Serialize(const google::protobuf::Message& message, Buffer* buf) {
 	return ctx.Serialize(message, dummy);
 }
 
-template<typename T, typename std::enable_if<std::is_scalar<T>::value, bool>::type>
+template<typename T>
 bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit) {
+	static_assert(std::is_scalar_v<T>, "T must be scalar");
 	static_assert(sizeof(T) == 4 || sizeof(T) == 8, "");
 	constexpr unsigned m = sizeof(T) / 4;
 	if (array.size() == 0) {
@@ -62,7 +63,7 @@ bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T
 		return false;
 	}
 	auto last = buf_.Size();
-	for (int i = array.size()-1; i >= 0; i--) {
+	for (int i = array.size(); i-- > 0;) {
 		*reinterpret_cast<T*>(buf_.Expand(m)) = array.Get(i);
 	}
 	buf_.Put((array.size() << 2U) | m);
@@ -199,7 +200,11 @@ public:
 			return {};
 		}
 		auto& key = keys_[idx_++];
-		return {reinterpret_cast<const uint8_t*>(&key), sizeof(T)};
+		if constexpr (std::is_same_v<T, std::string>) {
+			return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
+		} else {
+			return {reinterpret_cast<const uint8_t*>(&key), sizeof(T)};
+		}
 	}
 
 private:
@@ -207,29 +212,18 @@ private:
 	size_t idx_ = 0;
 };
 
-template <>
-class VectorReader<std::string> : public KeyReader {
-public:
-	explicit VectorReader(std::vector<std::string>&& keys) : keys_(std::move(keys)) {}
-
-	void Reset() override {
-		idx_ = 0;
+template <typename T, auto Getter>
+static std::unique_ptr<KeyReader> MakeVectorReaderByMethod(
+		const google::protobuf::RepeatedFieldRef<google::protobuf::Message>& pairs,
+		const google::protobuf::FieldDescriptor* key_field) {
+	std::vector<T> tmp;
+	tmp.reserve(pairs.size());
+	for (auto& pair : pairs) {
+		auto reflection = pair.GetReflection();
+		tmp.push_back((reflection->*Getter)(pair, key_field));
 	}
-	size_t Total() override {
-		return keys_.size();
-	}
-	Slice<uint8_t> Read() override {
-		if (idx_ >= keys_.size()) {
-			return {};
-		}
-		auto& key = keys_[idx_++];
-		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
-	}
-
-private:
-	std::vector<std::string> keys_;
-	size_t idx_ = 0;
-};
+	return std::make_unique<VectorReader<T>>(std::move(tmp));
+}
 
 bool SerializeContext::SerializeMapField(const google::protobuf::Message& message,
 										 const google::protobuf::FieldDescriptor* field, Unit& unit) {
@@ -239,40 +233,32 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	auto pairs = message.GetReflection()->GetRepeatedFieldRef<google::protobuf::Message>(message, field);
 
 	std::unique_ptr<KeyReader> reader;
-
-#define CREATE_KEY_READER(src_type,dest_type) \
-{																	\
-	std::vector<dest_type> tmp;										\
-	tmp.reserve(pairs.size());										\
-	for (auto& pair : pairs) {										\
-		auto reflection = pair.GetReflection();						\
-		tmp.push_back(reflection->Get##src_type(pair, key_field));	\
-	}																\
-	reader.reset(new VectorReader<dest_type>(std::move(tmp)));		\
-	break;                                       					\
-}
 	switch (key_field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_BYTES:
 		case google::protobuf::FieldDescriptor::Type::TYPE_STRING:
-			CREATE_KEY_READER(String, std::string)
+			reader = MakeVectorReaderByMethod<std::string, &google::protobuf::Reflection::GetString>(pairs, key_field);
+			break;
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			CREATE_KEY_READER(UInt64, uint64_t)
+			reader = MakeVectorReaderByMethod<uint64_t, &google::protobuf::Reflection::GetUInt64>(pairs, key_field);
+			break;
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			CREATE_KEY_READER(UInt32, uint32_t)
+			reader = MakeVectorReaderByMethod<uint32_t, &google::protobuf::Reflection::GetUInt32>(pairs, key_field);
+			break;
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			CREATE_KEY_READER(Int64, int64_t)
+			reader = MakeVectorReaderByMethod<int64_t, &google::protobuf::Reflection::GetInt64>(pairs, key_field);
+			break;
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			CREATE_KEY_READER(Int32, int32_t)
+			reader = MakeVectorReaderByMethod<int32_t, &google::protobuf::Reflection::GetInt32>(pairs, key_field);
+			break;
 		default:
 			return false;
 	}
-#undef CREATE_KEY_READER
 
 	auto index = PerfectHashObject::Build(*reader, true);
 	if (!index) {
@@ -280,18 +266,18 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	}
 	reader->Reset();
 	std::vector<int> book(pairs.size());
-	for (int i = 0; i < book.size(); i++) {
+	for (size_t i = 0; i < book.size(); i++) {
 		auto key = reader->Read();
 		auto pos = index.Locate(key.data(), key.size());
 		assert(pos < book.size());
-		book[pos] = i;
+		book[pos] = static_cast<int>(i);
 	}
 
 	auto last = buf_.Size();
 	std::vector<Unit> keys(book.size());
 	std::vector<Unit> values(book.size());
 	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
-	for (int i = static_cast<int>(book.size())-1; i >= 0; i--) {
+	for (size_t i = book.size(); i-- > 0;) {
 		auto& pair = pairs.Get(book[i], tmp.get());
 		if (!SerializeSimpleField(pair, value_field, values[i])
 			|| !SerializeSimpleField(pair, key_field, keys[i])) {
@@ -388,7 +374,7 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 
 	auto last = buf_.Size();
 	std::vector<Unit> parts(fields.size());
-	for (int i = static_cast<int>(fields.size())-1; i >= 0; i--) {
+	for (size_t i = fields.size(); i-- > 0;) {
 		auto field = fields[i];
 		if (field == nullptr) {
 			continue;

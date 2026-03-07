@@ -83,7 +83,7 @@ static inline constexpr size_t WordSize(size_t sz) noexcept {
 
 template<typename D, typename S>
 static inline constexpr Slice<D> SliceCast(const Slice<S>& src) noexcept {
-	static_assert(std::is_scalar<D>::value && std::is_scalar<S>::value && sizeof(D) == sizeof(S), "");
+	static_assert(std::is_scalar_v<D> && std::is_scalar_v<S> && sizeof(D) == sizeof(S), "");
 	return {reinterpret_cast<const D*>(src.data()), src.size()};
 }
 

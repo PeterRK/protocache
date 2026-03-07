@@ -3,19 +3,20 @@
 // license that can be found in the LICENSE file.
 
 #include "protocache/extension/reflection.h"
+#include <string_view>
 
 namespace protocache {
 namespace reflection {
 
-static inline std::string Fullname(const std::string& ns, const std::string& name) {
+static inline std::string Fullname(std::string_view ns, std::string_view name) {
 	if (ns.empty()) {
-		return name;
+		return std::string(name);
 	}
 	std::string fullname;
 	fullname.reserve(ns.size()+1+name.size());
-	fullname = ns;
+	fullname.assign(ns.data(), ns.size());
 	fullname += '.';
-	fullname += name;
+	fullname.append(name.data(), name.size());
 	return fullname;
 }
 
@@ -90,8 +91,7 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 			field.value_type.clear();
 			return true;
 		}
-		auto it = pool_.find(name);
-		if (it != pool_.end()) {
+		if (auto it = pool_.find(name); it != pool_.end()) {
 			field.value = Field::TYPE_MESSAGE;
 			field.value_type = name;
 			field.value_descriptor = &it->second;
@@ -135,8 +135,8 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 			return false;
 		}
 	} else {
-		for (auto& p : descriptor.fields) {
-			if (!check_type(p.second)) {
+		for (auto& [_, field] : descriptor.fields) {
+			if (!check_type(field)) {
 				return false;
 			}
 		}
@@ -165,13 +165,13 @@ const Descriptor* DescriptorPool::Find(const std::string& fullname) noexcept {
 
 bool DescriptorPool::Register(const std::string& ns, const google::protobuf::DescriptorProto& proto) {
 	auto fullname = Fullname(ns, proto.name());
-	for (auto& one : proto.enum_type()) {
+	for (const auto& one : proto.enum_type()) {
 		if (!one.options().deprecated()) {
 			enum_.insert(Fullname(fullname, one.name()));
 		}
 	}
 	std::unordered_map<std::string, const google::protobuf::DescriptorProto*> map_entries;
-	for (auto& one : proto.nested_type()) {
+	for (const auto& one : proto.nested_type()) {
 		if (one.options().deprecated()) {
 			continue;
 		}
@@ -215,7 +215,7 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 		}
 	} else {
 		descriptor.fields.reserve(proto.field_size());
-		for (auto& one : proto.field()) {
+		for (const auto& one : proto.field()) {
 			if (one.options().deprecated()) {
 				continue;
 			}
@@ -234,12 +234,12 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 }
 
 bool DescriptorPool::Register(const google::protobuf::FileDescriptorProto& proto) {
-	for (auto& one : proto.enum_type()) {
+	for (const auto& one : proto.enum_type()) {
 		if (!one.options().deprecated()) {
 			enum_.insert(Fullname(proto.package(), one.name()));
 		}
 	}
-	for (auto& one : proto.message_type()) {
+	for (const auto& one : proto.message_type()) {
 		if (one.options().deprecated()) {
 			continue;
 		}
@@ -247,9 +247,9 @@ bool DescriptorPool::Register(const google::protobuf::FileDescriptorProto& proto
 			return false;
 		}
 	}
-	for (auto& p : pool_) {
-		if (p.second.alias.id != 0 && FixUnknownType(p.first, p.second)) {
-			p.second.alias.id = 0;
+	for (auto& [name, descriptor] : pool_) {
+		if (descriptor.alias.id != 0 && FixUnknownType(name, descriptor)) {
+			descriptor.alias.id = 0;
 		}
 	}
 	return true;
