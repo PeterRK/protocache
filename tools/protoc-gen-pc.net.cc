@@ -222,12 +222,12 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			std::cerr << "found illegal field in message " << fullname << std::endl;
 			return {};
 		}
-		oss << "\tpublic const int _" << one->name() << " = " << (one->number()-1) << ";\n";
+		oss << "\tpublic const ushort _" << one->name() << " = " << (one->number()-1) << ";\n";
 	}
 	oss << "\n\tprivate global::ProtoCache.Message _core_;\n"
 		<< "\tpublic " << proto.name() << "() {}\n"
 		<< "\tpublic " << proto.name() << "(byte[] data) => Init(new global::ProtoCache.DataView(data));\n"
-		<< "\tpublic bool HasField(int id) => _core_.HasField(id);\n"
+		<< "\tpublic bool HasField(ushort id) => _core_.HasField(id);\n"
 		<< "\tpublic void Init(global::ProtoCache.DataView data) {\n"
 		<< "\t\t_core_.Init(data);\n";
 	for (auto one : fields) {
