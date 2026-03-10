@@ -144,12 +144,12 @@ template<typename T>
 struct ScalarArrayEX : public BaseArrayEX<T> {
 	ScalarArrayEX() = default;
 	ScalarArrayEX(const uint32_t* data, const uint32_t* end) {
-		static_assert(std::is_scalar_v<T>, "T must be scalar");
+		static_assert(std::is_scalar_v<T>);
 		auto view = Array(data, end).Numbers<T>();
 		this->core_.assign(view.begin(), view.end());
 	};
 	bool Serialize(Buffer& buf, Unit& unit, const uint32_t*) const {
-		static_assert(sizeof(T) == 4 || sizeof(T) == 8, "");
+		static_assert(sizeof(T) == 4 || sizeof(T) == 8);
 		constexpr unsigned m = sizeof(T) / 4;
 		if (this->size() == 0) {
 			unit.len = 1;

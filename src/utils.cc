@@ -13,7 +13,11 @@ bool LoadFile(const std::string& path, std::string* out) {
 	if (!ifs) {
 		return false;
 	}
-	size_t size = ifs.tellg();
+	auto pos = ifs.tellg();
+	if (pos < 0) {
+		return false;
+	}
+	size_t size = static_cast<size_t>(pos);
 	ifs.seekg(0);
 	out->resize(size);
 	if (!ifs.read(const_cast<char*>(out->data()), size)) {

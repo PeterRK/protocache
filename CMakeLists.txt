@@ -10,50 +10,69 @@ set(CMAKE_CXX_STANDARD 17)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 option(WITH_TEST "enable test" ON)
+option(WITH_TOOLS "build command line tools and protoc plugins" ON)
+option(WITH_BENCHMARK "build benchmark target" OFF)
 
 find_package(Protobuf REQUIRED)
-find_package(gflags REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-file(GLOB source
-    src/*.cc
+set(PROTOCACHE_CORE_SOURCES
+    src/access.cc
+    src/hash.cc
+    src/perfect_hash.cc
+    src/serialize.cc
+    src/utils.cc
 )
 
-add_library(protocache-lite ${source})
+add_library(protocache-lite ${PROTOCACHE_CORE_SOURCES})
 
-file(GLOB extension
-    src/extension/*.cc
+set(PROTOCACHE_EXTENSION_SOURCES
+    src/extension/deserialize.cc
+    src/extension/reflection.cc
+    src/extension/serialize.cc
+    src/extension/utils.cc
 )
 
-add_library(protocache ${source} ${extension})
+add_library(protocache ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
 target_link_libraries(protocache protobuf pthread)
 
 if(WITH_TEST)
+    enable_testing()
     find_package(GTest REQUIRED)
 
-    file(GLOB test_src
-        test/*.cc
+    set(PROTOCACHE_TEST_SOURCES
+        test/main.cc
+        test/perfect_hash.cc
+        test/protocache.cc
     )
 
-    add_executable(test ${test_src})
-    target_link_libraries(test protocache protobuf gtest pthread)
+    add_executable(protocache-test ${PROTOCACHE_TEST_SOURCES})
+    target_link_libraries(protocache-test protocache protobuf gtest pthread)
+    add_test(NAME protocache-test COMMAND protocache-test)
+    set_tests_properties(protocache-test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test
+    )
 endif()
 
-add_executable(json-to-binary tools/json-to-binary.cc)
-target_link_libraries(json-to-binary protocache protobuf gflags pthread)
+if(WITH_TOOLS)
+    find_package(gflags REQUIRED)
 
-add_executable(binary-to-json tools/binary-to-json.cc)
-target_link_libraries(binary-to-json protocache protobuf gflags pthread)
+    add_executable(json-to-binary tools/json-to-binary.cc)
+    target_link_libraries(json-to-binary protocache protobuf gflags pthread)
 
-add_executable(protoc-gen-pccx tools/protoc-gen-pccx.cc)
-target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
+    add_executable(binary-to-json tools/binary-to-json.cc)
+    target_link_libraries(binary-to-json protocache protobuf gflags pthread)
 
-add_executable(protoc-gen-pcjv tools/protoc-gen-pcjv.cc)
-target_link_libraries(protoc-gen-pcjv protoc protobuf pthread)
+    add_executable(protoc-gen-pccx tools/protoc-gen-pccx.cc)
+    target_link_libraries(protoc-gen-pccx protoc protobuf pthread)
 
-add_executable(protoc-gen-pc.net tools/protoc-gen-pc.net.cc)
-target_link_libraries(protoc-gen-pc.net protoc protobuf pthread)
+    add_executable(protoc-gen-pcjv tools/protoc-gen-pcjv.cc)
+    target_link_libraries(protoc-gen-pcjv protoc protobuf pthread)
+
+    add_executable(protoc-gen-pc.net tools/protoc-gen-pc.net.cc)
+    target_link_libraries(protoc-gen-pc.net protoc protobuf pthread)
+endif()
 
 install(
     DIRECTORY "${CMAKE_SOURCE_DIR}/include/protocache"
@@ -61,15 +80,24 @@ install(
 )
 
 install(
-    TARGETS protocache protocache-lite protoc-gen-pccx protoc-gen-pcjv
+    TARGETS protocache protocache-lite
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
 
-file(GLOB bench_src
-    test/benchmark/*.cc
-)
+if(WITH_TOOLS)
+    install(
+        TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net
+        RUNTIME DESTINATION bin
+    )
+endif()
 
-#add_executable(benchmark ${bench_src})
-#target_link_libraries(benchmark protocache protobuf flatbuffers capnp kj pthread)
+if(WITH_BENCHMARK)
+    file(GLOB PROTOCACHE_BENCHMARK_SOURCES
+        test/benchmark/*.cc
+    )
+
+    add_executable(benchmark ${PROTOCACHE_BENCHMARK_SOURCES})
+    target_link_libraries(benchmark protocache protobuf flatbuffers capnp kj pthread)
+endif()

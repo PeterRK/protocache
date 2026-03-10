@@ -52,8 +52,8 @@ bool Serialize(const google::protobuf::Message& message, Buffer* buf) {
 
 template<typename T>
 bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit) {
-	static_assert(std::is_scalar_v<T>, "T must be scalar");
-	static_assert(sizeof(T) == 4 || sizeof(T) == 8, "");
+	static_assert(std::is_scalar_v<T>);
+	static_assert(sizeof(T) == 4 || sizeof(T) == 8);
 	constexpr unsigned m = sizeof(T) / 4;
 	if (array.size() == 0) {
 		unit.len = 1;

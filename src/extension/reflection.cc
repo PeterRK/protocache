@@ -77,7 +77,6 @@ static inline bool CanBeKey(Field::Type type) noexcept {
 		case Field::TYPE_UINT32:
 		case Field::TYPE_INT64:
 		case Field::TYPE_INT32:
-		case Field::TYPE_BOOL:
 			return true;
 		default:
 			return false;

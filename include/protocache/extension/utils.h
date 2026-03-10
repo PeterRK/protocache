@@ -20,7 +20,18 @@ extern bool ParseProtoFile(const std::string& filename, google::protobuf::FileDe
 extern bool LoadJson(const std::string& path, google::protobuf::Message* message);
 extern bool DumpJson(const google::protobuf::Message& message, const std::string& path);
 
+// Serialize protobuf into ProtoCache format.
+// Returns false when the schema cannot be represented by ProtoCache, including:
+// - empty messages
+// - overly sparse field ids
+// - duplicate field ids after filtering deprecated fields
+// - map key types outside ProtoCache's supported key set
+// - alias messages whose only field is not a repeated field named "_"
 extern bool Serialize(const google::protobuf::Message& message, Buffer* buf);
+
+// Deserialize ProtoCache data into protobuf.
+// The protobuf schema is expected to obey the same ProtoCache schema constraints
+// as Serialize().
 extern bool Deserialize(const Slice<uint32_t>& raw, google::protobuf::Message* message);
 
 } // protocache
