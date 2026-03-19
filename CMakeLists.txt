@@ -7,15 +7,18 @@ project(protocache)
 
 set(CMAKE_CXX_STANDARD 17)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
 option(WITH_TEST "enable test" ON)
 option(WITH_TOOLS "build command line tools and protoc plugins" ON)
 option(WITH_BENCHMARK "build benchmark target" OFF)
+option(PROTOCACHE_ENABLE_NATIVE_OPT "enable native CPU optimizations" OFF)
 
 find_package(Protobuf REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
+
+if(PROTOCACHE_ENABLE_NATIVE_OPT)
+    add_compile_options(-march=native)
+endif()
 
 set(PROTOCACHE_CORE_SOURCES
     src/access.cc

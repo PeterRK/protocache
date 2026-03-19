@@ -291,7 +291,7 @@ int BenchmarkProtobufSerialize(bool flat) {
 			buf.Clear();
 		}
 		auto delta_ms = DeltaMs(start);
-		printf("protocache-reflect: %ldms %x\n", delta_ms, cnt);
+		printf("protocache-serialize: %ldms %x\n", delta_ms, cnt);
 	} else {
 		std::string data;
 		for (size_t i = 0; i < kLoop; i++) {
@@ -299,7 +299,7 @@ int BenchmarkProtobufSerialize(bool flat) {
 			cnt += data.size();
 		}
 		auto delta_ms = DeltaMs(start);
-		printf("protobuf: %ldms %x\n", delta_ms, cnt);
+		printf("protobuf-serialize: %ldms %x\n", delta_ms, cnt);
 	}
 	return 0;
 }

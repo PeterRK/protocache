@@ -208,16 +208,17 @@ static bool Deserialize(const uint32_t* data, const uint32_t* end, google::proto
 			continue;
 		}
 		const auto id = field->number() - 1;
-		if (!src.HasField(id, end)) {
+		auto src_field = src.GetField(id, end);
+		if (!src_field) {
 			continue;
 		}
 		bool ok = false;
 		if (!field->is_repeated()) {
-			ok = DeserializeSingle(src.GetField(id,end), end, field, out);
+			ok = DeserializeSingle(src_field, end, field, out);
 		} else if (field->is_map()) {
-			ok = DeserializeMap(src.GetField(id,end).GetObject(end), end, field, out);
+			ok = DeserializeMap(src_field.GetObject(end), end, field, out);
 		} else {
-			ok =  DeserializeArray(src.GetField(id,end).GetObject(end), end, field, out);
+			ok =  DeserializeArray(src_field.GetObject(end), end, field, out);
 		}
 		if (!ok) {
 			return false;
