@@ -10,6 +10,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <utility>
 #include <type_traits>
 #include "utils.h"
 #include "access.h"
@@ -85,7 +86,7 @@ static inline bool Serialize(const std::string& str, Buffer& buf, Unit& unit) {
 
 extern bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit& unit);
 extern bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit& unit);
-extern bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
-						 std::vector<Unit>& values, Buffer& buf, size_t last, Unit& unit);
+extern bool SerializeMap(const Slice<uint8_t>& index, std::vector<std::pair<Unit,Unit>>& pairs,
+						 Buffer& buf, size_t last, Unit& unit);
 } // protocache
 #endif //PROTOCACHE_SERIALIZE_H_

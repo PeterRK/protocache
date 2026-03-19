@@ -18,6 +18,7 @@ namespace protocache {
 static bool Deserialize(const uint32_t* data, const uint32_t* end, google::protobuf::Message* out);
 
 bool Deserialize(const Slice<uint32_t>& raw, google::protobuf::Message* message) {
+	message->Clear();
 	return Deserialize(raw.data(), raw.end(), message);
 }
 
@@ -182,7 +183,6 @@ static bool DeserializeMap(const uint32_t* data, const uint32_t* end,
 }
 
 static bool Deserialize(const uint32_t* data, const uint32_t* end, google::protobuf::Message* out) {
-	out->Clear();
 	const auto* descriptor = out->GetDescriptor();
 	const auto field_count = descriptor->field_count();
 	if (field_count == 1) {

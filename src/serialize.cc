@@ -55,9 +55,11 @@ bool Serialize(const Slice<char>& str, Buffer& buf, Unit& unit) {
 	return true;
 }
 
-static size_t BestArraySize(const std::vector<Unit>& elements, unsigned& m) {
+template <typename T, typename F>
+static size_t BestArraySize(const std::vector<T>& elements, unsigned& m, F f) {
 	size_t sizes[3] = {0, 0, 0};
-	for (auto& one : elements) {
+	for (auto& raw : elements) {
+		auto& one = f(raw);
 		sizes[0] += 1;
 		sizes[1] += 2;
 		sizes[2] += 3;
@@ -154,7 +156,7 @@ bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit&
 	}
 
 	unsigned m = 0;
-	size_t size = BestArraySize(elements, m);
+	size_t size = BestArraySize(elements, m, [](const Unit& u)->const Unit&{ return u; });
 	if (size >= (1U<<30U)) {
 		return false;
 	}
@@ -172,21 +174,20 @@ bool SerializeArray(std::vector<Unit>& elements, Buffer& buf, size_t last, Unit&
 	return true;
 }
 
-bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
-				  std::vector<Unit>& values, Buffer& buf, size_t last, Unit& unit) {
-	if (keys.size() != values.size()) {
-		return false;
-	}
-	if (keys.empty()) {
+bool SerializeMap(const Slice<uint8_t>& index, std::vector<std::pair<Unit,Unit>>& pairs,
+	Buffer& buf, size_t last, Unit& unit) {
+	if (pairs.empty()) {
 		unit.len = 1;
 		unit.data[0] = 5U << 28U;
 		return true;
 	}
 
 	unsigned m1 = 0;
-	auto key_size = BestArraySize(keys, m1);
+	auto key_size = BestArraySize(pairs, m1,
+		[](const std::pair<Unit,Unit>& p)->const Unit&{ return p.first; });
 	unsigned m2 = 0;
-	auto value_size = BestArraySize(values, m2);
+	auto value_size = BestArraySize(pairs, m2,
+		[](const std::pair<Unit,Unit>& p)->const Unit&{ return p.second; });
 
 	auto index_size = WordSize(index.size());
 	auto size = index_size + key_size + value_size;
@@ -195,14 +196,14 @@ bool SerializeMap(const Slice<uint8_t>& index, std::vector<Unit>& keys,
 	}
 
 	auto tail = buf.At(last);
-	for (int i = static_cast<int>(keys.size())-1; i >= 0; i--) {
-		Pick(values[i], buf, tail, m2);
-		Pick(keys[i], buf, tail, m1);
+	for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
+		Pick(it->second, buf, tail, m2);
+		Pick(it->first, buf, tail, m1);
 	}
 	buf.Shrink(tail - buf.Head());
-	for (int i = static_cast<int>(keys.size())-1; i >= 0; i--) {
-		Mark(values[i], buf, m2);
-		Mark(keys[i], buf, m1);
+	for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
+		Mark(it->second, buf, m2);
+		Mark(it->first, buf, m1);
 	}
 	auto head = buf.Expand(index_size);
 	head[index_size-1] = 0;

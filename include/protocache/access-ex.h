@@ -329,17 +329,16 @@ public:
 			book[pos] = memo[i];
 		}
 
-		std::vector<Unit> keys(book.size());
-		std::vector<Unit> values(book.size());
+		std::vector<std::pair<Unit,Unit>> units(book.size());
 		auto last = buf.Size();
 		for (size_t i = book.size(); i-- > 0;) {
 			auto& pair = *book[i];
-			if (!::protocache::Serialize(pair.second, end, buf, values[i])
-				|| !::protocache::Serialize(pair.first, buf, keys[i])) {
+			if (!::protocache::Serialize(pair.second, end, buf, units[i].second)
+				|| !::protocache::Serialize(pair.first, buf, units[i].first)) {
 				return false;
 			}
 		}
-		return ::protocache::SerializeMap(index.Data(), keys, values, buf, last, unit);
+		return ::protocache::SerializeMap(index.Data(), units, buf, last, unit);
 	}
 
 	size_t size() const noexcept { return core_.size(); }

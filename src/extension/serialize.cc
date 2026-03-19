@@ -274,17 +274,16 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	}
 
 	auto last = buf_.Size();
-	std::vector<Unit> keys(book.size());
-	std::vector<Unit> values(book.size());
+	std::vector<std::pair<Unit,Unit>> units(book.size());
 	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
 	for (size_t i = book.size(); i-- > 0;) {
 		auto& pair = pairs.Get(book[i], tmp.get());
-		if (!SerializeSimpleField(pair, value_field, values[i])
-			|| !SerializeSimpleField(pair, key_field, keys[i])) {
+		if (!SerializeSimpleField(pair, value_field, units[i].second)
+			|| !SerializeSimpleField(pair, key_field, units[i].first)) {
 			return false;
 		}
 	}
-	return SerializeMap(index.Data(), keys, values, buf_, last, unit);
+	return SerializeMap(index.Data(), units, buf_, last, unit);
 }
 
 bool SerializeContext::SerializeField(const google::protobuf::Message& message,

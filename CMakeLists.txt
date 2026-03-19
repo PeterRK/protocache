@@ -16,7 +16,12 @@ find_package(Protobuf REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-if(PROTOCACHE_ENABLE_NATIVE_OPT)
+set(PROTOCACHE_USE_NATIVE_OPT ${PROTOCACHE_ENABLE_NATIVE_OPT})
+if(WITH_BENCHMARK)
+    set(PROTOCACHE_USE_NATIVE_OPT ON)
+endif()
+
+if(PROTOCACHE_USE_NATIVE_OPT)
     add_compile_options(-march=native)
 endif()
 
