@@ -83,6 +83,12 @@ static inline void SetBit2on11(uint8_t* vec, size_t pos, uint8_t val) noexcept {
 	vec[pos>>2] ^= ((~val & 3) << ((pos&3)<<1));
 }
 
+#if defined(__GNUC__) && defined(__POPCNT__)
+static inline unsigned CountValidSlot(uint64_t v) noexcept {
+	v = (v & 0x5555555555555555ULL) & (v >> 1);
+	return 32U - __builtin_popcountll(v);
+}
+#else
 static inline unsigned CountValidSlot(uint64_t v) noexcept {
 	v &= (v >> 1);
 	v = (v & 0x1111111111111111ULL) + ((v >> 2U) & 0x1111111111111111ULL);
@@ -92,6 +98,7 @@ static inline unsigned CountValidSlot(uint64_t v) noexcept {
 	v = v + (v >> 32);
 	return 32U - (v & 0xffU);
 }
+#endif
 
 static inline void SetBit(uint8_t bitmap[], size_t pos) noexcept {
 	bitmap[pos>>3U] |= (1U<<(pos&7U));

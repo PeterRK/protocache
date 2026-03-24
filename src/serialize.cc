@@ -213,7 +213,7 @@ bool SerializeMap(const Slice<uint8_t>& index, std::vector<std::pair<Unit,Unit>>
 	return true;
 }
 
-bool SerializeMessage(std::vector<Unit>& fields, Buffer& buf, size_t last, Unit& unit) {
+bool SerializeMessage(Span<Unit> fields, Buffer& buf, size_t last, Unit& unit) {
 	if (fields.empty()) {
 		return false;
 	}

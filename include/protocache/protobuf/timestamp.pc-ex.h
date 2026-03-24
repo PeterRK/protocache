@@ -30,7 +30,7 @@ struct Timestamp final {
 		if (clean_head != nullptr) {
 			return protocache::Copy(Detect(clean_head, end), buf, unit);
 		}
-		std::vector<protocache::Unit> parts(2);
+		std::array<protocache::Unit,2> parts;
 		auto last = buf.Size();
 		if (!__view__.SerializeField(_::nanos, end, _nanos, buf, parts[_::nanos])) return false;
 		if (!__view__.SerializeField(_::seconds, end, _seconds, buf, parts[_::seconds])) return false;

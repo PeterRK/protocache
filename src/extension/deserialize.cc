@@ -218,7 +218,7 @@ static bool Deserialize(const uint32_t* data, const uint32_t* end, google::proto
 		} else if (field->is_map()) {
 			ok = DeserializeMap(src_field.GetObject(end), end, field, out);
 		} else {
-			ok =  DeserializeArray(src_field.GetObject(end), end, field, out);
+			ok = DeserializeArray(src_field.GetObject(end), end, field, out);
 		}
 		if (!ok) {
 			return false;

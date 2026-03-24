@@ -42,18 +42,13 @@ void Compress(const uint8_t* src, size_t len, std::string* out) {
 	auto pick = [&src, end]()->uint8_t {
 		uint8_t cnt = 1;
 		auto ch = *src++;
-		if (ch == 0) {
-			while (src < end && cnt < 4 && *src == 0) {
+		int8_t x = ch;
+		if (x == (x >> 1)) {
+			while (src < end && cnt < 4 && *src == ch) {
 				src++;
 				cnt++;
 			}
-			return 0x8 | (cnt-1);
-		} else if (ch == 0xff) {
-			while (src < end && cnt < 4 && *src == 0xff) {
-				src++;
-				cnt++;
-			}
-			return 0xC | (cnt-1);
+			return 0x8 | (ch & 0x4) | (cnt-1);
 		} else {
 			while (src < end && cnt < 7 && *src != 0 && *src != 0xff) {
 				src++;
@@ -126,7 +121,7 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 		return false;
 	}
 
-	out->resize(size);
+	out->resize(size+7);	// extra space for fast fill
 	auto dest = reinterpret_cast<uint8_t*>(const_cast<char*>(out->data()));
 	auto tail = reinterpret_cast<const uint8_t*>(out->data()) + size;
 
@@ -136,26 +131,14 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 			if (dest + cnt > tail) {
 				return false;
 			}
-			if (mark & 4) {
-				if (dest+4 <= tail) {
-					*reinterpret_cast<uint32_t*>(dest) = 0xffffffff;
-				} else {
-					memset(dest, 0xff, cnt);
-				}
-			} else {
-				if (dest+4 <= tail) {
-					*reinterpret_cast<uint32_t*>(dest) = 0;
-				} else {
-					memset(dest, 0, cnt);
-				}
-			}
+			*reinterpret_cast<uint32_t*>(dest) =  static_cast<uint32_t>(0) - static_cast<uint32_t>((mark>>2) & 1);
 			dest += cnt;
-		} else {
-			auto l = mark & 7;
+		} else if (mark != 0) {
+			auto l = mark;
 			if (src+l > end || dest+l > tail) {
 				return false;
 			}
-			if (src+8 <= end && dest+8 <= tail) {
+			if (src+8 <= end) {
 				*reinterpret_cast<uint64_t*>(dest) = *reinterpret_cast<const uint64_t*>(src);
 			} else {
 				memcpy(dest, src, l);
@@ -172,6 +155,7 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 			return false;
 		}
 	}
+	out->resize(size);
 	return dest == tail;
 }
 
