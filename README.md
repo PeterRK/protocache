@@ -5,11 +5,11 @@ Alternative [flat binary format](data-format.md) for [Protobuf schema](https://p
 |  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto |
 |:-------|----:|----:|----:|----:|
 | Data Size | **574B** | 780B | 1296B | 1288B |
-| Decode + Traverse + Dealloc | 1941ns | 140ns | **83ns** | 558ns |
-| Decode + Traverse(reflection) + Dealloc | 6127ns | **269ns** | 478ns | 7061ns |
+| Decode + Traverse + Dealloc | 2700ns | 150ns | **94ns** | 646ns |
+| Decode + Traverse(reflection) + Dealloc | 8033ns | **289ns** | 510ns | 9273ns |
 | Compressed/Packed Size | 566B | 571B | 856B | 626B |
-| Compress | 257ns | 401ns | 763ns | - |
-| Decompress/Unpack | 107ns | 250ns | 561ns | 641ns |
+| Compress | 279ns | 466ns | 870ns | - |
+| Decompress/Unpack | 122ns | 249ns | 563ns | 691ns |
 
 A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. Because Cap'n Proto has a builtin pack algorithm, which shows better compress ratio than our naive compress algorithm, without explicit compress/decompress API, we take the time gap between access in plain and packed mode as decompress time. 
 
@@ -54,9 +54,9 @@ You can create protocache binary by serializing a protobuf message with protocac
 
 | | Protobuf | ProtoCacheEX | ProtoCache |
 |:-------|----:|----:|----:|
-| Serialize | **542ns** | 350 ~ 2123ns | 6463ns |
-| Decode + Traverse + Dealloc | 1941ns | 1134ns | **154ns** |
-| Serialize (twitter.proto) | 214us | **125us** | 472us |
+| Serialize | **606ns** | 334 ~ 1981ns | 6250ns |
+| Decode + Traverse + Dealloc | 2700ns | 1322ns | **150ns** |
+| Serialize (twitter.proto) | 216us | **112us** | 449us |
 
 Test full serialization with a complicated `twitter.proto`. Since serializing big object is a memory-bound task, ProtoCache may show it's advantage.
 

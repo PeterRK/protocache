@@ -32,15 +32,19 @@ private:
 	bool SerializeArray(const google::protobuf::RepeatedFieldRef<T>& array, Unit& unit);
 
 	bool SerializeSimpleField(const google::protobuf::Message& message,
+						const google::protobuf::Reflection* reflection,
 						const google::protobuf::FieldDescriptor* field, Unit& unit);
 
 	bool SerializeArrayField(const google::protobuf::Message& message,
+							 const google::protobuf::Reflection* reflection,
 							 const google::protobuf::FieldDescriptor* field, Unit& unit);
 
 	bool SerializeMapField(const google::protobuf::Message& message,
+						   const google::protobuf::Reflection* reflection,
 						   const google::protobuf::FieldDescriptor* field, Unit& unit);
 
 	bool SerializeField(const google::protobuf::Message& message,
+						const google::protobuf::Reflection* reflection,
 						const google::protobuf::FieldDescriptor* field, Unit& unit);
 };
 
@@ -72,10 +76,10 @@ bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T
 }
 
 bool SerializeContext::SerializeArrayField(const google::protobuf::Message& message,
+										   const google::protobuf::Reflection* reflection,
 										   const google::protobuf::FieldDescriptor* field, Unit& unit) {
 	assert(field->is_repeated());
 	auto last = buf_.Size();
-	auto reflection = message.GetReflection();
 	switch (field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE:
 		{
@@ -149,8 +153,8 @@ bool SerializeContext::SerializeArrayField(const google::protobuf::Message& mess
 }
 
 bool SerializeContext::SerializeSimpleField(const google::protobuf::Message& message,
+									  const google::protobuf::Reflection* reflection,
 									  const google::protobuf::FieldDescriptor* field, Unit& unit) {
-	auto reflection = message.GetReflection();
 	switch (field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE:
 			return Serialize(reflection->GetMessage(message, field), unit);
@@ -226,11 +230,12 @@ static std::unique_ptr<KeyReader> MakeVectorReaderByMethod(
 }
 
 bool SerializeContext::SerializeMapField(const google::protobuf::Message& message,
+										 const google::protobuf::Reflection* reflection,
 										 const google::protobuf::FieldDescriptor* field, Unit& unit) {
 	assert(field->is_map());
 	auto key_field = field->message_type()->field(0);
 	auto value_field = field->message_type()->field(1);
-	auto pairs = message.GetReflection()->GetRepeatedFieldRef<google::protobuf::Message>(message, field);
+	auto pairs = reflection->GetRepeatedFieldRef<google::protobuf::Message>(message, field);
 
 	std::unique_ptr<KeyReader> reader;
 	switch (key_field->type()) {
@@ -278,8 +283,9 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
 	for (size_t i = book.size(); i-- > 0;) {
 		auto& pair = pairs.Get(book[i], tmp.get());
-		if (!SerializeSimpleField(pair, value_field, units[i].second)
-			|| !SerializeSimpleField(pair, key_field, units[i].first)) {
+		auto pair_reflection = pair.GetReflection();
+		if (!SerializeSimpleField(pair, pair_reflection, value_field, units[i].second)
+			|| !SerializeSimpleField(pair, pair_reflection, key_field, units[i].first)) {
 			return false;
 		}
 	}
@@ -287,19 +293,19 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 }
 
 bool SerializeContext::SerializeField(const google::protobuf::Message& message,
+									  const google::protobuf::Reflection* reflection,
 									  const google::protobuf::FieldDescriptor* field, Unit& unit) {
-	auto reflection = message.GetReflection();
 	if (field->is_repeated()) {
 		if (reflection->FieldSize(message, field) == 0) {
 			unit = {};
 			return true;
 		}
 		if (field->is_map()) {
-			if (!SerializeMapField(message, field, unit)) {
+			if (!SerializeMapField(message, reflection, field, unit)) {
 				return false;
 			}
 		} else {
-			if (!SerializeArrayField(message, field, unit)) {
+			if (!SerializeArrayField(message, reflection, field, unit)) {
 				return false;
 			}
 		}
@@ -308,7 +314,7 @@ bool SerializeContext::SerializeField(const google::protobuf::Message& message,
 			unit = {};
 			return true;
 		}
-		if (!SerializeSimpleField(message, field, unit)) {
+		if (!SerializeSimpleField(message, reflection, field, unit)) {
 			return false;
 		} else if (unit.size() == 1 &&
 				   field->type() == google::protobuf::FieldDescriptor::Type::TYPE_MESSAGE) {
@@ -325,6 +331,7 @@ bool SerializeContext::SerializeField(const google::protobuf::Message& message,
 }
 
 bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit& unit) {
+	auto reflection = message.GetReflection();
 	auto descriptor = message.GetDescriptor();
 	auto field_count = descriptor->field_count();
 	if (field_count <= 0) {
@@ -356,7 +363,7 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 
 	if (fields.size() == 1 && fields.front() != nullptr && fields.front()->name() == "_") {
 		if (!fields.front()->is_repeated()
-			|| !SerializeField(message, fields.front(), unit)) {
+			|| !SerializeField(message, reflection, fields.front(), unit)) {
 			return false;
 		}
 		assert(unit.len == 0);
@@ -380,7 +387,7 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 		}
 		//auto name = field->name().c_str();
 		auto& part = parts[i];
-		if (!SerializeField(message, field, part)) {
+		if (!SerializeField(message, reflection, field, part)) {
 			return false;
 		}
 		FoldField(buf_, part);
