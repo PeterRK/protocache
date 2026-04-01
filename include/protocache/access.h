@@ -26,15 +26,24 @@ public:
 	explicit String(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
 		auto p = reinterpret_cast<const uint8_t*>(ptr);
 		auto e = reinterpret_cast<const uint8_t*>(end);
-		if (p == nullptr || (*p & 3) != 0) {
+		if (p == nullptr || (e != nullptr && p >= e) || (*p & 3) != 0) {
 			return;
 		}
-		size_t mark = 0;
-		for (unsigned sft = 0; sft < 32U; sft += 7U) {
+		uint8_t b = *p++;
+		if ((b & 0x80U) == 0) {
+			auto str_len = static_cast<size_t>(b) >> 2U;
+			if (e != nullptr && p + str_len > e) {
+				return;
+			}
+			data_ = Slice<uint8_t>(p, str_len);
+			return;
+		}
+		size_t mark = b & 0x7fU;
+		for (unsigned sft = 7; sft < 32U; sft += 7U) {
 			if (e != nullptr && p >= e) {
 				return;
 			}
-			uint8_t b = *p++;
+			b = *p++;
 			if (b & 0x80U) {
 				mark |= static_cast<size_t>(b & 0x7fU) << sft;
 			} else {

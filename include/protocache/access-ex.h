@@ -277,8 +277,8 @@ private:
 		public:
 			explicit MapKeyReader(const std::vector<const std::pair<const K,V>*>& core) : core_(core) {}
 			void Reset() override { idx_ = 0; }
-		size_t Total() override { return core_.size(); }
-		Slice<uint8_t> Read() override {
+			size_t Total() override { return core_.size(); }
+			Slice<uint8_t> Read() override {
 				if (idx_ >= core_.size()) {
 					return {};
 				}
