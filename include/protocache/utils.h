@@ -138,9 +138,7 @@ public:
 	}
 	void Put(const Slice<uint32_t>& data) noexcept {
 		auto dest = Expand(data.size());
-		for (size_t i = 0; i < data.size(); i++) {
-			dest[i] = data[i];
-		}
+		memcpy(dest, data.data(), data.size() * sizeof(uint32_t));
 	}
 
 	uint32_t* Expand(size_t delta) {

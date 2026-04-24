@@ -204,6 +204,7 @@ uint32_t PerfectHashObject::Locate(const uint8_t* key, unsigned key_len) const n
 
 uint32_t PerfectHash::Locate(uint32_t slots[]) const noexcept {
 	auto header = reinterpret_cast<const Header*>(data_);
+	auto size = RealSize(header->size);
 	auto bitmap = data_ + sizeof(Header);
 	auto table = bitmap + BitmapSize(section_);
 	auto m = Bit2(bitmap,slots[0]) +
@@ -214,11 +215,11 @@ uint32_t PerfectHash::Locate(uint32_t slots[]) const noexcept {
 	uint32_t b = slot & 31U;
 
 	uint32_t off = 0;
-	if (RealSize(header->size) > UINT16_MAX) {
+	if (size > UINT16_MAX) {
 		off = reinterpret_cast<const uint32_t*>(table)[a];
-	} else if (RealSize(header->size) > UINT8_MAX) {
+	} else if (size > UINT8_MAX) {
 		off = reinterpret_cast<const uint16_t*>(table)[a];
-	} else if (RealSize(header->size) > 24) { // 3*Section(RealSize(header->Size)) > 32
+	} else if (size > 24) { // 3*Section(RealSize(header->Size)) > 32
 		off = reinterpret_cast<const uint8_t*>(table)[a];
 	}
 

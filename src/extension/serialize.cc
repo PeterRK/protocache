@@ -43,6 +43,12 @@ private:
 						   const google::protobuf::Reflection* reflection,
 						   const google::protobuf::FieldDescriptor* field, Unit& unit);
 
+	template <typename T, auto Getter>
+	bool SerializeMapFieldByKey(
+			const google::protobuf::RepeatedFieldRef<google::protobuf::Message>& pairs,
+			const google::protobuf::FieldDescriptor* key_field,
+			const google::protobuf::FieldDescriptor* value_field, Unit& unit);
+
 	bool SerializeField(const google::protobuf::Message& message,
 						const google::protobuf::Reflection* reflection,
 						const google::protobuf::FieldDescriptor* field, Unit& unit);
@@ -191,7 +197,7 @@ bool SerializeContext::SerializeSimpleField(const google::protobuf::Message& mes
 template <typename T>
 class VectorReader : public KeyReader {
 public:
-	explicit VectorReader(std::vector<T>&& keys) : keys_(std::move(keys)) {}
+	explicit VectorReader(const std::vector<T>& keys) : keys_(keys) {}
 
 	void Reset() override {
 		idx_ = 0;
@@ -212,21 +218,50 @@ public:
 	}
 
 private:
-	std::vector<T> keys_;
+	const std::vector<T>& keys_;
 	size_t idx_ = 0;
 };
 
 template <typename T, auto Getter>
-static std::unique_ptr<KeyReader> MakeVectorReaderByMethod(
+bool SerializeContext::SerializeMapFieldByKey(
 		const google::protobuf::RepeatedFieldRef<google::protobuf::Message>& pairs,
-		const google::protobuf::FieldDescriptor* key_field) {
-	std::vector<T> tmp;
-	tmp.reserve(pairs.size());
+		const google::protobuf::FieldDescriptor* key_field,
+		const google::protobuf::FieldDescriptor* value_field, Unit& unit) {
+	std::vector<T> keys;
+	keys.reserve(pairs.size());
 	for (auto& pair : pairs) {
 		auto reflection = pair.GetReflection();
-		tmp.push_back((reflection->*Getter)(pair, key_field));
+		keys.push_back((reflection->*Getter)(pair, key_field));
 	}
-	return std::make_unique<VectorReader<T>>(std::move(tmp));
+
+	VectorReader<T> reader(keys);
+	auto index = PerfectHashObject::Build(reader, true);
+	if (!index) {
+		return false;
+	}
+
+	reader.Reset();
+	std::vector<int> book(keys.size());
+	for (size_t i = 0; i < book.size(); i++) {
+		auto key = reader.Read();
+		auto pos = index.Locate(key.data(), key.size());
+		assert(pos < book.size());
+		book[pos] = static_cast<int>(i);
+	}
+
+	auto last = buf_.Size();
+	std::vector<std::pair<Unit,Unit>> units(book.size());
+	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
+	for (size_t i = book.size(); i-- > 0;) {
+		auto pair_index = book[i];
+		auto& pair = pairs.Get(pair_index, tmp.get());
+		auto pair_reflection = pair.GetReflection();
+		if (!SerializeSimpleField(pair, pair_reflection, value_field, units[i].second)
+			|| !::protocache::Serialize(keys[pair_index], buf_, units[i].first)) {
+			return false;
+		}
+	}
+	return SerializeMap(index.Data(), units, buf_, last, unit);
 }
 
 bool SerializeContext::SerializeMapField(const google::protobuf::Message& message,
@@ -237,59 +272,32 @@ bool SerializeContext::SerializeMapField(const google::protobuf::Message& messag
 	auto value_field = field->message_type()->field(1);
 	auto pairs = reflection->GetRepeatedFieldRef<google::protobuf::Message>(message, field);
 
-	std::unique_ptr<KeyReader> reader;
 	switch (key_field->type()) {
 		case google::protobuf::FieldDescriptor::Type::TYPE_BYTES:
 		case google::protobuf::FieldDescriptor::Type::TYPE_STRING:
-			reader = MakeVectorReaderByMethod<std::string, &google::protobuf::Reflection::GetString>(pairs, key_field);
-			break;
+			return SerializeMapFieldByKey<std::string, &google::protobuf::Reflection::GetString>(
+					pairs, key_field, value_field, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT64:
-			reader = MakeVectorReaderByMethod<uint64_t, &google::protobuf::Reflection::GetUInt64>(pairs, key_field);
-			break;
+			return SerializeMapFieldByKey<uint64_t, &google::protobuf::Reflection::GetUInt64>(
+					pairs, key_field, value_field, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_FIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_UINT32:
-			reader = MakeVectorReaderByMethod<uint32_t, &google::protobuf::Reflection::GetUInt32>(pairs, key_field);
-			break;
+			return SerializeMapFieldByKey<uint32_t, &google::protobuf::Reflection::GetUInt32>(
+					pairs, key_field, value_field, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT64:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT64:
-			reader = MakeVectorReaderByMethod<int64_t, &google::protobuf::Reflection::GetInt64>(pairs, key_field);
-			break;
+			return SerializeMapFieldByKey<int64_t, &google::protobuf::Reflection::GetInt64>(
+					pairs, key_field, value_field, unit);
 		case google::protobuf::FieldDescriptor::Type::TYPE_SFIXED32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_SINT32:
 		case google::protobuf::FieldDescriptor::Type::TYPE_INT32:
-			reader = MakeVectorReaderByMethod<int32_t, &google::protobuf::Reflection::GetInt32>(pairs, key_field);
-			break;
+			return SerializeMapFieldByKey<int32_t, &google::protobuf::Reflection::GetInt32>(
+					pairs, key_field, value_field, unit);
 		default:
 			return false;
 	}
-
-	auto index = PerfectHashObject::Build(*reader, true);
-	if (!index) {
-		return false;
-	}
-	reader->Reset();
-	std::vector<int> book(pairs.size());
-	for (size_t i = 0; i < book.size(); i++) {
-		auto key = reader->Read();
-		auto pos = index.Locate(key.data(), key.size());
-		assert(pos < book.size());
-		book[pos] = static_cast<int>(i);
-	}
-
-	auto last = buf_.Size();
-	std::vector<std::pair<Unit,Unit>> units(book.size());
-	std::unique_ptr<google::protobuf::Message> tmp(pairs.NewMessage());
-	for (size_t i = book.size(); i-- > 0;) {
-		auto& pair = pairs.Get(book[i], tmp.get());
-		auto pair_reflection = pair.GetReflection();
-		if (!SerializeSimpleField(pair, pair_reflection, value_field, units[i].second)
-			|| !SerializeSimpleField(pair, pair_reflection, key_field, units[i].first)) {
-			return false;
-		}
-	}
-	return SerializeMap(index.Data(), units, buf_, last, unit);
 }
 
 bool SerializeContext::SerializeField(const google::protobuf::Message& message,

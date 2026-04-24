@@ -34,6 +34,7 @@ set(PROTOCACHE_CORE_SOURCES
 )
 
 add_library(protocache-lite ${PROTOCACHE_CORE_SOURCES})
+set_target_properties(protocache-lite PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 set(PROTOCACHE_EXTENSION_SOURCES
     src/extension/deserialize.cc
@@ -44,6 +45,10 @@ set(PROTOCACHE_EXTENSION_SOURCES
 
 add_library(protocache ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
 target_link_libraries(protocache protobuf pthread)
+
+add_library(protocache-shared SHARED ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
+target_link_libraries(protocache-shared protobuf pthread)
+set_target_properties(protocache-shared PROPERTIES OUTPUT_NAME protocache)
 
 if(WITH_TEST)
     enable_testing()
@@ -88,7 +93,7 @@ install(
 )
 
 install(
-    TARGETS protocache protocache-lite
+    TARGETS protocache protocache-shared protocache-lite
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
