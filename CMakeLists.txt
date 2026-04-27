@@ -85,6 +85,9 @@ if(WITH_TOOLS)
 
     add_executable(protoc-gen-pc.net tools/protoc-gen-pc.net.cc)
     target_link_libraries(protoc-gen-pc.net protoc protobuf pthread)
+
+    add_executable(protoc-gen-pcpy tools/protoc-gen-pcpy.cc)
+    target_link_libraries(protoc-gen-pcpy protoc protobuf pthread)
 endif()
 
 install(
@@ -102,6 +105,10 @@ install(
 if(WITH_TOOLS)
     install(
         TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net
+        RUNTIME DESTINATION bin
+    )
+    install(
+        TARGETS protoc-gen-pcpy
         RUNTIME DESTINATION bin
     )
 endif()
