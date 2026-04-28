@@ -104,11 +104,7 @@ install(
 
 if(WITH_TOOLS)
     install(
-        TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net
-        RUNTIME DESTINATION bin
-    )
-    install(
-        TARGETS protoc-gen-pcpy
+        TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net protoc-gen-pcpy
         RUNTIME DESTINATION bin
     )
 endif()

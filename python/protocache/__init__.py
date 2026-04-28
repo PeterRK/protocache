@@ -15,6 +15,9 @@ ENUM = _protocache.ENUM
 ARRAY = _protocache.ARRAY
 MAP = _protocache.MAP
 
+compress = _protocache.compress
+decompress = _protocache.decompress
+
 _MessageView = _protocache.MessageView
 _ArrayView = _protocache.ArrayView
 _MapView = _protocache.MapView

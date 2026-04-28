@@ -163,6 +163,17 @@ class ProtoCachePythonTest(unittest.TestCase):
         self.assertEqual(loaded.str, "stable")
         self.assertEqual(loaded.data, b"payload")
 
+    def test_compress_decompress(self):
+        data = test_pc.Main(i32=7, str="zip", flags=[True, False, True]).Serialize()
+        packed = pc.compress(memoryview(data))
+
+        self.assertIsInstance(packed, bytes)
+        self.assertEqual(pc.decompress(packed), data)
+        self.assertEqual(pc.decompress(pc.compress(b"")), b"")
+
+        with self.assertRaises(ValueError):
+            pc.decompress(b"\xff")
+
     def test_schema_named_field(self):
         class Weird(pc.Message):
             _field_schema = 0

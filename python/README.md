@@ -26,6 +26,7 @@ protoc --pcpy_out=. test.proto
 Use the generated module as plain Python objects:
 
 ```python
+import protocache as pc
 import test_pc
 
 # Deserialize fully materializes the message. Nested messages, repeated fields,
@@ -42,6 +43,9 @@ data2 = root.Serialize()
 
 built = test_pc.Main(i32=1, str="hello", i32v=[1, 2])
 data3 = built.Serialize()
+
+packed = pc.compress(data3)
+assert pc.decompress(packed) == data3
 ```
 
 Generated message classes inherit from `protocache.Message`. Repeated-field
@@ -70,6 +74,8 @@ python3 -m unittest discover -s test -p '*_test.py'
   view and recursively materializes every schema field into Python values.
 - `Serialize()` uses the same schema tuples to reflect over Python
   attributes and emit ProtoCache bytes.
+- `compress()` and `decompress()` are thin bindings over the C++ ProtoCache
+  compression helpers and accept bytes-like objects.
 - The binding does not bridge Python protobuf message classes. Convert through
   ProtoCache bytes, not through `google.protobuf` objects.
 - Because values are fully materialized and serialized generically, this API

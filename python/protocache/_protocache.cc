@@ -1283,6 +1283,33 @@ static PyObject* Module_serialize_alias_map(PyObject*, PyObject* args) {
 	return UnitToBytes(buf, unit);
 }
 
+static PyObject* Module_compress(PyObject*, PyObject* arg) {
+	ScopedPyBuffer view;
+	if (!view.Get(arg, PyBUF_CONTIG_RO)) {
+		return nullptr;
+	}
+	auto* raw = view.get();
+	std::string out;
+	protocache::Compress(reinterpret_cast<const uint8_t*>(raw->buf),
+						  static_cast<size_t>(raw->len), &out);
+	return PyBytes_FromStringAndSize(out.data(), static_cast<Py_ssize_t>(out.size()));
+}
+
+static PyObject* Module_decompress(PyObject*, PyObject* arg) {
+	ScopedPyBuffer view;
+	if (!view.Get(arg, PyBUF_CONTIG_RO)) {
+		return nullptr;
+	}
+	auto* raw = view.get();
+	std::string out;
+	if (!protocache::Decompress(reinterpret_cast<const uint8_t*>(raw->buf),
+								static_cast<size_t>(raw->len), &out)) {
+		PyErr_SetString(PyExc_ValueError, "invalid ProtoCache compressed data");
+		return nullptr;
+	}
+	return PyBytes_FromStringAndSize(out.data(), static_cast<Py_ssize_t>(out.size()));
+}
+
 static PyMethodDef MessageViewMethods[] = {
 		{"from_bytes", reinterpret_cast<PyCFunction>(MessageView_from_bytes), METH_CLASS | METH_O,
 		 "Create a message view from a bytes-like object."},
@@ -1326,6 +1353,10 @@ static PyMethodDef ModuleMethods[] = {
 		 "Serialize a materialized generated alias array."},
 		{"serialize_alias_map", Module_serialize_alias_map, METH_VARARGS,
 		 "Serialize a materialized generated alias map."},
+		{"compress", Module_compress, METH_O,
+		 "Compress a bytes-like object with ProtoCache compression."},
+		{"decompress", Module_decompress, METH_O,
+		 "Decompress ProtoCache compressed bytes."},
 		{nullptr, nullptr, 0, nullptr},
 };
 
