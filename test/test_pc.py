@@ -15,19 +15,19 @@ class Small(_pc.Message):
 
 
 class Vec2D_Vec1D(_pc.Array):
-    TYPE = (_pc.NONE, _pc.F32, None)
+    schema = (_pc.NONE, _pc.F32, None)
 
 
 class Vec2D(_pc.Array):
-    TYPE = (_pc.NONE, _pc.ARRAY, Vec2D_Vec1D)
+    schema = (_pc.NONE, _pc.ARRAY, Vec2D_Vec1D)
 
 
 class ArrMap_Array(_pc.Array):
-    TYPE = (_pc.NONE, _pc.F32, None)
+    schema = (_pc.NONE, _pc.F32, None)
 
 
 class ArrMap(_pc.Map):
-    TYPE = (_pc.STRING, _pc.ARRAY, ArrMap_Array)
+    schema = (_pc.STRING, _pc.ARRAY, ArrMap_Array)
 
 
 class Main(_pc.Message):

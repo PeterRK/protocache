@@ -117,13 +117,82 @@ enum Kind {
 	KIND_MAP = 21,
 };
 
-struct SchemaField {
-	PyObject* name = nullptr;
-	unsigned id = 0;
+struct CompiledType {
+	CompiledType() noexcept = default;
+	CompiledType(const CompiledType&) = delete;
+	CompiledType& operator=(const CompiledType&) = delete;
+	CompiledType(CompiledType&& other) noexcept
+			: repeated(other.repeated),
+			  key_kind(other.key_kind),
+			  value_kind(other.value_kind),
+			  value_type(other.value_type) {
+		other.value_type = nullptr;
+	}
+	CompiledType& operator=(CompiledType&& other) noexcept {
+		if (this != &other) {
+			Py_XDECREF(value_type);
+			repeated = other.repeated;
+			key_kind = other.key_kind;
+			value_kind = other.value_kind;
+			value_type = other.value_type;
+			other.value_type = nullptr;
+		}
+		return *this;
+	}
+	~CompiledType() {
+		Py_XDECREF(value_type);
+	}
+
+	void SetValueType(PyObject* value) noexcept {
+		Py_XINCREF(value);
+		Py_XDECREF(value_type);
+		value_type = value;
+	}
+
 	bool repeated = false;
 	int key_kind = 0;
 	int value_kind = 0;
 	PyObject* value_type = nullptr;
+};
+
+struct SchemaField {
+	SchemaField() noexcept = default;
+	SchemaField(const SchemaField&) = delete;
+	SchemaField& operator=(const SchemaField&) = delete;
+	SchemaField(SchemaField&& other) noexcept
+			: name(other.name),
+			  id(other.id),
+			  type(std::move(other.type)) {
+		other.name = nullptr;
+	}
+	SchemaField& operator=(SchemaField&& other) noexcept {
+		if (this != &other) {
+			Py_XDECREF(name);
+			name = other.name;
+			id = other.id;
+			type = std::move(other.type);
+			other.name = nullptr;
+		}
+		return *this;
+	}
+	~SchemaField() {
+		Py_XDECREF(name);
+	}
+
+	void SetName(PyObject* value) noexcept {
+		Py_XINCREF(value);
+		Py_XDECREF(name);
+		name = value;
+	}
+
+	PyObject* name = nullptr;
+	unsigned id = 0;
+	CompiledType type;
+};
+
+struct Schema {
+	std::vector<SchemaField> fields;
+	unsigned max_id = 0;
 };
 
 using Storage = std::shared_ptr<ViewBuffer>;
@@ -150,9 +219,21 @@ struct MapView {
 	const uint32_t* end;
 };
 
+struct PySchema {
+	PyObject_HEAD
+	Schema schema;
+};
+
+struct PyCompiledTypeObject {
+	PyObject_HEAD
+	CompiledType type;
+};
+
 PyTypeObject MessageViewType = {PyVarObject_HEAD_INIT(nullptr, 0)};
 PyTypeObject ArrayViewType = {PyVarObject_HEAD_INIT(nullptr, 0)};
 PyTypeObject MapViewType = {PyVarObject_HEAD_INIT(nullptr, 0)};
+PyTypeObject SchemaType = {PyVarObject_HEAD_INIT(nullptr, 0)};
+PyTypeObject CompiledTypeType = {PyVarObject_HEAD_INIT(nullptr, 0)};
 
 static const char* DataOrEmpty(const char* data) {
 	return data == nullptr ? "" : data;
@@ -422,6 +503,65 @@ static PyObject* ArrayScalarGet(const uint32_t* ptr, const uint32_t* end, Py_ssi
 	}
 }
 
+template <typename T>
+static PyObject* ScalarToPy(T value) {
+	if constexpr (std::is_same_v<T, bool>) {
+		return PyBool_FromLong(value);
+	} else if constexpr (std::is_same_v<T, uint32_t>) {
+		return PyLong_FromUnsignedLong(value);
+	} else if constexpr (std::is_same_v<T, uint64_t>) {
+		return PyLong_FromUnsignedLongLong(value);
+	} else if constexpr (std::is_same_v<T, int64_t>) {
+		return PyLong_FromLongLong(value);
+	} else if constexpr (std::is_floating_point_v<T>) {
+		return PyFloat_FromDouble(value);
+	} else {
+		return PyLong_FromLong(value);
+	}
+}
+
+template <typename T>
+static PyObject* ArrayScalarToList(const uint32_t* ptr, const uint32_t* end) {
+	protocache::ArrayT<T> view(ptr, end);
+	if (!view) {
+		return PyList_New(0);
+	}
+	auto size = view.Size();
+	PyObjectPtr out(PyList_New(static_cast<Py_ssize_t>(size)));
+	if (!out) {
+		return nullptr;
+	}
+	for (uint32_t i = 0; i < size; i++) {
+		PyObject* item = ScalarToPy<T>(view[i]);
+		if (item == nullptr) {
+			return nullptr;
+		}
+		PyList_SET_ITEM(out.get(), static_cast<Py_ssize_t>(i), item);
+	}
+	return out.release();
+}
+
+static PyObject* ArrayFieldToList(const uint32_t* ptr, const uint32_t* end, int kind,
+								  const Storage& storage) {
+	protocache::Array view(ptr, end);
+	if (!view) {
+		return PyList_New(0);
+	}
+	auto size = view.Size();
+	PyObjectPtr out(PyList_New(static_cast<Py_ssize_t>(size)));
+	if (!out) {
+		return nullptr;
+	}
+	for (uint32_t i = 0; i < size; i++) {
+		PyObject* item = FieldToPy(view[i], kind, storage, end);
+		if (item == nullptr) {
+			return nullptr;
+		}
+		PyList_SET_ITEM(out.get(), static_cast<Py_ssize_t>(i), item);
+	}
+	return out.release();
+}
+
 static PyObject* ArrayView_get(ArrayView* self, PyObject* args) {
 	Py_ssize_t index;
 	int kind;
@@ -457,6 +597,39 @@ static PyObject* ArrayView_get(ArrayView* self, PyObject* args) {
 			}
 			return FieldToPy(view[static_cast<unsigned>(index)], kind, self->storage, self->end);
 		}
+	}
+}
+
+static PyObject* ArrayView_to_list(ArrayView* self, PyObject* arg) {
+	int kind = static_cast<int>(PyLong_AsLong(arg));
+	if (PyErr_Occurred()) {
+		return nullptr;
+	}
+	if (self->ptr == nullptr) {
+		return PyList_New(0);
+	}
+	switch (kind) {
+		case KIND_BYTES:
+		case KIND_STRING:
+			return ArrayFieldToList(self->ptr, self->end, kind, self->storage);
+		case KIND_BOOL:
+			return ArrayScalarToList<bool>(self->ptr, self->end);
+		case KIND_I32:
+		case KIND_ENUM:
+			return ArrayScalarToList<int32_t>(self->ptr, self->end);
+		case KIND_U32:
+			return ArrayScalarToList<uint32_t>(self->ptr, self->end);
+		case KIND_I64:
+			return ArrayScalarToList<int64_t>(self->ptr, self->end);
+		case KIND_U64:
+			return ArrayScalarToList<uint64_t>(self->ptr, self->end);
+		case KIND_F32:
+			return ArrayScalarToList<float>(self->ptr, self->end);
+		case KIND_F64:
+			return ArrayScalarToList<double>(self->ptr, self->end);
+		default:
+			PyErr_SetString(PyExc_ValueError, "ProtoCache array kind is not scalar");
+			return nullptr;
 	}
 }
 
@@ -508,18 +681,47 @@ static PyObject* MapView_items(MapView* self, PyObject* args) {
 	return out.release();
 }
 
+static PyObject* MapView_to_dict(MapView* self, PyObject* args) {
+	int key_kind;
+	int value_kind;
+	if (!PyArg_ParseTuple(args, "ii", &key_kind, &value_kind)) {
+		return nullptr;
+	}
+	PyObjectPtr out(PyDict_New());
+	if (!out) {
+		return nullptr;
+	}
+	if (self->ptr == nullptr) {
+		return out.release();
+	}
+	protocache::Map view(self->ptr, self->end);
+	if (!view) {
+		return out.release();
+	}
+	for (auto pair : view) {
+		PyObjectPtr key(FieldToPy(pair.Key(), key_kind, self->storage, self->end));
+		if (!key) {
+			return nullptr;
+		}
+		PyObjectPtr value(FieldToPy(pair.Value(), value_kind, self->storage, self->end));
+		if (!value) {
+			return nullptr;
+		}
+		if (PyDict_SetItem(out.get(), key.get(), value.get()) < 0) {
+			return nullptr;
+		}
+	}
+	return out.release();
+}
+
 static bool StringKey(PyObject* key, const char** data, Py_ssize_t* size, PyObject** keeper) {
 	*keeper = nullptr;
 	if (PyUnicode_Check(key)) {
-		*keeper = PyUnicode_AsUTF8String(key);
-		if (*keeper == nullptr) {
+		*data = PyUnicode_AsUTF8AndSize(key, size);
+		if (*data == nullptr) {
 			return false;
 		}
-		*data = PyBytes_AS_STRING(*keeper);
-		*size = PyBytes_GET_SIZE(*keeper);
 		if (!CheckStringKeySize(*size)) {
-			Py_DECREF(*keeper);
-			*keeper = nullptr;
 			return false;
 		}
 		return true;
@@ -539,6 +741,10 @@ static bool StringKey(PyObject* key, const char** data, Py_ssize_t* size, PyObje
 
 template <typename T>
 static bool NumberKey(PyObject* key, T* out) {
+	if (PyBool_Check(key)) {
+		PyErr_SetString(PyExc_TypeError, "integer map key must not be bool");
+		return false;
+	}
 	if constexpr (std::is_unsigned_v<T>) {
 		auto value = PyLong_AsUnsignedLongLong(key);
 		if (PyErr_Occurred()) {
@@ -635,20 +841,26 @@ static PyObject* MapView_get(MapView* self, PyObject* args) {
 	}
 }
 
+struct MapEntry {
+	PyObject* key = nullptr;
+	PyObject* value = nullptr;
+	std::string key_bytes;
+};
+
 struct PyKeyReader final : public protocache::KeyReader {
-	explicit PyKeyReader(const std::vector<std::string>& keys) : keys_(keys) {}
+	explicit PyKeyReader(const std::vector<MapEntry>& entries) : entries_(entries) {}
 	void Reset() override { idx_ = 0; }
-	size_t Total() override { return keys_.size(); }
+	size_t Total() override { return entries_.size(); }
 	protocache::Slice<uint8_t> Read() override {
-		if (idx_ >= keys_.size()) {
+		if (idx_ >= entries_.size()) {
 			return {};
 		}
-		auto& key = keys_[idx_++];
+		auto& key = entries_[idx_++].key_bytes;
 		return {reinterpret_cast<const uint8_t*>(key.data()), key.size()};
 	}
 
 private:
-	const std::vector<std::string>& keys_;
+	const std::vector<MapEntry>& entries_;
 	size_t idx_ = 0;
 };
 
@@ -664,52 +876,465 @@ static PyObject* UnitToBytes(protocache::Buffer& buf, const protocache::Unit& un
 			static_cast<Py_ssize_t>(view.size() * sizeof(uint32_t)));
 }
 
-static bool GetSchema(PyObject* obj, PyObject** schema) {
-	*schema = PyObject_GetAttrString(obj, "_schema");
-	if (*schema == nullptr) {
-		return false;
+static PyObject* CompileSchemaObject(PyObject* schema_obj);
+static PyObject* CompileContainerSchemaSpecObject(PyObject* schema_obj);
+static bool IsScalarKind(int kind);
+
+static PyObject* GetOwnClassAttr(PyObject* cls, const char* name) {
+	if (!PyType_Check(cls)) {
+		Py_RETURN_NONE;
 	}
-	if (*schema == Py_None) {
-		Py_DECREF(*schema);
-		*schema = nullptr;
-		PyErr_SetString(PyExc_TypeError, "object has no ProtoCache _schema");
-		return false;
+	auto* dict = reinterpret_cast<PyTypeObject*>(cls)->tp_dict;
+	if (dict == nullptr) {
+		Py_RETURN_NONE;
 	}
-	return true;
+	PyObject* value = PyDict_GetItemString(dict, name);
+	if (value == nullptr) {
+		Py_RETURN_NONE;
+	}
+	Py_INCREF(value);
+	return value;
 }
 
-static bool IsEmpty(PyObject* value) {
+static PyObject* GetCachedInternalSchemaObject(PyObject* cls, PyTypeObject* expected_type,
+											   const char* invalid_message) {
+	PyObjectPtr cached(GetOwnClassAttr(cls, "_internal_schema"));
+	if (!cached) {
+		return nullptr;
+	}
+	if (cached.get() != Py_None) {
+		if (!PyObject_TypeCheck(cached.get(), expected_type)) {
+			PyErr_SetString(PyExc_TypeError, invalid_message);
+			return nullptr;
+		}
+		return cached.release();
+	}
+	return cached.release();
+}
+
+static PyObject* RuntimeClass(const char* name) {
+	static PyObject* array_cls = nullptr;
+	static PyObject* map_cls = nullptr;
+	PyObject** cached = std::strcmp(name, "Array") == 0 ? &array_cls : &map_cls;
+	if (*cached != nullptr) {
+		Py_INCREF(*cached);
+		return *cached;
+	}
+	PyObjectPtr module(PyImport_ImportModule("protocache"));
+	if (!module) {
+		return nullptr;
+	}
+	PyObject* cls = PyObject_GetAttrString(module.get(), name);
+	if (cls == nullptr) {
+		return nullptr;
+	}
+	*cached = cls;
+	Py_INCREF(cls);
+	return cls;
+}
+
+static PyObject* NewContainer(PyObject* cls, const char* fallback, PyObject* arg = nullptr) {
+	PyObjectPtr actual(cls);
+	if (actual.get() == nullptr) {
+		actual.reset(RuntimeClass(fallback));
+		if (!actual) {
+			return nullptr;
+		}
+	} else {
+		Py_INCREF(actual.get());
+	}
+	if (arg == nullptr) {
+		return PyObject_CallObject(actual.get(), nullptr);
+	}
+	return PyObject_CallFunctionObjArgs(actual.get(), arg, nullptr);
+}
+
+static PyObject* DefaultValue(const CompiledType& type) {
+	if (type.key_kind != KIND_NONE) {
+		return NewContainer(nullptr, "Map");
+	}
+	if (type.repeated) {
+		return NewContainer(nullptr, "Array");
+	}
+	switch (type.value_kind) {
+		case KIND_BOOL:
+			return PyBool_FromLong(0);
+		case KIND_I32:
+		case KIND_U32:
+		case KIND_I64:
+		case KIND_U64:
+		case KIND_ENUM:
+			return PyLong_FromLong(0);
+		case KIND_F32:
+		case KIND_F64:
+			return PyFloat_FromDouble(0.0);
+		case KIND_STRING:
+			return PyUnicode_FromStringAndSize("", 0);
+		case KIND_BYTES:
+			return PyBytes_FromStringAndSize("", 0);
+		case KIND_MESSAGE:
+			Py_RETURN_NONE;
+		case KIND_ARRAY:
+		case KIND_MAP:
+			return NewContainer(type.value_type, nullptr);
+		default:
+			Py_RETURN_NONE;
+	}
+}
+
+static PyObject* GetMessageSchemaObject(PyObject* cls) {
+	PyObjectPtr cached(GetCachedInternalSchemaObject(
+			cls, &SchemaType, "ProtoCache message _internal_schema must be a ProtoCache Schema"));
+	if (!cached || cached.get() != Py_None) {
+		return cached.release();
+	}
+	PyObject* schema = PyObject_CallMethod(cls, "_get_internal_schema", nullptr);
+	if (schema == nullptr) {
+		return nullptr;
+	}
+	if (!PyObject_TypeCheck(schema, &SchemaType)) {
+		Py_DECREF(schema);
+		PyErr_SetString(PyExc_TypeError, "ProtoCache message _internal_schema must be a ProtoCache Schema");
+		return nullptr;
+	}
+	return schema;
+}
+
+static bool IsCompiledArrayType(const CompiledType& type) {
+	return type.repeated && type.key_kind == KIND_NONE;
+}
+
+static bool IsCompiledMapType(const CompiledType& type) {
+	return type.repeated && type.key_kind != KIND_NONE;
+}
+
+static PyObject* GetContainerSchemaObject(PyObject* cls) {
+	PyObjectPtr cached(GetCachedInternalSchemaObject(
+			cls, &CompiledTypeType, "ProtoCache container _internal_schema must be a compiled ProtoCache type"));
+	if (!cached || cached.get() != Py_None) {
+		return cached.release();
+	}
+	PyObject* schema = PyObject_CallMethod(cls, "_get_internal_schema", nullptr);
+	if (schema == nullptr) {
+		return nullptr;
+	}
+	if (!PyObject_TypeCheck(schema, &CompiledTypeType)) {
+		Py_DECREF(schema);
+		PyErr_SetString(PyExc_TypeError, "ProtoCache container _internal_schema must be a compiled ProtoCache type");
+		return nullptr;
+	}
+	return schema;
+}
+
+static PyObject* NestedContainerTypeObject(const CompiledType& type, int kind) {
+	PyObjectPtr nested_obj(GetContainerSchemaObject(type.value_type));
+	if (!nested_obj) {
+		return nullptr;
+	}
+	const auto& nested = reinterpret_cast<PyCompiledTypeObject*>(nested_obj.get())->type;
+	const char* name = kind == KIND_ARRAY ? "array" : "map";
+	bool ok = kind == KIND_ARRAY ? IsCompiledArrayType(nested) : IsCompiledMapType(nested);
+	if (!ok) {
+		PyErr_Format(PyExc_TypeError, "ProtoCache %s type expected", name);
+		return nullptr;
+	}
+	return nested_obj.release();
+}
+
+static const CompiledType* NestedContainerType(const CompiledType& type, int kind,
+											  PyObjectPtr* owner) {
+	owner->reset(NestedContainerTypeObject(type, kind));
+	if (!*owner) {
+		return nullptr;
+	}
+	return &reinterpret_cast<PyCompiledTypeObject*>(owner->get())->type;
+}
+
+static PyObject* MaterializeMessage(PyObject* cls, const Storage& storage,
+									const uint32_t* ptr, const uint32_t* end,
+									const Schema& schema);
+static PyObject* MaterializeValue(const protocache::Field& field, const CompiledType& type,
+								  const Storage& storage, const uint32_t* end);
+
+static PyObject* MaterializeArray(const uint32_t* ptr, const CompiledType& type,
+								  PyObject* cls, const Storage& storage, const uint32_t* end) {
+	auto item_kind = type.value_kind;
+	if (IsScalarKind(item_kind)) {
+		PyObjectPtr values;
+		switch (item_kind) {
+			case KIND_BYTES:
+			case KIND_STRING:
+				values.reset(ArrayFieldToList(ptr, end, item_kind, storage));
+				break;
+			case KIND_BOOL:
+				values.reset(ArrayScalarToList<bool>(ptr, end));
+				break;
+			case KIND_I32:
+			case KIND_ENUM:
+				values.reset(ArrayScalarToList<int32_t>(ptr, end));
+				break;
+			case KIND_U32:
+				values.reset(ArrayScalarToList<uint32_t>(ptr, end));
+				break;
+			case KIND_I64:
+				values.reset(ArrayScalarToList<int64_t>(ptr, end));
+				break;
+			case KIND_U64:
+				values.reset(ArrayScalarToList<uint64_t>(ptr, end));
+				break;
+			case KIND_F32:
+				values.reset(ArrayScalarToList<float>(ptr, end));
+				break;
+			case KIND_F64:
+				values.reset(ArrayScalarToList<double>(ptr, end));
+				break;
+			default:
+				PyErr_SetString(PyExc_ValueError, "unsupported ProtoCache scalar array kind");
+				return nullptr;
+		}
+		if (!values) {
+			return nullptr;
+		}
+		return NewContainer(cls, "Array", values.get());
+	}
+	PyObjectPtr out(NewContainer(cls, "Array"));
+	if (!out) {
+		return nullptr;
+	}
+	if (ptr == nullptr) {
+		return out.release();
+	}
+	protocache::Array view(ptr, end);
+	if (!view) {
+		return out.release();
+	}
+	auto size = view.Size();
+	for (uint32_t i = 0; i < size; i++) {
+		PyObjectPtr value(MaterializeValue(view[i], type, storage, end));
+		if (!value) {
+			return nullptr;
+		}
+		if (PyList_Append(out.get(), value.get()) < 0) {
+			return nullptr;
+		}
+	}
+	return out.release();
+}
+
+static PyObject* MaterializeMap(const uint32_t* ptr, const CompiledType& type,
+								PyObject* cls, const Storage& storage, const uint32_t* end) {
+	PyObjectPtr out(NewContainer(cls, "Map"));
+	if (!out) {
+		return nullptr;
+	}
+	if (ptr == nullptr) {
+		return out.release();
+	}
+	protocache::Map view(ptr, end);
+	if (!view) {
+		return out.release();
+	}
+	for (auto pair : view) {
+		PyObjectPtr key(FieldToPy(pair.Key(), type.key_kind, storage, end));
+		if (!key) {
+			return nullptr;
+		}
+		PyObjectPtr value(MaterializeValue(pair.Value(), type, storage, end));
+		if (!value) {
+			return nullptr;
+		}
+		if (PyObject_SetItem(out.get(), key.get(), value.get()) < 0) {
+			return nullptr;
+		}
+	}
+	return out.release();
+}
+
+static PyObject* MaterializeContainer(const uint32_t* ptr, const CompiledType& type,
+									  PyObject* cls, const Storage& storage, const uint32_t* end) {
+	if (IsCompiledArrayType(type)) {
+		return MaterializeArray(ptr, type, cls, storage, end);
+	}
+	if (IsCompiledMapType(type)) {
+		return MaterializeMap(ptr, type, cls, storage, end);
+	}
+	PyErr_SetString(PyExc_TypeError, "ProtoCache array or map type expected");
+	return nullptr;
+}
+
+static PyObject* MaterializeValue(const protocache::Field& field, const CompiledType& type,
+								  const Storage& storage, const uint32_t* end) {
+	if (IsScalarKind(type.value_kind)) {
+		return FieldToPy(field, type.value_kind, storage, end);
+	}
+	switch (type.value_kind) {
+		case KIND_MESSAGE:
+		{
+			auto ptr = field.GetObject(end);
+			if (ptr == nullptr) {
+				Py_RETURN_NONE;
+			}
+			protocache::Message msg(ptr, end);
+			if (!msg) {
+				PyErr_SetString(PyExc_ValueError, "invalid nested ProtoCache message");
+				return nullptr;
+			}
+			PyObject* raw_schema = GetMessageSchemaObject(type.value_type);
+			if (raw_schema == nullptr) {
+				return nullptr;
+			}
+			PyObjectPtr schema(raw_schema);
+			return MaterializeMessage(type.value_type, storage, ptr, end,
+									  reinterpret_cast<PySchema*>(schema.get())->schema);
+		}
+		case KIND_ARRAY:
+		{
+			PyObjectPtr nested_owner;
+			const auto* nested = NestedContainerType(type, KIND_ARRAY, &nested_owner);
+			if (nested == nullptr) {
+				return nullptr;
+			}
+			return MaterializeArray(field.GetObject(end), *nested, type.value_type, storage, end);
+		}
+		case KIND_MAP:
+		{
+			PyObjectPtr nested_owner;
+			const auto* nested = NestedContainerType(type, KIND_MAP, &nested_owner);
+			if (nested == nullptr) {
+				return nullptr;
+			}
+			return MaterializeMap(field.GetObject(end), *nested, type.value_type, storage, end);
+		}
+		default:
+			PyErr_SetString(PyExc_ValueError, "unsupported ProtoCache kind");
+			return nullptr;
+	}
+}
+
+static PyObject* MaterializeMessage(PyObject* cls, const Storage& storage,
+									const uint32_t* ptr, const uint32_t* end,
+									const Schema& schema) {
+	protocache::Message msg(ptr, end);
+	if (!msg) {
+		PyErr_SetString(PyExc_ValueError, "invalid ProtoCache message");
+		return nullptr;
+	}
+	PyObjectPtr obj(PyObject_CallMethod(cls, "__new__", "O", cls));
+	if (!obj) {
+		return nullptr;
+	}
+	PyObjectPtr present(PySet_New(nullptr));
+	if (!present) {
+		return nullptr;
+	}
+	if (PyObject_SetAttrString(obj.get(), "_present", present.get()) < 0) {
+		return nullptr;
+	}
+	for (const auto& field : schema.fields) {
+		PyObjectPtr value;
+		if (msg.HasField(field.id, end)) {
+			PyObjectPtr id(PyLong_FromUnsignedLong(field.id));
+			if (!id || PySet_Add(present.get(), id.get()) < 0) {
+				return nullptr;
+			}
+			auto raw = msg.GetField(field.id, end);
+			if (field.type.repeated || field.type.key_kind != KIND_NONE) {
+				value.reset(MaterializeContainer(raw.GetObject(end), field.type, nullptr, storage, end));
+			} else {
+				value.reset(MaterializeValue(raw, field.type, storage, end));
+			}
+		} else {
+			value.reset(DefaultValue(field.type));
+		}
+		if (!value) {
+			return nullptr;
+		}
+		if (PyObject_SetAttr(obj.get(), field.name, value.get()) < 0) {
+			return nullptr;
+		}
+	}
+	return obj.release();
+}
+
+static bool LongIsZero(PyObject* value) {
+	if (PyBool_Check(value) || !PyLong_Check(value)) {
+		return false;
+	}
+	auto zero = PyLong_AsLongLong(value);
+	if (PyErr_Occurred()) {
+		PyErr_Clear();
+		return false;
+	}
+	return zero == 0;
+}
+
+static bool FloatIsZero(PyObject* value) {
+	auto zero = PyFloat_AsDouble(value);
+	if (PyErr_Occurred()) {
+		PyErr_Clear();
+		return false;
+	}
+	return zero == 0.0;
+}
+
+static bool BytesLikeIsEmpty(PyObject* value) {
+	if (PyBytes_Check(value)) {
+		return PyBytes_GET_SIZE(value) == 0;
+	}
+	ScopedPyBuffer view;
+	if (!view.Get(value, PyBUF_CONTIG_RO)) {
+		PyErr_Clear();
+		return false;
+	}
+	return view.get()->len == 0;
+}
+
+static bool IsDefaultField(const SchemaField& field, PyObject* value) {
 	if (value == Py_None) {
 		return true;
 	}
-	if (PyBool_Check(value)) {
-		return value == Py_False;
+	const auto& type = field.type;
+	if (type.key_kind != KIND_NONE) {
+		return PyDict_Check(value) && PyDict_Size(value) == 0;
 	}
-	if (PyLong_Check(value)) {
-		auto zero = PyLong_AsLongLong(value);
-		if (PyErr_Occurred()) {
-			PyErr_Clear();
+	if (type.repeated) {
+		return PyList_Check(value) && PyList_GET_SIZE(value) == 0;
+	}
+	switch (type.value_kind) {
+		case KIND_BOOL:
+			return value == Py_False;
+		case KIND_I32:
+		case KIND_U32:
+		case KIND_I64:
+		case KIND_U64:
+		case KIND_ENUM:
+			return LongIsZero(value);
+		case KIND_F32:
+		case KIND_F64:
+			return FloatIsZero(value);
+		case KIND_STRING:
+			return PyUnicode_Check(value) && PyUnicode_GET_LENGTH(value) == 0;
+		case KIND_BYTES:
+			return BytesLikeIsEmpty(value);
+		case KIND_MESSAGE:
 			return false;
-		}
-		return zero == 0;
+		case KIND_ARRAY:
+			return PyList_Check(value) && PyList_GET_SIZE(value) == 0;
+		case KIND_MAP:
+			return PyDict_Check(value) && PyDict_Size(value) == 0;
+		default:
+			return false;
 	}
-	if (PyFloat_Check(value)) {
-		return PyFloat_AsDouble(value) == 0.0;
-	}
-	auto size = PyObject_Size(value);
-	if (size >= 0) {
-		return size == 0;
-	}
-	PyErr_Clear();
-	return false;
 }
 
-static bool SerializeValue(PyObject* value, int kind, PyObject* value_type,
+static bool SerializeValue(PyObject* value, const CompiledType& type,
 						   protocache::Buffer& buf, protocache::Unit& unit);
-static bool SerializeArrayObject(PyObject* value, int item_kind, PyObject* item_cls,
+static bool SerializeArrayObject(PyObject* value, const CompiledType& type,
 								 protocache::Buffer& buf, protocache::Unit& unit);
-static bool SerializeMapObject(PyObject* value, int key_kind, int value_kind, PyObject* value_type,
+static bool SerializeMapObject(PyObject* value, const CompiledType& type,
 							   protocache::Buffer& buf, protocache::Unit& unit);
+static bool SerializeContainerObject(PyObject* value, const CompiledType& type,
+									 protocache::Buffer& buf, protocache::Unit& unit);
 
 static bool IsScalarKind(int kind) {
 	switch (kind) {
@@ -732,7 +1357,7 @@ static bool IsScalarKind(int kind) {
 static bool CheckValueType(int kind, PyObject* value_type) {
 	if (IsScalarKind(kind)) {
 		if (value_type != Py_None) {
-			PyErr_SetString(PyExc_TypeError, "scalar ProtoCache TYPE must not have value_type");
+			PyErr_SetString(PyExc_TypeError, "scalar ProtoCache schema must not have value_type");
 			return false;
 		}
 		return true;
@@ -742,44 +1367,39 @@ static bool CheckValueType(int kind, PyObject* value_type) {
 		return false;
 	}
 	if (!PyType_Check(value_type)) {
-		PyErr_SetString(PyExc_TypeError, "complex ProtoCache TYPE must have class value_type");
+		PyErr_SetString(PyExc_TypeError, "complex ProtoCache schema must have class value_type");
 		return false;
 	}
 	return true;
 }
 
-static bool ParseAliasTypeSpec(PyObject* spec, SchemaField* out) {
-	if (!PyTuple_Check(spec)) {
-		PyErr_SetString(PyExc_TypeError, "ProtoCache alias TYPE must be a tuple");
-		return false;
-	}
-	if (PyTuple_GET_SIZE(spec) != 3) {
-		PyErr_SetString(PyExc_ValueError, "ProtoCache alias TYPE must have 3 entries");
-		return false;
-	}
-	out->repeated = true;
-	out->key_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(spec, 0)));
-	if (PyErr_Occurred()) {
-		return false;
-	}
-	out->value_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(spec, 1)));
-	if (PyErr_Occurred()) {
-		return false;
-	}
-	out->value_type = PyTuple_GET_ITEM(spec, 2);
+static bool CompileTypeParts(bool repeated, int key_kind, int value_kind,
+							 PyObject* value_type, CompiledType* out) {
+	out->repeated = repeated;
+	out->key_kind = key_kind;
+	out->value_kind = value_kind;
+	out->SetValueType(value_type);
 	return CheckValueType(out->value_kind, out->value_type);
 }
 
-static bool ParseAliasType(PyObject* cls, PyObjectPtr* keeper, SchemaField* out) {
-	keeper->reset(PyObject_GetAttrString(cls, "TYPE"));
-	if (!*keeper) {
+static bool ParseContainerSchemaSpec(PyObject* spec, CompiledType* out) {
+	if (!PyTuple_Check(spec)) {
+		PyErr_SetString(PyExc_TypeError, "ProtoCache container schema must be a tuple");
 		return false;
 	}
-	if (keeper->get() == Py_None) {
-		PyErr_SetString(PyExc_TypeError, "ProtoCache alias TYPE is not set");
+	if (PyTuple_GET_SIZE(spec) != 3) {
+		PyErr_SetString(PyExc_ValueError, "ProtoCache container schema must have 3 entries");
 		return false;
 	}
-	return ParseAliasTypeSpec(keeper->get(), out);
+	int key_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(spec, 0)));
+	if (PyErr_Occurred()) {
+		return false;
+	}
+	int value_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(spec, 1)));
+	if (PyErr_Occurred()) {
+		return false;
+	}
+	return CompileTypeParts(true, key_kind, value_kind, PyTuple_GET_ITEM(spec, 2), out);
 }
 
 static bool CheckSchemaField(PyObject* item) {
@@ -798,7 +1418,7 @@ static bool ParseSchemaField(PyObject* item, SchemaField* field) {
 	if (!CheckSchemaField(item)) {
 		return false;
 	}
-	field->name = PyTuple_GET_ITEM(item, 0);
+	field->SetName(PyTuple_GET_ITEM(item, 0));
 	field->id = static_cast<unsigned>(PyLong_AsUnsignedLong(PyTuple_GET_ITEM(item, 1)));
 	if (PyErr_Occurred()) {
 		return false;
@@ -808,72 +1428,129 @@ static bool ParseSchemaField(PyObject* item, SchemaField* field) {
 		PyErr_SetString(PyExc_TypeError, "ProtoCache schema repeated must be bool");
 		return false;
 	}
-	field->repeated = repeated == Py_True;
-	field->key_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(item, 3)));
+	int key_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(item, 3)));
 	if (PyErr_Occurred()) {
 		return false;
 	}
-	field->value_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(item, 4)));
+	int value_kind = static_cast<int>(PyLong_AsLong(PyTuple_GET_ITEM(item, 4)));
 	if (PyErr_Occurred()) {
 		return false;
 	}
-	field->value_type = PyTuple_GET_ITEM(item, 5);
-	return CheckValueType(field->value_kind, field->value_type);
+	return CompileTypeParts(repeated == Py_True, key_kind, value_kind,
+							PyTuple_GET_ITEM(item, 5), &field->type);
 }
 
-static bool SerializeMessageObject(PyObject* obj, PyObject* schema, protocache::Buffer& buf, protocache::Unit& unit) {
-	if (!PyTuple_Check(schema)) {
+static void Schema_dealloc(PySchema* self) {
+	self->schema.~Schema();
+	Py_TYPE(self)->tp_free(reinterpret_cast<PyObject*>(self));
+}
+
+static void CompiledType_dealloc(PyCompiledTypeObject* self) {
+	self->type.~CompiledType();
+	Py_TYPE(self)->tp_free(reinterpret_cast<PyObject*>(self));
+}
+
+static PyObject* CompileSchemaObject(PyObject* schema_obj) {
+	if (PyObject_TypeCheck(schema_obj, &SchemaType)) {
+		Py_INCREF(schema_obj);
+		return schema_obj;
+	}
+	if (!PyTuple_Check(schema_obj)) {
 		PyErr_SetString(PyExc_TypeError, "ProtoCache schema must be a tuple");
-		return false;
+		return nullptr;
 	}
-	auto n = PyTuple_GET_SIZE(schema);
+	auto n = PyTuple_GET_SIZE(schema_obj);
 
-	unsigned max_id = 0;
+	auto* out = PyObject_New(PySchema, &SchemaType);
+	if (out == nullptr) {
+		return nullptr;
+	}
+	new (&out->schema) Schema();
+	PyObjectPtr keeper(reinterpret_cast<PyObject*>(out));
+	try {
+		out->schema.fields.reserve(static_cast<size_t>(n));
+	} catch (const std::bad_alloc&) {
+		PyErr_NoMemory();
+		return nullptr;
+	}
+
 	for (Py_ssize_t i = 0; i < n; i++) {
-		auto* item = PyTuple_GET_ITEM(schema, i);
-		if (!CheckSchemaField(item)) {
-			return false;
+		SchemaField field;
+		if (!ParseSchemaField(PyTuple_GET_ITEM(schema_obj, i), &field)) {
+			return nullptr;
 		}
-		auto field_id = static_cast<unsigned>(PyLong_AsUnsignedLong(PyTuple_GET_ITEM(item, 1)));
-		if (PyErr_Occurred()) {
-			return false;
+		if (field.id > out->schema.max_id) {
+			out->schema.max_id = field.id;
 		}
-		if (field_id > max_id) {
-			max_id = field_id;
+		try {
+			out->schema.fields.emplace_back(std::move(field));
+		} catch (const std::bad_alloc&) {
+			PyErr_NoMemory();
+			return nullptr;
 		}
 	}
-	if (max_id > 12 + 25 * 255) {
+	if (out->schema.max_id > 12 + 25 * 255) {
 		PyErr_SetString(PyExc_ValueError, "too many ProtoCache fields");
+		return nullptr;
+	}
+	return keeper.release();
+}
+
+static PyObject* CompileContainerSchemaSpecObject(PyObject* schema_obj) {
+	if (PyObject_TypeCheck(schema_obj, &CompiledTypeType)) {
+		Py_INCREF(schema_obj);
+		return schema_obj;
+	}
+	auto* out = PyObject_New(PyCompiledTypeObject, &CompiledTypeType);
+	if (out == nullptr) {
+		return nullptr;
+	}
+	new (&out->type) CompiledType();
+	PyObjectPtr keeper(reinterpret_cast<PyObject*>(out));
+	if (!ParseContainerSchemaSpec(schema_obj, &out->type)) {
+		return nullptr;
+	}
+	return keeper.release();
+}
+
+static PyObject* MessageInstanceDict(PyObject* obj) {
+	PyObject** dict_ptr = _PyObject_GetDictPtr(obj);
+	if (dict_ptr == nullptr || *dict_ptr == nullptr || !PyDict_Check(*dict_ptr)) {
+		PyErr_SetString(PyExc_TypeError, "ProtoCache message object must have instance dict");
+		return nullptr;
+	}
+	return *dict_ptr;
+}
+
+static bool SerializeMessageObject(PyObject* obj, const Schema& schema, protocache::Buffer& buf, protocache::Unit& unit) {
+	std::vector<protocache::Unit> fields(schema.max_id + 1);
+	PyObject* dict = MessageInstanceDict(obj);
+	if (dict == nullptr) {
 		return false;
 	}
-
-	std::vector<protocache::Unit> fields(max_id + 1);
 	auto last = buf.Size();
-	for (Py_ssize_t i = n; i-- > 0;) {
-		SchemaField field;
-		if (!ParseSchemaField(PyTuple_GET_ITEM(schema, i), &field)) {
-			return false;
+	for (auto it = schema.fields.rbegin(); it != schema.fields.rend(); ++it) {
+		const auto& field = *it;
+		PyObject* value = PyDict_GetItemWithError(dict, field.name);
+		if (value == nullptr) {
+			if (PyErr_Occurred()) {
+				return false;
+			}
+			continue;
 		}
-		PyObjectPtr value(PyObject_GetAttr(obj, field.name));
-		if (!value) {
-			return false;
-		}
-		if (IsEmpty(value.get())) {
+		if (IsDefaultField(field, value)) {
 			continue;
 		}
 		protocache::Unit part;
-		if (field.key_kind != KIND_NONE) {
-			if (!SerializeMapObject(value.get(), field.key_kind, field.value_kind, field.value_type, buf, part)) {
+		if (field.type.repeated || field.type.key_kind != KIND_NONE) {
+			if (!SerializeContainerObject(value, field.type, buf, part)) {
 				return false;
 			}
-		} else if (field.repeated) {
-			if (!SerializeArrayObject(value.get(), field.value_kind, field.value_type, buf, part)) {
-				return false;
-			}
-		} else if (!SerializeValue(value.get(), field.value_kind, field.value_type, buf, part)) {
+		} else if (!SerializeValue(value, field.type, buf, part)) {
 			return false;
 		}
-		if (!field.repeated && field.key_kind == KIND_NONE && field.value_kind == KIND_MESSAGE && part.size() == 1) {
+		if (!field.type.repeated && field.type.key_kind == KIND_NONE &&
+			field.type.value_kind == KIND_MESSAGE && part.size() == 1) {
 			if (part.len == 0) {
 				buf.Shrink(1);
 			}
@@ -895,6 +1572,10 @@ static bool ReadNumber(PyObject* value, T* out) {
 		*out = static_cast<T>(v);
 		return true;
 	} else if constexpr (std::is_unsigned_v<T>) {
+		if (PyBool_Check(value)) {
+			PyErr_SetString(PyExc_TypeError, "integer field must not be bool");
+			return false;
+		}
 		auto v = PyLong_AsUnsignedLongLong(value);
 		if (PyErr_Occurred() || v > static_cast<unsigned long long>(std::numeric_limits<T>::max())) {
 			if (!PyErr_Occurred()) {
@@ -905,6 +1586,10 @@ static bool ReadNumber(PyObject* value, T* out) {
 		*out = static_cast<T>(v);
 		return true;
 	} else {
+		if (PyBool_Check(value)) {
+			PyErr_SetString(PyExc_TypeError, "integer field must not be bool");
+			return false;
+		}
 		auto v = PyLong_AsLongLong(value);
 		if (PyErr_Occurred() ||
 			v < static_cast<long long>(std::numeric_limits<T>::min()) ||
@@ -929,16 +1614,13 @@ static bool SerializeNumber(PyObject* value, protocache::Buffer& buf, protocache
 }
 
 static bool SerializeStringLike(PyObject* value, bool text, protocache::Buffer& buf, protocache::Unit& unit) {
-	PyObjectPtr keeper;
 	const char* data = nullptr;
 	Py_ssize_t size = 0;
 	if (text) {
-		keeper.reset(PyUnicode_AsUTF8String(value));
-		if (!keeper) {
+		data = PyUnicode_AsUTF8AndSize(value, &size);
+		if (data == nullptr) {
 			return false;
 		}
-		data = PyBytes_AS_STRING(keeper.get());
-		size = PyBytes_GET_SIZE(keeper.get());
 	} else if (PyBytes_Check(value)) {
 		if (PyBytes_AsStringAndSize(value, const_cast<char**>(&data), &size) < 0) {
 			return false;
@@ -970,14 +1652,15 @@ static bool KeyBytes(PyObject* key, int kind, std::string* out) {
 	switch (kind) {
 		case KIND_STRING:
 		{
-			PyObjectPtr keeper(PyUnicode_AsUTF8String(key));
-			if (!keeper) {
+			Py_ssize_t size = 0;
+			const char* data = PyUnicode_AsUTF8AndSize(key, &size);
+			if (data == nullptr) {
 				return false;
 			}
-			if (!CheckStringKeySize(PyBytes_GET_SIZE(keeper.get()))) {
+			if (!CheckStringKeySize(size)) {
 				return false;
 			}
-			out->assign(PyBytes_AS_STRING(keeper.get()), static_cast<size_t>(PyBytes_GET_SIZE(keeper.get())));
+			out->assign(data, static_cast<size_t>(size));
 			return true;
 		}
 		case KIND_I32:
@@ -996,38 +1679,60 @@ static bool KeyBytes(PyObject* key, int kind, std::string* out) {
 }
 
 template <typename T>
-static bool SerializeNumberMapKey(PyObject* key, protocache::Buffer& buf, protocache::Unit& unit) {
-	return SerializeNumber<T>(key, buf, unit);
+static bool SerializeCachedNumberMapKey(const MapEntry& entry, protocache::Buffer& buf, protocache::Unit& unit) {
+	if (entry.key_bytes.size() != sizeof(T)) {
+		PyErr_SetString(PyExc_ValueError, "invalid cached ProtoCache map key");
+		return false;
+	}
+	T value;
+	std::memcpy(&value, entry.key_bytes.data(), sizeof(T));
+	return protocache::Serialize(value, buf, unit);
 }
 
-static bool SerializeMapKey(PyObject* key, int kind, protocache::Buffer& buf, protocache::Unit& unit) {
+static bool SerializeCachedMapKey(const MapEntry& entry, int kind, protocache::Buffer& buf, protocache::Unit& unit) {
 	switch (kind) {
 		case KIND_STRING:
-			return SerializeStringLike(key, true, buf, unit);
+			return protocache::Serialize(
+					protocache::Slice<char>(entry.key_bytes.data(), entry.key_bytes.size()), buf, unit);
 		case KIND_I32:
 		case KIND_ENUM:
-			return SerializeNumberMapKey<int32_t>(key, buf, unit);
+			return SerializeCachedNumberMapKey<int32_t>(entry, buf, unit);
 		case KIND_U32:
-			return SerializeNumberMapKey<uint32_t>(key, buf, unit);
+			return SerializeCachedNumberMapKey<uint32_t>(entry, buf, unit);
 		case KIND_I64:
-			return SerializeNumberMapKey<int64_t>(key, buf, unit);
+			return SerializeCachedNumberMapKey<int64_t>(entry, buf, unit);
 		case KIND_U64:
-			return SerializeNumberMapKey<uint64_t>(key, buf, unit);
+			return SerializeCachedNumberMapKey<uint64_t>(entry, buf, unit);
 		default:
 			PyErr_SetString(PyExc_ValueError, "unsupported ProtoCache map key type");
 			return false;
 	}
 }
 
+static bool CheckArrayObject(PyObject* value) {
+	if (PyList_Check(value)) {
+		return true;
+	}
+	PyErr_SetString(PyExc_TypeError, "repeated field must be list");
+	return false;
+}
+
+static Py_ssize_t ArrayObjectSize(PyObject* value) {
+	return PyList_GET_SIZE(value);
+}
+
+static PyObject* ArrayObjectItem(PyObject* value, Py_ssize_t index) {
+	return PyList_GET_ITEM(value, index);
+}
+
 static bool SerializeBoolArrayObject(PyObject* value, protocache::Buffer& buf, protocache::Unit& unit) {
-	PyObjectPtr seq(PySequence_Fast(value, "repeated field must be a sequence"));
-	if (!seq) {
+	if (!CheckArrayObject(value)) {
 		return false;
 	}
-	auto n = PySequence_Fast_GET_SIZE(seq.get());
+	auto n = ArrayObjectSize(value);
 	std::vector<uint8_t> data(static_cast<size_t>(n));
 	for (Py_ssize_t i = 0; i < n; i++) {
-		PyObject* one = PySequence_Fast_GET_ITEM(seq.get(), i);
+		PyObject* one = ArrayObjectItem(value, i);
 		if (!PyBool_Check(one)) {
 			PyErr_SetString(PyExc_TypeError, "bool field must be bool");
 			return false;
@@ -1040,11 +1745,10 @@ static bool SerializeBoolArrayObject(PyObject* value, protocache::Buffer& buf, p
 template <typename T>
 static bool SerializeScalarArrayObject(PyObject* value, protocache::Buffer& buf, protocache::Unit& unit) {
 	static_assert(std::is_scalar_v<T> && sizeof(T) % sizeof(uint32_t) == 0);
-	PyObjectPtr seq(PySequence_Fast(value, "repeated field must be a sequence"));
-	if (!seq) {
+	if (!CheckArrayObject(value)) {
 		return false;
 	}
-	auto n = PySequence_Fast_GET_SIZE(seq.get());
+	auto n = ArrayObjectSize(value);
 	constexpr unsigned m = sizeof(T) / sizeof(uint32_t);
 	if (n == 0) {
 		unit.len = 1;
@@ -1059,7 +1763,7 @@ static bool SerializeScalarArrayObject(PyObject* value, protocache::Buffer& buf,
 	auto last = buf.Size();
 	for (Py_ssize_t i = n; i-- > 0;) {
 		T one;
-		if (!ReadNumber(PySequence_Fast_GET_ITEM(seq.get(), i), &one)) {
+		if (!ReadNumber(ArrayObjectItem(value, i), &one)) {
 			return false;
 		}
 		*reinterpret_cast<T*>(buf.Expand(m)) = one;
@@ -1069,9 +1773,9 @@ static bool SerializeScalarArrayObject(PyObject* value, protocache::Buffer& buf,
 	return true;
 }
 
-static bool SerializeArrayObject(PyObject* value, int item_kind, PyObject* item_cls,
+static bool SerializeArrayObject(PyObject* value, const CompiledType& type,
 								 protocache::Buffer& buf, protocache::Unit& unit) {
-	switch (item_kind) {
+	switch (type.value_kind) {
 		case KIND_BOOL:
 			return SerializeBoolArrayObject(value, buf, unit);
 		case KIND_I32:
@@ -1090,53 +1794,45 @@ static bool SerializeArrayObject(PyObject* value, int item_kind, PyObject* item_
 		default:
 			break;
 	}
-	PyObjectPtr seq(PySequence_Fast(value, "repeated field must be a sequence"));
-	if (!seq) {
+	if (!CheckArrayObject(value)) {
 		return false;
 	}
-	auto n = PySequence_Fast_GET_SIZE(seq.get());
+	auto n = ArrayObjectSize(value);
 	std::vector<protocache::Unit> elements(static_cast<size_t>(n));
 	auto last = buf.Size();
 	for (Py_ssize_t i = n; i-- > 0;) {
-		PyObject* one = PySequence_Fast_GET_ITEM(seq.get(), i);
-		if (!SerializeValue(one, item_kind, item_cls, buf, elements[static_cast<size_t>(i)])) {
+		PyObject* one = ArrayObjectItem(value, i);
+		if (!SerializeValue(one, type, buf, elements[static_cast<size_t>(i)])) {
 			return false;
 		}
 	}
 	return protocache::SerializeArray(elements, buf, last, unit);
 }
 
-static PyObject* MapItemPair(PyObject* items, Py_ssize_t index) {
-	auto* pair = PyList_GET_ITEM(items, index);
-	if (!PyTuple_Check(pair) || PyTuple_GET_SIZE(pair) != 2) {
-		PyErr_SetString(PyExc_TypeError, "mapping items must be 2-tuples");
-		return nullptr;
-	}
-	return pair;
-}
-
-static bool SerializeMapObject(PyObject* value, int key_kind, int value_kind, PyObject* value_type,
+static bool SerializeMapObject(PyObject* value, const CompiledType& type,
 							   protocache::Buffer& buf, protocache::Unit& unit) {
-	PyObjectPtr items(PyMapping_Items(value));
-	if (!items) {
+	if (!PyDict_Check(value)) {
+		PyErr_SetString(PyExc_TypeError, "map field must be dict");
 		return false;
 	}
-	if (!PyList_Check(items.get())) {
-		PyErr_SetString(PyExc_TypeError, "mapping items must be a list");
+	auto n = PyDict_Size(value);
+	if (n < 0) {
 		return false;
 	}
-	auto n = PyList_GET_SIZE(items.get());
-	std::vector<std::string> keys(static_cast<size_t>(n));
-	for (Py_ssize_t i = 0; i < n; i++) {
-		PyObject* pair = MapItemPair(items.get(), i);
-		if (pair == nullptr) {
-			return false;
-		}
-		if (!KeyBytes(PyTuple_GET_ITEM(pair, 0), key_kind, &keys[static_cast<size_t>(i)])) {
+	std::vector<MapEntry> entries(static_cast<size_t>(n));
+	Py_ssize_t pos = 0;
+	Py_ssize_t i = 0;
+	PyObject* key = nullptr;
+	PyObject* item = nullptr;
+	while (PyDict_Next(value, &pos, &key, &item)) {
+		auto idx = static_cast<size_t>(i++);
+		entries[idx].key = key;
+		entries[idx].value = item;
+		if (!KeyBytes(key, type.key_kind, &entries[idx].key_bytes)) {
 			return false;
 		}
 	}
-	PyKeyReader reader(keys);
+	PyKeyReader reader(entries);
 	auto index = protocache::PerfectHashObject::Build(reader, true);
 	if (!index) {
 		PyErr_SetString(PyExc_ValueError, "failed to build ProtoCache map index");
@@ -1157,21 +1853,30 @@ static bool SerializeMapObject(PyObject* value, int key_kind, int value_kind, Py
 	std::vector<std::pair<protocache::Unit, protocache::Unit>> units(static_cast<size_t>(n));
 	auto last = buf.Size();
 	for (Py_ssize_t i = n; i-- > 0;) {
-		PyObject* pair = MapItemPair(items.get(), book[static_cast<size_t>(i)]);
-		if (pair == nullptr) {
-			return false;
-		}
-		if (!SerializeValue(PyTuple_GET_ITEM(pair, 1), value_kind, value_type, buf, units[static_cast<size_t>(i)].second) ||
-			!SerializeMapKey(PyTuple_GET_ITEM(pair, 0), key_kind, buf, units[static_cast<size_t>(i)].first)) {
+		const auto& entry = entries[static_cast<size_t>(book[static_cast<size_t>(i)])];
+		if (!SerializeValue(entry.value, type, buf, units[static_cast<size_t>(i)].second) ||
+			!SerializeCachedMapKey(entry, type.key_kind, buf, units[static_cast<size_t>(i)].first)) {
 			return false;
 		}
 	}
 	return protocache::SerializeMap(index.Data(), units, buf, last, unit);
 }
 
-static bool SerializeValue(PyObject* value, int kind, PyObject* value_type,
+static bool SerializeContainerObject(PyObject* value, const CompiledType& type,
+									 protocache::Buffer& buf, protocache::Unit& unit) {
+	if (IsCompiledArrayType(type)) {
+		return SerializeArrayObject(value, type, buf, unit);
+	}
+	if (IsCompiledMapType(type)) {
+		return SerializeMapObject(value, type, buf, unit);
+	}
+	PyErr_SetString(PyExc_TypeError, "ProtoCache array or map type expected");
+	return false;
+}
+
+static bool SerializeValue(PyObject* value, const CompiledType& type,
 						   protocache::Buffer& buf, protocache::Unit& unit) {
-	switch (kind) {
+	switch (type.value_kind) {
 		case KIND_BOOL:
 		{
 			if (!PyBool_Check(value)) {
@@ -1199,38 +1904,38 @@ static bool SerializeValue(PyObject* value, int kind, PyObject* value_type,
 			return SerializeStringLike(value, false, buf, unit);
 		case KIND_MESSAGE:
 		{
-			PyObject* raw_schema;
-			if (!GetSchema(value, &raw_schema)) {
+			if (type.value_type == nullptr || type.value_type == Py_None || !PyType_Check(type.value_type)) {
+				PyErr_SetString(PyExc_TypeError, "message field must have class value_type");
+				return false;
+			}
+			if (Py_TYPE(value) != reinterpret_cast<PyTypeObject*>(type.value_type)) {
+				PyErr_SetString(PyExc_TypeError, "message field must match schema type exactly");
+				return false;
+			}
+			PyObject* raw_schema = GetMessageSchemaObject(type.value_type);
+			if (raw_schema == nullptr) {
 				return false;
 			}
 			PyObjectPtr schema(raw_schema);
-			return SerializeMessageObject(value, schema.get(), buf, unit);
+			return SerializeMessageObject(value, reinterpret_cast<PySchema*>(schema.get())->schema, buf, unit);
 		}
 		case KIND_ARRAY:
 		{
-			SchemaField nested;
-			PyObjectPtr type;
-			if (!ParseAliasType(value_type, &type, &nested)) {
+			PyObjectPtr nested_owner;
+			const auto* nested = NestedContainerType(type, KIND_ARRAY, &nested_owner);
+			if (nested == nullptr) {
 				return false;
 			}
-			if (!nested.repeated || nested.key_kind != KIND_NONE) {
-				PyErr_SetString(PyExc_TypeError, "ProtoCache array type expected");
-				return false;
-			}
-			return SerializeArrayObject(value, nested.value_kind, nested.value_type, buf, unit);
+			return SerializeArrayObject(value, *nested, buf, unit);
 		}
 		case KIND_MAP:
 		{
-			SchemaField nested;
-			PyObjectPtr type;
-			if (!ParseAliasType(value_type, &type, &nested)) {
+			PyObjectPtr nested_owner;
+			const auto* nested = NestedContainerType(type, KIND_MAP, &nested_owner);
+			if (nested == nullptr) {
 				return false;
 			}
-			if (!nested.repeated || nested.key_kind == KIND_NONE) {
-				PyErr_SetString(PyExc_TypeError, "ProtoCache map type expected");
-				return false;
-			}
-			return SerializeMapObject(value, nested.key_kind, nested.value_kind, nested.value_type, buf, unit);
+			return SerializeMapObject(value, *nested, buf, unit);
 		}
 		default:
 			PyErr_SetString(PyExc_ValueError, "unsupported ProtoCache kind");
@@ -1246,41 +1951,87 @@ static PyObject* Module_serialize_model(PyObject*, PyObject* args) {
 	}
 	protocache::Buffer buf;
 	protocache::Unit unit;
-	if (!SerializeMessageObject(obj, schema, buf, unit)) {
+	if (!PyObject_TypeCheck(schema, &SchemaType)) {
+		PyErr_SetString(PyExc_TypeError, "serialize_model schema must be a ProtoCache Schema");
+		return nullptr;
+	}
+	if (!SerializeMessageObject(obj, reinterpret_cast<PySchema*>(schema)->schema, buf, unit)) {
 		return nullptr;
 	}
 	return UnitToBytes(buf, unit);
 }
 
-static PyObject* Module_serialize_alias_array(PyObject*, PyObject* args) {
-	PyObject* obj;
-	int item_kind;
-	PyObject* item_cls;
-	if (!PyArg_ParseTuple(args, "OiO", &obj, &item_kind, &item_cls)) {
+static PyObject* Module_compile_schema(PyObject*, PyObject* arg) {
+	return CompileSchemaObject(arg);
+}
+
+static PyObject* Module_compile_type(PyObject*, PyObject* arg) {
+	return CompileContainerSchemaSpecObject(arg);
+}
+
+static PyObject* Module_deserialize_model(PyObject*, PyObject* args) {
+	PyObject* cls;
+	PyObject* src;
+	PyObject* schema_obj;
+	if (!PyArg_ParseTuple(args, "OOO", &cls, &src, &schema_obj)) {
 		return nullptr;
 	}
+	auto storage = ReadBufferWords(src);
+	if (!storage) {
+		return nullptr;
+	}
+	auto ptr = storage->data();
+	auto end = ptr + storage->size();
+	protocache::Message msg(ptr, end);
+	if (!msg) {
+		PyErr_SetString(PyExc_ValueError, "invalid ProtoCache message");
+		return nullptr;
+	}
+	if (!PyObject_TypeCheck(schema_obj, &SchemaType)) {
+		PyErr_SetString(PyExc_TypeError, "deserialize_model schema must be a ProtoCache Schema");
+		return nullptr;
+	}
+	return MaterializeMessage(cls, storage, ptr, end, reinterpret_cast<PySchema*>(schema_obj)->schema);
+}
+
+static PyObject* Module_serialize_container(PyObject*, PyObject* args) {
+	PyObject* obj;
+	PyObject* type_obj;
+	if (!PyArg_ParseTuple(args, "OO", &obj, &type_obj)) {
+		return nullptr;
+	}
+	if (!PyObject_TypeCheck(type_obj, &CompiledTypeType)) {
+		PyErr_SetString(PyExc_TypeError, "serialize_container schema must be a compiled ProtoCache type");
+		return nullptr;
+	}
+	const auto& type = reinterpret_cast<PyCompiledTypeObject*>(type_obj)->type;
 	protocache::Buffer buf;
 	protocache::Unit unit;
-	if (!SerializeArrayObject(obj, item_kind, item_cls, buf, unit)) {
+	if (!SerializeContainerObject(obj, type, buf, unit)) {
 		return nullptr;
 	}
 	return UnitToBytes(buf, unit);
 }
 
-static PyObject* Module_serialize_alias_map(PyObject*, PyObject* args) {
-	PyObject* obj;
-	int key_kind;
-	int value_kind;
-	PyObject* value_type;
-	if (!PyArg_ParseTuple(args, "OiiO", &obj, &key_kind, &value_kind, &value_type)) {
+static PyObject* Module_deserialize_container(PyObject*, PyObject* args) {
+	PyObject* cls;
+	PyObject* src;
+	PyObject* type_obj;
+	if (!PyArg_ParseTuple(args, "OOO", &cls, &src, &type_obj)) {
 		return nullptr;
 	}
-	protocache::Buffer buf;
-	protocache::Unit unit;
-	if (!SerializeMapObject(obj, key_kind, value_kind, value_type, buf, unit)) {
+	if (!PyObject_TypeCheck(type_obj, &CompiledTypeType)) {
+		PyErr_SetString(PyExc_TypeError, "deserialize_container schema must be a compiled ProtoCache type");
 		return nullptr;
 	}
-	return UnitToBytes(buf, unit);
+	auto storage = ReadBufferWords(src);
+	if (!storage) {
+		return nullptr;
+	}
+	auto ptr = storage->data();
+	auto end = ptr + storage->size();
+	const auto& type = reinterpret_cast<PyCompiledTypeObject*>(type_obj)->type;
+	return MaterializeContainer(ptr, type, cls, storage, end);
 }
 
 static PyObject* Module_compress(PyObject*, PyObject* arg) {
@@ -1331,6 +2082,8 @@ static PyMethodDef ArrayViewMethods[] = {
 		 "Return array size for the supplied element kind."},
 		{"get", reinterpret_cast<PyCFunction>(ArrayView_get), METH_VARARGS,
 		 "Read a typed array element."},
+		{"to_list", reinterpret_cast<PyCFunction>(ArrayView_to_list), METH_O,
+		 "Materialize a scalar array as a Python list."},
 		{nullptr, nullptr, 0, nullptr},
 };
 
@@ -1341,18 +2094,26 @@ static PyMethodDef MapViewMethods[] = {
 		 "Return map size."},
 		{"items", reinterpret_cast<PyCFunction>(MapView_items), METH_VARARGS,
 		 "Return map items as typed Python values."},
+		{"to_dict", reinterpret_cast<PyCFunction>(MapView_to_dict), METH_VARARGS,
+		 "Materialize map items as a Python dict."},
 		{"get", reinterpret_cast<PyCFunction>(MapView_get), METH_VARARGS,
 		 "Find a map value by key."},
 		{nullptr, nullptr, 0, nullptr},
 };
 
 static PyMethodDef ModuleMethods[] = {
+		{"compile_schema", Module_compile_schema, METH_O,
+		 "Compile a generated ProtoCache schema tuple."},
+		{"compile_type", Module_compile_type, METH_O,
+		 "Compile a generated ProtoCache container schema tuple."},
+		{"deserialize_container", Module_deserialize_container, METH_VARARGS,
+		 "Deserialize a generated container object with a compiled schema."},
+		{"deserialize_model", Module_deserialize_model, METH_VARARGS,
+		 "Deserialize a generated message object with a compiled schema."},
+		{"serialize_container", Module_serialize_container, METH_VARARGS,
+		 "Serialize a materialized generated container object."},
 		{"serialize_model", Module_serialize_model, METH_VARARGS,
 		 "Serialize a materialized generated message object."},
-		{"serialize_alias_array", Module_serialize_alias_array, METH_VARARGS,
-		 "Serialize a materialized generated alias array."},
-		{"serialize_alias_map", Module_serialize_alias_map, METH_VARARGS,
-		 "Serialize a materialized generated alias map."},
 		{"compress", Module_compress, METH_O,
 		 "Compress a bytes-like object with ProtoCache compression."},
 		{"decompress", Module_decompress, METH_O,
@@ -1409,9 +2170,23 @@ PyMODINIT_FUNC PyInit__protocache() {
 	MapViewType.tp_doc = "ProtoCache map view";
 	MapViewType.tp_methods = MapViewMethods;
 
+	SchemaType.tp_name = "protocache._protocache.CompiledSchema";
+	SchemaType.tp_basicsize = sizeof(PySchema);
+	SchemaType.tp_dealloc = reinterpret_cast<destructor>(Schema_dealloc);
+	SchemaType.tp_flags = Py_TPFLAGS_DEFAULT;
+	SchemaType.tp_doc = "Compiled ProtoCache schema";
+
+	CompiledTypeType.tp_name = "protocache._protocache.CompiledType";
+	CompiledTypeType.tp_basicsize = sizeof(PyCompiledTypeObject);
+	CompiledTypeType.tp_dealloc = reinterpret_cast<destructor>(CompiledType_dealloc);
+	CompiledTypeType.tp_flags = Py_TPFLAGS_DEFAULT;
+	CompiledTypeType.tp_doc = "Compiled ProtoCache type";
+
 	if (PyType_Ready(&MessageViewType) < 0 ||
 		PyType_Ready(&ArrayViewType) < 0 ||
-		PyType_Ready(&MapViewType) < 0) {
+		PyType_Ready(&MapViewType) < 0 ||
+		PyType_Ready(&SchemaType) < 0 ||
+		PyType_Ready(&CompiledTypeType) < 0) {
 		return nullptr;
 	}
 

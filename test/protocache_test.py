@@ -1,6 +1,7 @@
 import math
 import sys
 import unittest
+from collections import UserDict
 from pathlib import Path
 
 
@@ -77,7 +78,7 @@ class ProtoCachePythonTest(unittest.TestCase):
         self.assertTrue(objects[1].flag)
         self.assertEqual(objects[2].str, "good luck!")
 
-    def test_maps_and_aliases(self):
+    def test_maps_and_containers(self):
         root = _load_root()
 
         index = root.index
@@ -181,8 +182,20 @@ class ProtoCachePythonTest(unittest.TestCase):
         Weird._schema = (("schema", Weird._field_schema, False, pc.NONE, pc.I32, None),)
 
         obj = Weird(schema=7)
-        self.assertTrue(obj.HasField(Weird._field_schema))
+        self.assertFalse(obj.HasField(Weird._field_schema))
         self.assertEqual(Weird.Deserialize(obj.Serialize()).schema, 7)
+
+    def test_constructed_message_is_sparse_until_deserialized(self):
+        obj = test_pc.Main(i32=7)
+        self.assertFalse(obj.HasField(test_pc.Main._field_i32))
+        with self.assertRaises(AttributeError):
+            _ = obj.str
+
+        loaded = test_pc.Main.Deserialize(obj.Serialize())
+        self.assertEqual(loaded.i32, 7)
+        self.assertEqual(loaded.str, "")
+        self.assertTrue(loaded.HasField(test_pc.Main._field_i32))
+        self.assertFalse(loaded.HasField(test_pc.Main._field_str))
 
     def test_schema_contract(self):
         self.assertEqual(pc.NONE, 0)
@@ -209,23 +222,36 @@ class ProtoCachePythonTest(unittest.TestCase):
         self.assertEqual(arrays[2:], (False, pc.NONE, pc.MAP, test_pc.ArrMap))
 
     def test_schema_rejects_wrong_tuple_size(self):
-        obj = test_pc.Main(i32=1)
         with self.assertRaises(ValueError):
-            pc._protocache.serialize_model(obj, (("i32", test_pc.Main._field_i32, pc.I32),))
+            pc._protocache.compile_schema((("i32", test_pc.Main._field_i32, pc.I32),))
 
-    def test_alias_type_contract(self):
-        self.assertEqual(test_pc.Vec2D_Vec1D.TYPE, (pc.NONE, pc.F32, None))
-        self.assertEqual(test_pc.Vec2D.TYPE, (pc.NONE, pc.ARRAY, test_pc.Vec2D_Vec1D))
-        self.assertEqual(test_pc.ArrMap.TYPE, (pc.STRING, pc.ARRAY, test_pc.ArrMap_Array))
+    def test_c_api_requires_compiled_schema(self):
+        obj = test_pc.Main(i32=1)
+        data = obj.Serialize()
+
+        with self.assertRaises(TypeError):
+            pc._protocache.serialize_model(obj, test_pc.Main._schema)
+
+        with self.assertRaises(TypeError):
+            pc._protocache.deserialize_model(test_pc.Main, data, test_pc.Main._schema)
+
+    def test_container_type_contract(self):
+        self.assertEqual(test_pc.Vec2D_Vec1D.schema, (pc.NONE, pc.F32, None))
+        self.assertEqual(test_pc.Vec2D.schema, (pc.NONE, pc.ARRAY, test_pc.Vec2D_Vec1D))
+        self.assertEqual(test_pc.ArrMap.schema, (pc.STRING, pc.ARRAY, test_pc.ArrMap_Array))
 
         class BrokenArray(pc.Array):
-            TYPE = (pc.STRING, pc.I32, None)
+            schema = (pc.STRING, pc.I32, None)
 
         class BrokenMap(pc.Map):
-            TYPE = (pc.NONE, pc.I32, None)
+            schema = (pc.NONE, pc.I32, None)
 
         class BrokenComplex(pc.Array):
-            TYPE = (pc.NONE, pc.ARRAY, object())
+            schema = (pc.NONE, pc.ARRAY, object())
+
+        class RecursiveArray(pc.Array):
+            pass
+        RecursiveArray.schema = (pc.NONE, pc.ARRAY, RecursiveArray)
 
         with self.assertRaises(TypeError):
             BrokenArray([1]).Serialize()
@@ -233,21 +259,31 @@ class ProtoCachePythonTest(unittest.TestCase):
             BrokenMap({"a": 1}).Serialize()
         with self.assertRaises(TypeError):
             BrokenComplex([]).Serialize()
+        loaded_recursive = RecursiveArray.Deserialize(RecursiveArray([RecursiveArray()]).Serialize())
+        self.assertEqual([list(item) for item in loaded_recursive], [[]])
+        self.assertIsNotNone(RecursiveArray._internal_schema)
 
         obj = test_pc.Main(matrix=test_pc.Vec2D())
         with self.assertRaises(TypeError):
-            pc._protocache.serialize_model(
-                obj,
-                (("matrix", test_pc.Main._field_matrix, False, pc.NONE, pc.ARRAY, object()),),
+            pc._protocache.compile_schema(
+                (("matrix", test_pc.Main._field_matrix, False, pc.NONE, pc.ARRAY, object()),)
             )
 
-    def test_only_alias_array_map_serialize_standalone(self):
+    def test_only_array_map_containers_serialize_standalone(self):
         row = test_pc.Vec2D_Vec1D([1.0, 2.0])
         self.assertEqual(list(test_pc.Vec2D_Vec1D.Deserialize(row.Serialize())), [1.0, 2.0])
+        self.assertIsNotNone(test_pc.Vec2D_Vec1D._internal_schema)
 
         arrays = test_pc.ArrMap({"a": test_pc.ArrMap_Array([7.0])})
         loaded = test_pc.ArrMap.Deserialize(arrays.Serialize())
         self.assertEqual(list(loaded["a"]), [7.0])
+        self.assertIsNotNone(test_pc.ArrMap._internal_schema)
+        self.assertFalse(hasattr(pc._protocache, "Schema"))
+        self.assertFalse(hasattr(pc._protocache, "Type"))
+        self.assertFalse(hasattr(pc._protocache, "serialize_alias"))
+        self.assertFalse(hasattr(pc._protocache, "deserialize_alias"))
+        self.assertFalse(hasattr(pc._protocache, "serialize_alias_array"))
+        self.assertFalse(hasattr(pc._protocache, "serialize_alias_map"))
 
         with self.assertRaises(TypeError):
             pc.Array([1]).Serialize()
@@ -262,6 +298,31 @@ class ProtoCachePythonTest(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             test_pc.Main(flag="yes").Serialize()
+
+    def test_serialize_rejects_wide_python_compatibility(self):
+        class SmallChild(test_pc.Small):
+            pass
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(i32=True).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(i32v=[1, True]).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(i32v=range(2)).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(i32v=(1, 2)).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(index=UserDict({"a": 1})).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(object=SmallChild(i32=1)).Serialize()
+
+        with self.assertRaises(TypeError):
+            test_pc.Main(objectv=[SmallChild(i32=1)]).Serialize()
 
 
 if __name__ == "__main__":

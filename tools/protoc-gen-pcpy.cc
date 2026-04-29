@@ -352,7 +352,7 @@ static std::string GenAliasClass(const MessageInfo& info) {
 	if (alias.key_type == TYPE_NONE) {
 		auto value = ValueOf(alias.value_type, alias.value_class);
 		oss << "class " << info.py_name << "(_pc.Array):\n"
-			<< "    TYPE = (_pc.NONE, " << value.kind << ", " << ValueTypeSpec(value) << ")\n\n\n";
+			<< "    schema = (_pc.NONE, " << value.kind << ", " << ValueTypeSpec(value) << ")\n\n\n";
 	} else {
 		if (!CanBeKey(alias.key_type)) {
 			std::cerr << "illegal alias map key type: " << alias.key_type << std::endl;
@@ -360,7 +360,7 @@ static std::string GenAliasClass(const MessageInfo& info) {
 		}
 		auto value = ValueOf(alias.value_type, alias.value_class);
 		oss << "class " << info.py_name << "(_pc.Map):\n"
-			<< "    TYPE = (" << KindName(alias.key_type) << ", "
+			<< "    schema = (" << KindName(alias.key_type) << ", "
 			<< value.kind << ", " << ValueTypeSpec(value) << ")\n\n\n";
 	}
 	return oss.str();

@@ -48,12 +48,12 @@ packed = pc.compress(data3)
 assert pc.decompress(packed) == data3
 ```
 
-Generated message classes inherit from `protocache.Message`. Repeated-field
-aliases inherit from `protocache.Array`, and map aliases inherit from
-`protocache.Map`. Regular repeated fields and maps can be initialized with
-normal Python `list` and `dict` values; alias classes are only needed when the
-schema defines a standalone repeated/map type that should be serialized on its
-own.
+Generated message classes inherit from `protocache.Message`. Standalone
+repeated containers inherit from `protocache.Array`, and standalone map
+containers inherit from `protocache.Map`. Regular repeated fields and maps can
+be initialized with normal Python `list` and `dict` values; container classes
+are only needed when the schema defines a standalone repeated/map type that
+should be serialized on its own.
 
 Run the Python smoke test from the repository root after building the extension:
 
@@ -66,7 +66,7 @@ python3 -m unittest discover -s test -p '*_test.py'
 - The generated `*_pc.py` file contains field numbers and lightweight type
   metadata. Message schemas are direct reflection-style 6-tuples:
   `(name, field_id, repeated, key_kind, value_kind, value_type)`.
-  Standalone repeated/map aliases use a compact 3-tuple `TYPE`:
+  Standalone repeated/map containers use a compact 3-tuple `schema`:
   `(key_kind, value_kind, value_type)`.
   `key_kind` is `_pc.NONE` (0) when there is no map key, and complex
   `value_type` entries must be generated Python classes.
