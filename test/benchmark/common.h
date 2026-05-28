@@ -53,10 +53,12 @@ extern int BenchmarkFlatBuffers();
 extern int BenchmarkFlatBuffersReflect();
 extern int BenchmarkCapnProto(bool packed);
 extern int BenchmarkCapnProtoReflect(bool packed);
+extern int BenchmarkFory();
 
 extern int BenchmarkProtoCacheEX();
 extern int BenchmarkProtobufSerialize(bool flat=false);
 extern int BenchmarkProtoCacheSerialize(bool partly=false);
+extern int BenchmarkForySerialize();
 
 extern int BenchmarkCompress(const char* name, const std::string& filepath);
 

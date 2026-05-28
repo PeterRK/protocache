@@ -17,6 +17,7 @@ int main() {
 	BenchmarkCapnProto(true);
 	BenchmarkCapnProtoReflect(false);
 	BenchmarkCapnProtoReflect(true);
+	BenchmarkFory();
 
 	BenchmarkProtoCacheEX();
 	std::cout << "========serialize========" << std::endl;
@@ -29,5 +30,6 @@ int main() {
 	BenchmarkCompress("pb", "test.pb");
 	BenchmarkCompress("pc", "test.pc");
 	BenchmarkCompress("fb", "test.fb");
+	BenchmarkCompress("fr", "test.fr");
 	return 0;
 }

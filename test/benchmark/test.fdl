@@ -1,0 +1,62 @@
+package test_fory;
+
+enum Mode [id=1] {
+    MODE_A = 0;
+    MODE_B = 1;
+    MODE_C = 2;
+}
+
+message Small [id=2] {
+    int32 i32 = 1;
+    bool flag = 2;
+    string str = 4;
+}
+
+message Vec2D [id=4] {
+    message Vec1D [id=3] {
+        list<float32> x = 1;
+    }
+
+    list<Vec1D> x = 1;
+}
+
+message ArrMap [id=6] {
+    message Array [id=5] {
+        list<float32> x = 1;
+    }
+
+    map<string, Array> x = 1;
+}
+
+message Main [id=7] {
+    int32 i32 = 1;
+    uint32 u32 = 2;
+    int64 i64 = 3;
+    uint64 u64 = 4;
+    bool flag = 5;
+    Mode mode = 6;
+    string str = 7;
+    bytes data = 8;
+    float32 f32 = 9;
+    float64 f64 = 10;
+    Small object = 11;
+    list<int32> i32v = 12;
+    list<uint64> u64v = 13;
+    list<string> strv = 14;
+    list<bytes> datav = 15;
+    list<float32> f32v = 16;
+    list<float64> f64v = 17;
+    list<bool> flags = 18;
+    list<Small> objectv = 19;
+    uint32 t_u32 = 20;
+    int32 t_i32 = 21;
+    int32 t_s32 = 22;
+    uint64 t_u64 = 23;
+    int64 t_i64 = 24;
+    int64 t_s64 = 25;
+    map<string, int32> index = 26;
+    map<int32, Small> objects = 27;
+    Vec2D matrix = 28;
+    list<ArrMap> vector = 29;
+    ArrMap arrays = 30;
+}

@@ -2,14 +2,14 @@
 
 Alternative [flat binary format](data-format.md) for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead. FlatBuffers is fast but wastes space. ProtoCache takes balance of data size and read speed, so it's useful in data caching.
 
-|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto |
-|:-------|----:|----:|----:|----:|
-| Data Size | **574B** | 780B | 1296B | 1288B |
-| Decode + Traverse + Dealloc | 2620ns | 132ns | **89ns** | 610ns |
-| Decode + Traverse(reflection) + Dealloc | 8189ns | **270ns** | 484ns | 8748ns |
-| Compressed/Packed Size | 566B | 571B | 856B | 626B |
-| Compress | 258ns | 427ns | 775ns | - |
-| Decompress/Unpack | 114ns | 229ns | 532ns | 653ns |
+|  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto | Fory |
+|:-------|----:|----:|----:|----:|-------:|
+| Data Size | **574B** | 780B | 1296B | 1288B | 615B |
+| Decode + Traverse + Dealloc | 2620ns | 132ns | **89ns** | 610ns | 1748ns |
+| Decode + Traverse(reflection) + Dealloc | 8189ns | **270ns** | 484ns | 8748ns | - |
+| Compressed/Packed Size | 566B | 571B | 856B | 626B | 611B |
+| Compress | 258ns | 427ns | 775ns | - |  295ns | 
+| Decompress/Unpack | 114ns | 229ns | 532ns | 653ns | 140ns |
 
 A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. Because Cap'n Proto has a builtin pack algorithm, which shows better compress ratio than our naive compress algorithm, without explicit compress/decompress API, we take the time gap between access in plain and packed mode as decompress time. 
 
