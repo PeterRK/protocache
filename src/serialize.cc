@@ -263,7 +263,7 @@ bool SerializeMessage(Span<Unit> fields, Buffer& buf, size_t last, Unit& unit) {
 
 	*head = section;
 	uint32_t cnt = 0;
-	for (unsigned i = 0; i < std::min(12UL, fields.size()); i++) {
+	for (unsigned i = 0; i < std::min(size_t{12}, fields.size()); i++) {
 		auto& field = fields[i];
 		if (field.len != 0) {
 			assert(field.len < 4);

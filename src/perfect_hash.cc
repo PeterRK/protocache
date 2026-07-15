@@ -8,6 +8,9 @@
 #include <chrono>
 #include <memory>
 #include <algorithm>
+#if defined(__wasm__) && defined(__wasm_atomics__)
+#include <atomic>
+#endif
 #include "protocache/perfect_hash.h"
 #include "hash.h"
 
@@ -391,12 +394,39 @@ static bool Check(KeyReader& source, uint32_t n, uint32_t seed, V128* space) {
 	return true;
 }
 
+#if defined(__wasm__)
+#if defined(__wasm_atomics__)
+static std::atomic<uint32_t> g_seed{0};
+
+void InitializeWasmSeed(uint32_t seed) noexcept {
+	g_seed.store(seed, std::memory_order_relaxed);
+}
+
+static inline uint32_t GetSeed() noexcept {
+	return g_seed.fetch_add(1, std::memory_order_relaxed);
+}
+#else
+// A non-atomic WASM target cannot execute this instance concurrently. Keep the
+// counter plain so the single-thread build does not acquire a threads/shared-
+// memory requirement merely for seed allocation.
+static uint32_t g_seed = 0;
+
+void InitializeWasmSeed(uint32_t seed) noexcept {
+	g_seed = seed;
+}
+
+static inline uint32_t GetSeed() noexcept {
+	return g_seed++;
+}
+#endif
+#else
 static const auto g_time_base = std::chrono::steady_clock::now();
 
 static inline uint32_t GetSeed() {
 	return std::chrono::duration_cast<std::chrono::nanoseconds>(
 			std::chrono::steady_clock::now() - g_time_base).count();
 }
+#endif
 
 template <typename Word>
 static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, bool no_check) {

@@ -1,0 +1,9 @@
+# Local extension build outputs
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+/build/
+/dist/
+/*.egg-info/
+/native/

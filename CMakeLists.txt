@@ -88,6 +88,9 @@ if(WITH_TOOLS)
 
     add_executable(protoc-gen-pcpy tools/protoc-gen-pcpy.cc)
     target_link_libraries(protoc-gen-pcpy protoc protobuf pthread)
+
+    add_executable(protoc-gen-pcts tools/protoc-gen-pcts.cc)
+    target_link_libraries(protoc-gen-pcts protoc protobuf pthread)
 endif()
 
 install(
@@ -104,7 +107,7 @@ install(
 
 if(WITH_TOOLS)
     install(
-        TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net protoc-gen-pcpy
+        TARGETS protoc-gen-pccx protoc-gen-pcjv protoc-gen-pc.net protoc-gen-pcpy protoc-gen-pcts
         RUNTIME DESTINATION bin
     )
 endif()
@@ -114,6 +117,6 @@ if(WITH_BENCHMARK)
         test/benchmark/*.cc
     )
 
-    add_executable(benchmark ${PROTOCACHE_BENCHMARK_SOURCES})
-    target_link_libraries(benchmark protocache protobuf flatbuffers capnp kj pthread)
+    add_executable(benchmark ${PROTOCACHE_BENCHMARK_SOURCES} ${FORY_BENCHMARK_GENERATED_HEADER})
+    target_link_libraries(benchmark protocache protobuf flatbuffers capnp kj fory_serialization fory_meta fory_util fory_thirdparty pthread)
 endif()

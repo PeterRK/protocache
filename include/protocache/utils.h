@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <type_traits>
 #include <vector>
 #include <atomic>
 #include <memory>
@@ -22,7 +23,13 @@ public:
 	Slice() noexcept = default;
 	Slice(const T* p, size_t l) noexcept : ptr_(p), len_(l) {}
 
-	explicit Slice(const std::basic_string<T>& v) noexcept : ptr_(v.data()), len_(v.size()) {}
+	template <typename U, typename = std::enable_if_t<std::is_same_v<T, U>>>
+	explicit Slice(const std::basic_string<U>& v) noexcept : ptr_(v.data()), len_(v.size()) {}
+	template <typename U = T, std::enable_if_t<
+		std::is_same_v<T, U> && (std::is_same_v<U, char> ||
+		std::is_same_v<U, wchar_t> || std::is_same_v<U, char16_t> ||
+		std::is_same_v<U, char32_t>), int> = 0>
+	explicit Slice(const U* v) noexcept : ptr_(v), len_(std::char_traits<U>::length(v)) {}
 	explicit Slice(const std::vector<T>& v) noexcept : ptr_(v.data()), len_(v.size()) {}
 
 	bool operator!() const noexcept {

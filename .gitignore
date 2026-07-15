@@ -1,0 +1,9 @@
+# Local development state
+/.codex
+/.idea/
+/cmake-build-*/
+
+# Locally installed benchmark dependencies
+/capnproto/
+/fory/
+/pb/

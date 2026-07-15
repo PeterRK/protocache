@@ -1,0 +1,64 @@
+{
+  "name": "protocache",
+  "version": "0.1.0",
+  "description": "Typed TypeScript runtime for the ProtoCache flat binary format",
+  "license": "BSD-3-Clause",
+  "author": "Ruan Kunliang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PeterRK/ProtoCache.git",
+    "directory": "typescript"
+  },
+  "homepage": "https://github.com/PeterRK/ProtoCache#readme",
+  "bugs": "https://github.com/PeterRK/ProtoCache/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocache.wasm": "./dist/protocache.wasm"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "protobuf",
+    "serialization",
+    "wasm",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "npm run build:ts && npm run build:wasm",
+    "build:ts": "node scripts/clean-output.mjs dist && tsc -p tsconfig.build.json",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "build:test": "node scripts/clean-output.mjs .test-dist && tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && npm run build:test && npm run test:runtime:built && npm run test:platform:built && npm run test:wasm-native",
+    "test:runtime:built": "node --test test/*.test.mjs && node test/wasm-smoke.mjs",
+    "test:platform:built": "node scripts/test-worker.mjs && node scripts/test-bundler.mjs && node scripts/test-browser.mjs",
+    "test:worker": "npm run build && node scripts/test-worker.mjs",
+    "test:bundler": "npm run build && node scripts/test-bundler.mjs",
+    "test:browser": "npm run build && npm run build:test && node scripts/test-browser.mjs",
+    "test:wasm-native": "cmake -S wasm -B .wasm-build/native -DCMAKE_BUILD_TYPE=Release && cmake --build .wasm-build/native && ctest --test-dir .wasm-build/native --output-on-failure",
+    "test:wasm": "npm run build:wasm && npm run build:test && node test/wasm-smoke.mjs",
+    "benchmark": "node --expose-gc benchmark/benchmark.mjs",
+    "benchmark:deserialize": "node --expose-gc benchmark/deserialize.mjs",
+    "prepack": "npm run build && npm run typecheck"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "flatbuffers": "^25.9.23",
+    "protobufjs": "^8.7.1",
+    "typescript": "^7.0.2"
+  }
+}

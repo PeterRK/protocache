@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+
+# Generated root fixtures and bindings
+/*.pb*
+/*.pc
+/junk.*
+
+# Generated benchmark fixtures and bindings
+/benchmark/*.bin
+/benchmark/*.capnp.cc
+/benchmark/*.capnp.h
+/benchmark/*.fb
+/benchmark/*.fr
+/benchmark/*.pb*
+/benchmark/*.pc*
+/benchmark/*_generated.h
+/benchmark/test.proto
+/benchmark/twitter.json

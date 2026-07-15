@@ -161,7 +161,7 @@ bool Decompress(const uint8_t* src, size_t len, std::string* out) {
 
 void Buffer::DoExpand(size_t delta) {
 	if (data_ == nullptr) {
-		size_ = std::max(delta, 8UL);
+		size_ = std::max(delta, size_t{8});
 		data_.reset(new uint32_t[size_]);
 		off_ = size_ - delta;
 		return;

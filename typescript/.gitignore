@@ -1,0 +1,8 @@
+/node_modules/
+/dist/
+/.test-dist/
+/.test-bundle/
+/.test-fixtures/
+/.benchmark-fixtures/
+/.wasm-build/
+/.tools/
