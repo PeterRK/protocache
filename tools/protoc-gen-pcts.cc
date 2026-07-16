@@ -10,8 +10,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <unistd.h>
-
 #include "proto-gen-utils.h"
 
 namespace {
@@ -757,6 +755,10 @@ static bool ParseOptions(const std::string& raw) {
 }  // namespace
 
 int main() {
+	if (!PrepareProtocPluginIO()) {
+		std::cerr << "failed to configure protoc plugin IO" << std::endl;
+		return 1;
+	}
 	::google::protobuf::compiler::CodeGeneratorRequest request;
 	::google::protobuf::compiler::CodeGeneratorResponse response;
 	if (!request.ParseFromFileDescriptor(STDIN_FILENO)) {

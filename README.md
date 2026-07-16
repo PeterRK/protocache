@@ -1,6 +1,12 @@
 # ProtoCache
 
-Alternative [flat binary format](data-format.md) for [Protobuf schema](https://protobuf.dev/programming-guides/proto3/). It' works like FlatBuffers, but it's usually smaller and surpports map. Flat means no deserialization overhead. [A benchmark](test/benchmark) shows the Protobuf has considerable deserialization overhead and significant reflection overhead. FlatBuffers is fast but wastes space. ProtoCache takes balance of data size and read speed, so it's useful in data caching.
+ProtoCache is an alternative [flat binary format](data-format.md) for
+[Protobuf schemas](https://protobuf.dev/programming-guides/proto3/). Like
+FlatBuffers, it supports direct reads without first materializing an object
+graph, while usually producing smaller data and supporting maps. The
+[benchmark](test/benchmark) compares data size, traversal, reflection, and
+compression costs. ProtoCache is designed for workloads that need a balance
+between compact cached data and fast reads.
 
 |  | Protobuf | ProtoCache | FlatBuffers | Cap'n Proto | Fory |
 |:-------|----:|----:|----:|----:|-------:|
@@ -24,6 +30,42 @@ message Vec2D {
 }
 ```
 Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache.
+
+## Build and Install
+
+ProtoCache requires a C++17 compiler and Protobuf. Tests additionally require
+GoogleTest, while command-line tools require gflags. CMake 3.13 or newer is
+required.
+
+```sh
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DWITH_TEST=ON \
+  -DWITH_TOOLS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /path/to/prefix
+```
+
+`WITH_BENCHMARK` and `PROTOCACHE_ENABLE_NATIVE_OPT` are disabled by default so
+normal builds remain portable. Benchmark builds enable native CPU optimization
+and require the additional benchmark libraries used by this repository.
+
+Installed CMake packages can be consumed directly:
+
+```cmake
+find_package(ProtoCache 1.2 CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE ProtoCache::protocache)
+```
+
+Available library targets are `ProtoCache::protocache` (full static library),
+`ProtoCache::protocache-shared`, and `ProtoCache::protocache-lite` (core API
+without the reflection extension). When tools are enabled, the install also
+contains the JSON converters and all protoc plugins.
+
+The C++, Python, and TypeScript distributions use the same repository release
+version. Format compatibility remains governed by [data-format.md](data-format.md)
+and cross-language fixtures.
 
 ## Code Gen
 ```sh

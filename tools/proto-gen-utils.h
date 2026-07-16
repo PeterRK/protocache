@@ -1,11 +1,34 @@
 #pragma once
 
 #include <cctype>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/compiler/plugin.pb.h>
+
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
+#else
+#include <unistd.h>
+#endif
+
+static inline bool PrepareProtocPluginIO() noexcept {
+#if defined(_WIN32)
+	return _setmode(_fileno(stdin), _O_BINARY) != -1 &&
+		   _setmode(_fileno(stdout), _O_BINARY) != -1;
+#else
+	return true;
+#endif
+}
 
 static inline std::string NaiveJoinName(const std::string& ns, const std::string& name) {
 	std::string fullname;

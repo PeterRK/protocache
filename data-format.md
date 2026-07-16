@@ -1,9 +1,10 @@
 # Data Format
 
-All data are little endian and 4 byte aligned. Byte `0x00` is used as padding to keep alignment.
+All data is little-endian and aligned to 4-byte boundaries. Byte `0x00` is used
+as padding to preserve alignment.
 
 ## Scalar Type
-Scalar type is always stored as a word (4byte) or a double word (8byte).
+A scalar is always stored as a word (4 bytes) or a double word (8 bytes).
 
 ## Object Type
 
@@ -12,28 +13,37 @@ Scalar type is always stored as a word (4byte) or a double word (8byte).
 xx...xx11 -> object
 |  X words  |
 ```
-If an object is too big to store embedded, a offset word will be stored before. The lowest 2 bits of a valid offset are always 11, while any embeddable object will not have such word first. We can tell whether an element is an offset or an embedded object by this pattern.
+If an object is too large to embed, an offset word is stored instead. The two
+lowest bits of a valid offset are always `11`, while an embeddable object never
+starts with such a word. This pattern distinguishes offsets from embedded
+objects.
 
 ## Array
 ```
 |header|
 xx...xyy element element element ... [object...]
 ```
-The lowest 2 bits of array header marks the element size in words, while other bits means the numbers of elements.
+The two lowest bits of an array header encode the element size in words; the
+remaining bits encode the number of elements.
 
-- Header of **byte array** is stored as varint, and the element size is 0.
-- Header of **gneral array** is stored as a word. When element size is 3, this array must contain embedded objects with size of 3 words, which means it's not empty.
+- A **byte array** header is stored as a varint and has element size 0.
+- A **general array** header is stored as a word. Element size 3 denotes
+  embedded objects occupying three words, so that representation is non-empty.
 
 ## Map
 ```
 | header |
 yyzzxx...x [index] key value key value key value ... [object...]
 ```
-Header of map is stored as a word. The 31-30bit of header means key size in word, the 29-28bit of header means value size in word, and the 27-0bit of header means numbers of key-value pairs. Key size and value size should not be 0. Map with more than one element will have an index stored before key-value pairs.
+A map header is stored as a word. Bits 31–30 encode the key size in words,
+bits 29–28 encode the value size in words, and bits 27–0 encode the number of
+key-value pairs. Key and value sizes must be nonzero. A map with more than one
+element stores an index before its key-value pairs.
 ```
 seed bitmap [offset table]
 ```
-Index is based on [BDZ algorithm](https://cmph.sourceforge.net/bdz.html), which is stored as 4 byte seed, 8byte-aligned bitmap and offset table.
+The index is based on the [BDZ algorithm](https://cmph.sourceforge.net/bdz.html)
+and consists of a 4-byte seed, an 8-byte-aligned bitmap, and an offset table.
 
 ## Message
 ```
@@ -41,8 +51,13 @@ Index is based on [BDZ algorithm](https://cmph.sourceforge.net/bdz.html), which 
 _______xx...x yy...yy_______ ... field field field ... [object...]
 |   header  | |   section  |
 ```
-Fields of a message will be organized by sections. The first 12 fields are default section, then every 25 fields make up an extended section. Header of message is stored as a word. The lowest byte of header represents number of extended sections. An extended section is stored as a double word, highest 14 bits of which records offset in words of the first field in this section. Every field takes 2 bits to 
-mark field size in word. 0 means the field is omitted. A message can have at most 6387 fields.
+Message fields are organized into sections. The first 12 fields form the
+default section; each subsequent group of 25 fields forms an extended section.
+The message header is one word whose lowest byte stores the number of extended
+sections. Each extended section is a double word; its highest 14 bits record
+the word offset of the section's first field. Every field uses 2 bits to encode
+its size in words, with 0 meaning omitted. A message can contain at most 6387
+fields.
 
 
 ## Schema Mapping

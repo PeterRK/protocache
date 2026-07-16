@@ -9,8 +9,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <unistd.h>
-
 #include "proto-gen-utils.h"
 
 namespace {
@@ -508,6 +506,10 @@ static std::string GenFile(const FileProto& proto) {
 } // namespace
 
 int main() {
+	if (!PrepareProtocPluginIO()) {
+		std::cerr << "fail to configure protoc plugin IO" << std::endl;
+		return 1;
+	}
 	::google::protobuf::compiler::CodeGeneratorRequest request;
 	::google::protobuf::compiler::CodeGeneratorResponse response;
 

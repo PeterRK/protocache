@@ -9,7 +9,6 @@
 #include <iostream>
 #include <unordered_set>
 #include <unordered_map>
-#include <unistd.h>
 #include "proto-gen-utils.h"
 
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
@@ -829,6 +828,10 @@ static std::string GenFileEX(const ::google::protobuf::FileDescriptorProto& prot
 }
 
 int main() {
+	if (!PrepareProtocPluginIO()) {
+		std::cerr << "fail to configure protoc plugin IO" << std::endl;
+		return 1;
+	}
 	::google::protobuf::compiler::CodeGeneratorRequest request;
 	::google::protobuf::compiler::CodeGeneratorResponse response;
 

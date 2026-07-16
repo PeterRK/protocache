@@ -119,4 +119,4 @@ EX API, runtime `.proto` reflection, protobuf message bridge, services, or RPC.
 ## License
 
 BSD-3-Clause. See the repository's
-[LICENSE](https://github.com/PeterRK/ProtoCache/blob/master/LICENSE).
+[LICENSE](https://github.com/PeterRK/ProtoCache/blob/main/LICENSE).

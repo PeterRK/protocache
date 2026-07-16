@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protocache"
-version = "0.1.0"
+version = "1.2.0"
 description = "Format-compatible Python binding for the ProtoCache flat binary format"
 readme = "README.md"
 requires-python = ">=3.10"
