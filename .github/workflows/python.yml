@@ -1,0 +1,132 @@
+name: Python
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    name: Shared test fixture
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install fixture generator dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            protobuf-compiler libprotobuf-dev libprotoc-dev libgflags-dev
+      - name: Generate fixture
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DWITH_TEST=OFF \
+            -DWITH_TOOLS=ON \
+            -DWITH_BENCHMARK=OFF \
+            -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
+          cmake --build build --target json-to-binary --parallel 2
+          build/json-to-binary \
+            --schema=test/test.proto \
+            --input=test/test.json \
+            --root=test.Main \
+            --output=test/test.pc
+      - uses: actions/upload-artifact@v7
+        with:
+          name: protocache-test-fixture
+          path: test/test.pc
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    name: CPython ${{ matrix.python-version }}
+    needs: fixture
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: protocache-test-fixture
+          path: test
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Install build and type-check tools
+        run: >-
+          python -m pip install --upgrade
+          "setuptools>=83,<84" "packaging>=24.2" "mypy>=1.10"
+      - name: Build extension in place
+        working-directory: python
+        run: python setup.py build_ext --inplace
+      - name: Run unit and smoke tests
+        run: |
+          python -m unittest discover -s test -p '*_test.py'
+          python python/smoke_test.py
+      - name: Check public typing
+        if: matrix.python-version == '3.14'
+        working-directory: python
+        run: |
+          python -m mypy --strict typing_check.py
+          python -m mypy.stubtest protocache
+
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Install packaging tools
+        run: python -m pip install --upgrade build twine
+      - name: Build and inspect sdist
+        working-directory: python
+        run: |
+          python -m build --sdist --outdir dist .
+          python -m twine check dist/*
+      - name: Install sdist and smoke test outside the checkout
+        run: |
+          cp python/smoke_test.py "${RUNNER_TEMP}/protocache-smoke.py"
+          python -m pip install --force-reinstall python/dist/*.tar.gz
+          cd "${RUNNER_TEMP}"
+          python protocache-smoke.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: protocache-python-sdist
+          path: python/dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pypa/cibuildwheel@v3.4.1
+        with:
+          package-dir: python
+          output-dir: wheelhouse
+      - uses: actions/upload-artifact@v7
+        with:
+          name: protocache-python-wheels-${{ runner.os }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error

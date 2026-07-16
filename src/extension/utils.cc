@@ -17,6 +17,21 @@ namespace protocache {
 
 class ErrorCollector : public google::protobuf::io::ErrorCollector {
 public:
+#if GOOGLE_PROTOBUF_VERSION >= 5026000
+	void RecordError(int line, google::protobuf::io::ColumnNumber column,
+					 absl::string_view message) override {
+		core_ << "[error] line " << line << ", column " << column << ": ";
+		core_.write(message.data(), static_cast<std::streamsize>(message.size()));
+		core_ << std::endl;
+	}
+
+	void RecordWarning(int line, google::protobuf::io::ColumnNumber column,
+					   absl::string_view message) override {
+		core_ << "[warning] line " << line << ", column " << column << ": ";
+		core_.write(message.data(), static_cast<std::streamsize>(message.size()));
+		core_ << std::endl;
+	}
+#else
 	void AddError(int line, int column, const std::string& message) override {
 		core_ << "[error] line " << line << ", column " << column << ": " << message << std::endl;
 	}
@@ -24,6 +39,7 @@ public:
 	void AddWarning(int line, int column, const std::string& message) override {
 		core_ << "[warning] line " << line << ", column " << column << ": " << message << std::endl;
 	}
+#endif
 
 	std::string String() noexcept {
 		return core_.str();

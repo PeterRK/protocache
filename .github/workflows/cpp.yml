@@ -1,0 +1,125 @@
+name: C++
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Prepare vcpkg binary cache (Windows)
+        if: runner.os == 'Windows'
+        id: vcpkg-cache-info
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force `
+            -Path "${{ runner.temp }}\vcpkg-binary-cache" | Out-Null
+          "image-version=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Restore vcpkg binary cache (Windows)
+        if: runner.os == 'Windows'
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}\vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            protobuf-compiler libprotobuf-dev libprotoc-dev \
+            libgtest-dev libgflags-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf googletest gflags
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}\vcpkg-binary-cache
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            protobuf:x64-windows-release `
+            gtest:x64-windows-release
+
+      - name: Save vcpkg binary cache (Windows)
+        if: runner.os == 'Windows' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}\vcpkg-binary-cache
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/install
+          -DWITH_TEST=ON
+          -DWITH_TOOLS=ON
+          -DWITH_BENCHMARK=OFF
+          -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          cmake -S . -B build -A x64
+          "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows-release
+          "-DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/install"
+          -DWITH_TEST=ON
+          -DWITH_TOOLS=OFF
+          -DWITH_BENCHMARK=OFF
+          -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test core and generated fixtures
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Install
+        run: cmake --install build --config Release
+
+      - name: Configure installed-package consumer (Unix)
+        if: runner.os != 'Windows'
+        run: >-
+          cmake -S test/cmake-consumer -B consumer-build
+          "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/build/install"
+
+      - name: Configure installed-package consumer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          cmake -S test/cmake-consumer -B consumer-build -A x64
+          "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows-release
+          "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/build/install"
+
+      - name: Build installed-package consumer
+        run: cmake --build consumer-build --config Release --parallel
+
+      - name: Test installed-package consumer
+        run: ctest --test-dir consumer-build -C Release --output-on-failure

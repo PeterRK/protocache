@@ -1,0 +1,72 @@
+name: TypeScript
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "24"]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install Emscripten SDK 6.0.3
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "${RUNNER_TEMP}/emsdk"
+          "${RUNNER_TEMP}/emsdk/emsdk" install 6.0.3
+          "${RUNNER_TEMP}/emsdk/emsdk" activate 6.0.3
+          echo "EMSDK=${RUNNER_TEMP}/emsdk" >> "${GITHUB_ENV}"
+
+      - name: Verify browser availability
+        run: google-chrome --version || firefox --version || chromium --version
+
+      - name: Install fixture generator dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            protobuf-compiler libprotobuf-dev libprotoc-dev libgflags-dev
+
+      - name: Stage shared C++ fixture
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DWITH_TEST=OFF \
+            -DWITH_TOOLS=ON \
+            -DWITH_BENCHMARK=OFF \
+            -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
+          cmake --build build --target json-to-binary --parallel 2
+          mkdir -p typescript/.test-fixtures
+          build/json-to-binary \
+            --schema=test/test.proto \
+            --input=test/test.json \
+            --root=test.Main \
+            --output=typescript/.test-fixtures/test.pc
+
+      - name: Install dependencies
+        working-directory: typescript
+        run: npm ci
+
+      - name: Run TypeScript, WASM, Worker, bundler, and browser tests
+        working-directory: typescript
+        run: npm test
+
+      - name: Inspect npm package
+        working-directory: typescript
+        run: npm pack --dry-run

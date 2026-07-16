@@ -17,7 +17,10 @@ option(WITH_TOOLS "build command line tools and protoc plugins" ON)
 option(WITH_BENCHMARK "build benchmark target" OFF)
 option(PROTOCACHE_ENABLE_NATIVE_OPT "enable native CPU optimizations" OFF)
 
-find_package(Protobuf REQUIRED)
+find_package(Protobuf CONFIG QUIET)
+if(NOT Protobuf_FOUND)
+    find_package(Protobuf REQUIRED)
+endif()
 find_package(Threads REQUIRED)
 
 set(PROTOCACHE_USE_NATIVE_OPT ${PROTOCACHE_ENABLE_NATIVE_OPT})

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -691,13 +692,15 @@ TEST(PtotoCache, ExtensionUtilsFailurePaths) {
 	std::unique_ptr<google::protobuf::Message> message(prototype->New());
 	ASSERT_FALSE(protocache::LoadJson("missing-file.json", message.get()));
 
-	const std::string bad_json_path = "/tmp/protocache-bad-json-test.json";
+	const auto bad_json_path =
+			std::filesystem::temp_directory_path() / "protocache-bad-json-test.json";
 	{
 		std::ofstream out(bad_json_path);
 		ASSERT_TRUE(out.good());
 		out << "{this is not valid json}";
 	}
-	ASSERT_FALSE(protocache::LoadJson(bad_json_path, message.get()));
+	ASSERT_FALSE(protocache::LoadJson(bad_json_path.string(), message.get()));
+	std::filesystem::remove(bad_json_path);
 }
 
 TEST(PtotoCache, SerializeRejectsUnsupportedShapes) {

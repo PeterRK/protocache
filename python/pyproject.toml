@@ -45,8 +45,8 @@ protocache = ["_protocache.cc"]
 
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
-test-sources = ["smoke_test.py"]
-test-command = "python smoke_test.py"
+test-sources = ["python/smoke_test.py"]
+test-command = "python python/smoke_test.py"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
@@ -55,4 +55,4 @@ archs = ["x86_64"]
 archs = ["AMD64"]
 
 [tool.cibuildwheel.macos]
-archs = ["x86_64", "arm64"]
+archs = ["arm64"]
