@@ -232,8 +232,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	for (auto one : fields) {
 		if (IsRepeated(*one)
 			|| one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE
-			|| one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_STRING
-			|| one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_BYTES) {
+			|| one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_STRING) {
 			oss << "\t\t" << one->name() << "_ = null;\n";
 		}
 	}
@@ -294,7 +293,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 			}
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_BYTES:
-				handle_simple_field(*one, "byte[]", "Bytes", false);
+				handle_simple_field(*one, "global::System.ReadOnlySpan<byte>", "Bytes");
 				break;
 			case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
 				handle_simple_field(*one, "string", "String", false);
