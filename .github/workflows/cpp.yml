@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}\vcpkg-binary-cache
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-v1
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-libprotoc-v1
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ runner.arch }}-
 
@@ -60,7 +60,7 @@ jobs:
           VCPKG_DEFAULT_BINARY_CACHE: ${{ runner.temp }}\vcpkg-binary-cache
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
-            protobuf:x64-windows-release `
+            "protobuf[libprotoc]:x64-windows-release" `
             gtest:x64-windows-release `
             gflags:x64-windows-release
 
@@ -69,7 +69,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\vcpkg-binary-cache
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-v1
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-libprotoc-v1
 
       - name: Configure (Unix)
         if: runner.os != 'Windows'

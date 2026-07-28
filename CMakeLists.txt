@@ -102,6 +102,12 @@ endif()
 
 if(WITH_TOOLS)
     find_package(gflags REQUIRED)
+    if(NOT TARGET protobuf::libprotoc)
+        message(FATAL_ERROR
+            "WITH_TOOLS requires the Protobuf libprotoc library; "
+            "with vcpkg, install protobuf[libprotoc]"
+        )
+    endif()
 
     add_executable(json-to-binary tools/json-to-binary.cc)
     target_link_libraries(json-to-binary PRIVATE ProtoCache::protocache ${GFLAGS_TARGET})
