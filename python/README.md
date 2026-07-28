@@ -3,22 +3,29 @@
 The Python binding is a format-compatible convenience layer for ProtoCache.
 Generated modules describe a schema, while the shared native runtime fully
 serializes and deserializes normal Python object graphs. It supports CPython
-3.10 through 3.14 on 64-bit Linux, macOS, and Windows.
+3.10 through 3.14. Release wheels target Linux x86_64, Windows AMD64, and
+macOS arm64.
 
 The API favors a concise Python object model and format compatibility. Unlike
 the C++ binding, it is not a zero-copy view over the input buffer.
 
 ## Installation
 
-Install directly from a repository checkout:
+Install the release from PyPI:
+
+```sh
+python -m pip install protocache
+```
+
+Release wheels include the native extension and do not require a compiler.
+To install directly from a repository checkout instead:
 
 ```sh
 python -m pip install ./python
 ```
 
 The package contains a C++17 extension. Building from source therefore requires
-a supported Python development environment and a C++ compiler. Release wheels
-do not require a compiler at installation time.
+a supported Python development environment and a C++ compiler.
 
 Generate Python schema classes with the ProtoCache protoc plugin:
 
@@ -100,4 +107,4 @@ the Python package.
   through ProtoCache bytes.
 
 ProtoCache is distributed under the repository's
-[BSD 3-Clause license](../LICENSE).
+[BSD 3-Clause license](https://github.com/PeterRK/ProtoCache/blob/main/LICENSE).

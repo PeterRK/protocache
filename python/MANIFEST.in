@@ -1,3 +1,4 @@
+include LICENSE
 include README.md
 include smoke_test.py
 recursive-include protocache *.py *.pyi py.typed

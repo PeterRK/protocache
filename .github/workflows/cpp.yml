@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}\vcpkg-binary-cache
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-v1
           restore-keys: |
             vcpkg-${{ runner.os }}-${{ runner.arch }}-
 
@@ -61,14 +61,15 @@ jobs:
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
             protobuf:x64-windows-release `
-            gtest:x64-windows-release
+            gtest:x64-windows-release `
+            gflags:x64-windows-release
 
       - name: Save vcpkg binary cache (Windows)
         if: runner.os == 'Windows' && steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\vcpkg-binary-cache
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg-cache-info.outputs.image-version }}-x64-windows-release-tools-v1
 
       - name: Configure (Unix)
         if: runner.os != 'Windows'
@@ -90,7 +91,7 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=x64-windows-release
           "-DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/install"
           -DWITH_TEST=ON
-          -DWITH_TOOLS=OFF
+          -DWITH_TOOLS=ON
           -DWITH_BENCHMARK=OFF
           -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
 
