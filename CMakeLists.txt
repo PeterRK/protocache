@@ -3,7 +3,7 @@
 # license that can be found in the LICENSE file.
 
 cmake_minimum_required(VERSION 3.13)
-project(ProtoCache VERSION 1.2.0 LANGUAGES CXX)
+project(ProtoCache VERSION 1.2.1 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)

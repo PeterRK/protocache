@@ -1,6 +1,6 @@
 {
   "name": "protocache",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Typed TypeScript runtime for the ProtoCache flat binary format",
   "license": "BSD-3-Clause",
   "author": "Ruan Kunliang",
