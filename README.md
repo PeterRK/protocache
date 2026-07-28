@@ -31,6 +31,12 @@ message Vec2D {
 ```
 Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache.
 
+Protobuf permits `bool` map keys, but ProtoCache does not support
+`map<bool, ...>`. ProtoCache map keys are limited to `string`, `int32`, `sint32`, `sfixed32`,
+`uint32`, `fixed32`, and their 64-bit counterparts.
+The code generators and reflection serializer reject schemas that use any other
+map key type.
+
 ## Build and Install
 
 ProtoCache requires a C++17 compiler and Protobuf. Tests additionally require

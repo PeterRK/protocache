@@ -167,25 +167,6 @@ static const char* TypeMark(::google::protobuf::FieldDescriptorProto::Type type)
 	}
 }
 
-static bool CanBeKey(::google::protobuf::FieldDescriptorProto::Type type) {
-	switch (type) {
-		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
-		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
-			return true;
-		default:
-			return false;
-	}
-}
-
 static std::string GenEnum(const ::google::protobuf::EnumDescriptorProto& proto) {
 	std::ostringstream oss;
 	oss << "enum " << proto.name() << " : int32_t {\n";

@@ -193,25 +193,6 @@ static std::string LoaderName(const std::string& proto_file) {
 	return "load" + ToPascal(TsIdent(Basename(StripExtension(proto_file))));
 }
 
-static bool CanBeKey(FieldProto::Type type) {
-	switch (type) {
-		case FieldProto::TYPE_STRING:
-		case FieldProto::TYPE_FIXED64:
-		case FieldProto::TYPE_UINT64:
-		case FieldProto::TYPE_FIXED32:
-		case FieldProto::TYPE_UINT32:
-		case FieldProto::TYPE_SFIXED64:
-		case FieldProto::TYPE_SINT64:
-		case FieldProto::TYPE_INT64:
-		case FieldProto::TYPE_SFIXED32:
-		case FieldProto::TYPE_SINT32:
-		case FieldProto::TYPE_INT32:
-			return true;
-		default:
-			return false;
-	}
-}
-
 static std::string KindName(FieldProto::Type type) {
 	switch (type) {
 		case FieldProto::TYPE_BYTES: return "$pc.Kind.Bytes";

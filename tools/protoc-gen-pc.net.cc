@@ -125,6 +125,10 @@ static std::string CalcAliasName(const AliasUnit& alias) {
 			out += "Array";
 		}
 	} else {
+		if (!CanBeKey(alias.key_type)) {
+			std::cerr << "illegal map key type: " << alias.key_type << std::endl;
+			return {};
+		}
 		auto key_type =  BasicCsType(alias.key_type);
 		if (key_type == nullptr) {
 			return {};

@@ -38,25 +38,6 @@ static std::string g_current_file;
 static std::unordered_map<std::string, std::string> g_import_aliases;
 static bool g_failed = false;
 
-static bool CanBeKey(FieldProto::Type type) {
-	switch (type) {
-		case FieldProto::TYPE_STRING:
-		case FieldProto::TYPE_FIXED64:
-		case FieldProto::TYPE_UINT64:
-		case FieldProto::TYPE_FIXED32:
-		case FieldProto::TYPE_UINT32:
-		case FieldProto::TYPE_SFIXED64:
-		case FieldProto::TYPE_SINT64:
-		case FieldProto::TYPE_INT64:
-		case FieldProto::TYPE_SFIXED32:
-		case FieldProto::TYPE_SINT32:
-		case FieldProto::TYPE_INT32:
-			return true;
-		default:
-			return false;
-	}
-}
-
 static bool CollectAlias(const std::string& ns, const MessageProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	std::unordered_map<std::string, const MessageProto*> map_entries;

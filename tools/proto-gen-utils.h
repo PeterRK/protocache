@@ -67,6 +67,25 @@ static std::string AddIndent(const std::string& raw) {
 
 static constexpr ::google::protobuf::FieldDescriptorProto::Type TYPE_NONE = static_cast<::google::protobuf::FieldDescriptorProto::Type>(0);
 
+static inline bool CanBeKey(::google::protobuf::FieldDescriptorProto::Type type) {
+	switch (type) {
+		case ::google::protobuf::FieldDescriptorProto::TYPE_STRING:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_FIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_UINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT64:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SFIXED32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_SINT32:
+		case ::google::protobuf::FieldDescriptorProto::TYPE_INT32:
+			return true;
+		default:
+			return false;
+	}
+}
+
 struct AliasUnit {
 	::google::protobuf::FieldDescriptorProto::Type key_type = TYPE_NONE;
 	::google::protobuf::FieldDescriptorProto::Type value_type = TYPE_NONE;
