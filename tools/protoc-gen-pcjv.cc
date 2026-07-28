@@ -371,6 +371,15 @@ int main() {
 		return 1;
 	}
 
+	response.set_supported_features(
+		::google::protobuf::compiler::CodeGeneratorResponse::FEATURE_PROTO3_OPTIONAL);
+	std::string schema_error;
+	if (!ValidateGeneratorInput(request, &schema_error, true)) {
+		response.set_error(schema_error);
+		response.SerializeToFileDescriptor(STDOUT_FILENO);
+		return 0;
+	}
+
 	for (auto& proto : request.proto_file()) {
 		std::string ns;
 		if (!proto.package().empty()) {

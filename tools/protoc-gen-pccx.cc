@@ -388,10 +388,6 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		std::cerr << "too many fields in message " << proto.name() << std::endl;
 		return {};
 	}
-	if (max_id - proto.field_size() > 6 && max_id > proto.field_size()*2) {
-		std::cerr << "fields in message are too sparse " << proto.name() << std::endl;
-		return {};
-	}
 
 	auto handle_get = [&oss](bool repeated, const std::string& field_name, const char* out_type) {
 		std::string tmp;
@@ -819,6 +815,15 @@ int main() {
 	if (!request.ParseFromFileDescriptor(STDIN_FILENO)) {
 		std::cerr << "fail to get request" << std::endl;
 		return 1;
+	}
+
+	response.set_supported_features(
+		::google::protobuf::compiler::CodeGeneratorResponse::FEATURE_PROTO3_OPTIONAL);
+	std::string schema_error;
+	if (!ValidateGeneratorInput(request, &schema_error)) {
+		response.set_error(schema_error);
+		response.SerializeToFileDescriptor(STDOUT_FILENO);
+		return 0;
 	}
 
 	bool extra = request.parameter() == "extra";

@@ -20,22 +20,23 @@ between compact cached data and fast reads.
 A naive compress algorithm is introduced to reduce continuous `0x00` or `0xff` bytes, which makes the final output size of ProtoCache close to Protobuf. Because Cap'n Proto has a builtin pack algorithm, which shows better compress ratio than our naive compress algorithm, without explicit compress/decompress API, we take the time gap between access in plain and packed mode as decompress time. 
 
 ## Difference to Protobuf
-Field IDs should not be too sparse. It's illegal to reverse field by assigning a large ID. Normal message should not have any field named `_`, message with only one such field will be considered as an alias. Alias to array or map is useful. We can declare a 2D array like this.
+
+ProtoCache reserves a single repeated field named `_` with field number 1 as an alias to an array
+or map rather than a normal one-field message. This makes multidimensional
+containers possible without an extra message layer:
+
 ```protobuf
 message Vec2D {
-	message Vec1D {
-		repeated float _ = 1;
-	}
-	repeated Vec1D _ = 1;
+  message Vec1D {
+    repeated float _ = 1;
+  }
+  repeated Vec1D _ = 1;
 }
 ```
-Some features in Protobuf, like Services, are not supported by ProtoCache. Message defined without any field or message defined with sparse fields, which means too many field ids are missing, are illegal in ProtoCache.
 
-Protobuf permits `bool` map keys, but ProtoCache does not support
-`map<bool, ...>`. ProtoCache map keys are limited to `string`, `int32`, `sint32`, `sfixed32`,
-`uint32`, `fixed32`, and their 64-bit counterparts.
-The code generators and reflection serializer reject schemas that use any other
-map key type.
+For all other schema and object-model differences, including field numbering,
+presence and defaults, `oneof`, maps, deprecated declarations, unknown fields,
+and evolution rules, see [schema.md](schema.md).
 
 ## Build and Install
 

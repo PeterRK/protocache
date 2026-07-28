@@ -77,7 +77,8 @@ exactly one of `wasm` and `wasmUrl`.
 Generated classes extend `Message` and expose `serialize()`, static
 `deserialize()`, and `hasField(name)`. Repeated fields use `Array<T>`, maps use
 `Map<K, V>`, bytes use `Uint8Array`, and signed or unsigned 64-bit integers use
-`bigint`.
+`bigint`. For differences from the Protobuf object model, including presence,
+`oneof`, maps, and aliases, see the [schema compatibility guide](../schema.md).
 
 Standalone alias containers are represented by a native value plus a generated
 schema token:

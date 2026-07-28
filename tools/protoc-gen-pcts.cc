@@ -457,10 +457,9 @@ static bool CheckField(const std::string& owner, const FieldProto& field) {
 		Fail("field number is outside the ProtoCache range: " + owner + "." + field.name());
 		return false;
 	}
-	if (field.has_oneof_index() && !field.proto3_optional()) {
-		Fail("oneof is not supported: " + owner + "." + field.name());
-		return false;
-	}
+	// ProtoCache has no oneof discriminator. Match the other generators by
+	// emitting oneof members as independent fields without enforcing oneof
+	// exclusivity or active-case semantics.
 	return true;
 }
 
@@ -746,6 +745,15 @@ int main() {
 		std::cerr << "failed to parse CodeGeneratorRequest" << std::endl;
 		return 1;
 	}
+
+	response.set_supported_features(
+		::google::protobuf::compiler::CodeGeneratorResponse::FEATURE_PROTO3_OPTIONAL);
+	std::string schema_error;
+	if (!ValidateGeneratorInput(request, &schema_error)) {
+		response.set_error(schema_error);
+		response.SerializeToFileDescriptor(STDOUT_FILENO);
+		return 0;
+	}
 	if (!ParseOptions(request.parameter())) {
 		response.set_error(g_error);
 		response.SerializeToFileDescriptor(STDOUT_FILENO);
@@ -753,10 +761,6 @@ int main() {
 	}
 
 	for (const auto& proto : request.proto_file()) {
-		if (proto.syntax() != "proto3") {
-			Fail("protoc-gen-pcts supports proto3 only: " + proto.name());
-			break;
-		}
 		std::string ns = proto.package().empty() ? "" : "." + proto.package();
 		for (const auto& one : proto.message_type()) {
 			if (!CollectAlias(ns, one)) break;
@@ -789,8 +793,7 @@ int main() {
 		}
 	}
 	if (!g_error.empty()) response.set_error(g_error);
-	response.set_supported_features(
-		::google::protobuf::compiler::CodeGeneratorResponse::FEATURE_PROTO3_OPTIONAL);
+
 	if (!response.SerializeToFileDescriptor(STDOUT_FILENO)) {
 		std::cerr << "failed to serialize CodeGeneratorResponse" << std::endl;
 		return 2;
