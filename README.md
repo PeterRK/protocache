@@ -70,9 +70,7 @@ Available library targets are `ProtoCache::protocache` (full static library),
 without the reflection extension). When tools are enabled, the install also
 contains the JSON converters and all protoc plugins.
 
-The C++, Python, and TypeScript distributions use the same repository release
-version. Format compatibility remains governed by [data-format.md](data-format.md)
-and cross-language fixtures.
+Format compatibility is governed by [data-format.md](data-format.md).
 
 ## Code Gen
 ```sh
@@ -80,28 +78,6 @@ protoc --pccx_out=. [--pccx_opt=extra] test.proto
 ```
 A protobuf compiler plugin called `protoc-gen-pccx` is [available](tools/protoc-gen-pccx.cc) to generate header-only C++ file. If option `extra` is set, it will generate another file for extra APIs.
 
-For TypeScript, build the native tools with `WITH_TOOLS=ON`, then run:
-
-```sh
-protoc --pcts_out=. test.proto
-```
-
-[`protoc-gen-pcts`](tools/protoc-gen-pcts.cc) generates `test.pc.ts`, the public
-type/loader entry, and `test.pc.internal.ts`, which contains typed classes,
-literal enums, alias schemas, and message metadata. Runtime values are obtained
-only after WASM initialization:
-
-```ts
-import { loadTest, type Main } from "./test.pc.js";
-
-const generated = await loadTest({ wasm });
-const root: Main = generated.Main.deserialize(bytes);
-```
-
-Generated files import the npm module `protocache` by default. Use
-`--pcts_opt=runtime_import=@scope/package` when the runtime has another module
-specifier. See the [TypeScript runtime guide](typescript/README.md) for Node,
-browser, module Worker, bundler, and WASM deployment instructions.
 
 ## APIs
 ```cpp
