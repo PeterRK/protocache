@@ -80,6 +80,7 @@ jobs:
           -DWITH_TEST=ON
           -DWITH_TOOLS=ON
           -DWITH_BENCHMARK=OFF
+          -DPROTOCACHE_BUILD_SHARED=ON
           -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
 
       - name: Configure (Windows)
@@ -93,6 +94,7 @@ jobs:
           -DWITH_TEST=ON
           -DWITH_TOOLS=ON
           -DWITH_BENCHMARK=OFF
+          -DPROTOCACHE_BUILD_SHARED=OFF
           -DPROTOCACHE_ENABLE_NATIVE_OPT=OFF
 
       - name: Build

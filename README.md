@@ -57,6 +57,9 @@ cmake --install build --prefix /path/to/prefix
 `WITH_BENCHMARK` and `PROTOCACHE_ENABLE_NATIVE_OPT` are disabled by default so
 normal builds remain portable. Benchmark builds enable native CPU optimization
 and require the additional benchmark libraries used by this repository.
+`PROTOCACHE_BUILD_SHARED` is enabled by default on Linux and macOS and disabled
+on Windows. Windows currently supports the static libraries, tools, and Python
+extension; building the shared library there is not supported yet.
 
 Installed CMake packages can be consumed directly:
 
@@ -65,10 +68,11 @@ find_package(ProtoCache 1.2 CONFIG REQUIRED)
 target_link_libraries(my_target PRIVATE ProtoCache::protocache)
 ```
 
-Available library targets are `ProtoCache::protocache` (full static library),
-`ProtoCache::protocache-shared`, and `ProtoCache::protocache-lite` (core API
-without the reflection extension). When tools are enabled, the install also
-contains the JSON converters and all protoc plugins.
+Available library targets are `ProtoCache::protocache` (full static library)
+and `ProtoCache::protocache-lite` (static core library without the reflection
+extension). When `PROTOCACHE_BUILD_SHARED=ON`, the install also provides
+`ProtoCache::protocache-shared` on Linux and macOS. When tools are enabled, the
+install contains the JSON converters and all protoc plugins.
 
 Format compatibility is governed by [data-format.md](data-format.md).
 

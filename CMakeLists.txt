@@ -16,6 +16,20 @@ option(WITH_TEST "enable test" ON)
 option(WITH_TOOLS "build command line tools and protoc plugins" ON)
 option(WITH_BENCHMARK "build benchmark target" OFF)
 option(PROTOCACHE_ENABLE_NATIVE_OPT "enable native CPU optimizations" OFF)
+if(WIN32)
+    set(PROTOCACHE_BUILD_SHARED_DEFAULT OFF)
+else()
+    set(PROTOCACHE_BUILD_SHARED_DEFAULT ON)
+endif()
+option(PROTOCACHE_BUILD_SHARED "build the ProtoCache shared library" ${PROTOCACHE_BUILD_SHARED_DEFAULT})
+unset(PROTOCACHE_BUILD_SHARED_DEFAULT)
+
+if(WIN32 AND PROTOCACHE_BUILD_SHARED)
+    message(FATAL_ERROR
+        "PROTOCACHE_BUILD_SHARED is not supported on Windows yet; "
+        "use the static ProtoCache targets"
+    )
+endif()
 
 find_package(Protobuf CONFIG QUIET)
 if(NOT Protobuf_FOUND)
@@ -55,7 +69,7 @@ set(PROTOCACHE_CORE_SOURCES
     src/utils.cc
 )
 
-add_library(protocache-lite ${PROTOCACHE_CORE_SOURCES})
+add_library(protocache-lite STATIC ${PROTOCACHE_CORE_SOURCES})
 add_library(ProtoCache::protocache-lite ALIAS protocache-lite)
 protocache_configure_library(protocache-lite)
 set_target_properties(protocache-lite PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -67,20 +81,22 @@ set(PROTOCACHE_EXTENSION_SOURCES
     src/extension/utils.cc
 )
 
-add_library(protocache ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
+add_library(protocache STATIC ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
 add_library(ProtoCache::protocache ALIAS protocache)
 protocache_configure_library(protocache)
 target_link_libraries(protocache PUBLIC protobuf::libprotobuf Threads::Threads)
 
-add_library(protocache-shared SHARED ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
-add_library(ProtoCache::protocache-shared ALIAS protocache-shared)
-protocache_configure_library(protocache-shared)
-target_link_libraries(protocache-shared PUBLIC protobuf::libprotobuf Threads::Threads)
-set_target_properties(protocache-shared PROPERTIES
-    OUTPUT_NAME protocache
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
+if(PROTOCACHE_BUILD_SHARED)
+    add_library(protocache-shared SHARED ${PROTOCACHE_CORE_SOURCES} ${PROTOCACHE_EXTENSION_SOURCES})
+    add_library(ProtoCache::protocache-shared ALIAS protocache-shared)
+    protocache_configure_library(protocache-shared)
+    target_link_libraries(protocache-shared PUBLIC protobuf::libprotobuf Threads::Threads)
+    set_target_properties(protocache-shared PROPERTIES
+        OUTPUT_NAME protocache
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+endif()
 
 if(WITH_TEST)
     enable_testing()
@@ -194,8 +210,13 @@ install(
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+set(PROTOCACHE_LIBRARY_TARGETS protocache protocache-lite)
+if(TARGET protocache-shared)
+    list(APPEND PROTOCACHE_LIBRARY_TARGETS protocache-shared)
+endif()
+
 install(
-    TARGETS protocache protocache-shared protocache-lite
+    TARGETS ${PROTOCACHE_LIBRARY_TARGETS}
     EXPORT ProtoCacheTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
