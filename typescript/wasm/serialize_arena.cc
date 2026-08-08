@@ -266,9 +266,6 @@ bool SerializeMapNode(
 
   ArenaKeyReader reader(keys);
   auto perfect_hash = protocache::PerfectHashObject::Build(reader, true);
-  for (uint32_t attempt = 1; attempt < 8 && !perfect_hash; ++attempt) {
-    perfect_hash = protocache::PerfectHashObject::Build(reader, true);
-  }
   if (!perfect_hash) return false;
 
   std::vector<uint32_t> slot_to_input(node.count);

@@ -284,13 +284,6 @@ int32_t pc_ph_build(
     PackedKeyReader reader(keys, spans, key_count);
     auto perfect_hash = protocache::PerfectHashObject::Build(
         reader, (flags & PC_PH_TRUST_UNIQUE) != 0);
-    constexpr uint32_t kBuildAttempts = 8;
-    for (uint32_t attempt = 1;
-         attempt < kBuildAttempts && !perfect_hash;
-         ++attempt) {
-      perfect_hash = protocache::PerfectHashObject::Build(
-          reader, (flags & PC_PH_TRUST_UNIQUE) != 0);
-    }
     if (!perfect_hash) {
       return Fail(PC_WASM_BUILD_FAILED);
     }
