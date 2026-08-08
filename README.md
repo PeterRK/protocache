@@ -135,6 +135,7 @@ The reflection apis are simliar to protobuf's. An example can be found in the [t
 | Java | https://github.com/peterrk/protocache-java |
 | C# | https://github.com/peterrk/protocache.net |
 | Rust | https://github.com/peterrk/protocache-rust |
+| Swift | https://github.com/peterrk/protocache-swift |
 
 ## Data Size Evaluation
 Following work in [paper](https://arxiv.org/pdf/2201.03051), we can find that protocache has smaller data size than [FlatBuffers](https://flatbuffers.dev/) and [Cap'n Proto](https://capnproto.org/), in most cases.
