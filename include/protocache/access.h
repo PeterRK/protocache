@@ -152,7 +152,7 @@ public:
 	Message() noexcept : ptr_(&s_empty) {};
 	explicit Message(const Slice<uint32_t>& data) : Message(data.data(), data.end()) {}
 	explicit Message(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept : ptr_(&s_empty) {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return;
 		}
 		uint32_t section = *ptr & 0xff;
@@ -166,11 +166,14 @@ public:
 		return ptr_ == &s_empty;
 	}
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return {};
 		}
 		uint32_t section = *ptr & 0xff;
 		auto tail = ptr + 1 + section*2;
+		if (end != nullptr && tail > end) {
+			return {};
+		}
 		if (section == 0) {
 			tail += Count32(*ptr);
 		} else {
@@ -252,7 +255,7 @@ class Array final {
 public:
 	Array() noexcept = default;
 	explicit Array(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return;
 		}
 		body_ = ptr + 1;
@@ -266,7 +269,7 @@ public:
 		return body_ == nullptr;
 	}
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return {};
 		}
 		auto body = ptr + 1;
@@ -367,7 +370,7 @@ class Map final {
 public:
 	Map() noexcept = default;
 	explicit Map(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return;
 		}
 		key_width_ = (*ptr >> 30U) & 3U;
@@ -392,7 +395,7 @@ public:
 		return body_ == nullptr;
 	}
 	static Slice<uint32_t> Detect(const uint32_t* ptr, const uint32_t* end=nullptr) noexcept {
-		if (ptr == nullptr) {
+		if (ptr == nullptr || (end != nullptr && ptr + 1 > end)) {
 			return {};
 		}
 		auto key_width = (*ptr >> 30U) & 3U;
