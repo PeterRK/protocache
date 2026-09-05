@@ -65,18 +65,20 @@ bool SerializeContext::SerializeArray(const google::protobuf::RepeatedFieldRef<T
 	static_assert(std::is_scalar_v<T>);
 	static_assert(sizeof(T) == 4 || sizeof(T) == 8);
 	constexpr unsigned m = sizeof(T) / 4;
-	if (array.size() == 0) {
+	const auto n = array.size();
+	if (n == 0) {
 		unit.len = 1;
 		unit.data[0] = m;
 		return true;
-	} else if (m*array.size() >= (1U << 30U)) {
+	} else if (static_cast<size_t>(n) * m >= (1U << 30U)) {
 		return false;
 	}
 	auto last = buf_.Size();
-	for (int i = array.size(); i-- > 0;) {
-		*reinterpret_cast<T*>(buf_.Expand(m)) = array.Get(i);
+	auto dest = reinterpret_cast<T*>(buf_.Expand(static_cast<size_t>(n) * m));
+	for (int i = 0; i < n; i++) {
+		dest[i] = array.Get(i);
 	}
-	buf_.Put((array.size() << 2U) | m);
+	buf_.Put((static_cast<uint32_t>(n) << 2U) | m);
 	unit = Segment(last, buf_.Size());
 	return true;
 }
