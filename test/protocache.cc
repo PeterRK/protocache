@@ -595,6 +595,41 @@ TEST(PtotoCacheEX, Alias) {
 	ASSERT_EQ(view[6], 1);
 }
 
+TEST(PtotoCacheEX, RootContainers) {
+	for (int size : {0, 1}) {
+		SCOPED_TRACE(size);
+		protocache::ArrayEX<protocache::Slice<char>> array;
+		protocache::MapEX<int32_t, int32_t> map;
+		if (size != 0) {
+			array.emplace_back("x");
+			map.emplace(7, 11);
+		}
+		protocache::Buffer buffer;
+		ASSERT_TRUE(array.Serialize(&buffer));
+		ASSERT_EQ(buffer.Size(), size == 0 ? 1U : 2U);
+		auto raw = buffer.View();
+		protocache::ArrayT<protocache::Slice<char>> array_view(raw.data(), raw.end());
+		ASSERT_FALSE(!array_view);
+		ASSERT_EQ(array_view.Size(), size);
+		if (size == 0) EXPECT_EQ(raw[0], 1U);
+		else EXPECT_EQ(array_view[0], std::string("x"));
+
+		buffer.Clear();
+		ASSERT_TRUE(map.Serialize(&buffer));
+		ASSERT_EQ(buffer.Size(), size == 0 ? 1U : 3U);
+		raw = buffer.View();
+		protocache::MapT<int32_t, int32_t> map_view(raw.data(), raw.end());
+		ASSERT_FALSE(!map_view);
+		ASSERT_EQ(map_view.Size(), size);
+		if (size == 0) EXPECT_EQ(raw[0], 5U << 28U);
+		else {
+			auto it = map_view.Find(7, raw.end());
+			ASSERT_NE(it, map_view.end());
+			EXPECT_EQ((*it).Value(raw.end()), 11);
+		}
+	}
+}
+
 TEST(PtotoCacheEX, Tiny) {
 	protocache::Buffer buffer;
 	::ex::test::Main root;
@@ -669,6 +704,60 @@ static bool BuildDynamicSchema(const std::string& proto_src,
 	}
 	*descriptor = pool.FindMessageTypeByName(root_message);
 	return *descriptor != nullptr;
+}
+
+TEST(PtotoCache, ShortAlias) {
+	google::protobuf::DescriptorPool pool;
+	const google::protobuf::Descriptor* descriptor = nullptr;
+	ASSERT_TRUE(BuildDynamicSchema(
+		"syntax = \"proto3\"; "
+		"message BoolRow { repeated bool _ = 1; } "
+		"message IntRow { repeated int32 _ = 1; } "
+		"message LongRow { repeated int64 _ = 1; } "
+		"message Holder { BoolRow bool_row = 1; IntRow int_row = 2; LongRow long_row = 3; }",
+		"Holder", pool, &descriptor));
+	google::protobuf::DynamicMessageFactory factory(&pool);
+	std::unique_ptr<google::protobuf::Message> holder(factory.GetPrototype(descriptor)->New());
+
+	for (int index : {0, 1, 2}) {
+		auto* field = descriptor->field(index);
+		SCOPED_TRACE(field->name());
+		auto* row_descriptor = field->message_type();
+		const bool is_bool = index == 0;
+		const unsigned width = index;
+		std::unique_ptr<google::protobuf::Message> row(factory.GetPrototype(row_descriptor)->New());
+		for (int size = 0; size <= 4; ++size) {
+			SCOPED_TRACE(size);
+			row->Clear();
+			for (int i = 0; i < size; ++i) {
+				if (is_bool) {
+					row->GetReflection()->AddBool(row.get(), row_descriptor->field(0), i % 2 != 0);
+				} else if (index == 2) {
+					row->GetReflection()->AddInt64(row.get(), row_descriptor->field(0), (int64_t(i) << 33) - 1);
+				} else {
+					row->GetReflection()->AddInt32(row.get(), row_descriptor->field(0), i - 1);
+				}
+			}
+			holder->Clear();
+			holder->GetReflection()->MutableMessage(holder.get(), field)->CopyFrom(*row);
+			for (const auto* input : {row.get(), holder.get()}) {
+				SCOPED_TRACE(input->GetDescriptor()->name());
+				protocache::Buffer buffer;
+				ASSERT_TRUE(protocache::Serialize(*input, &buffer));
+				ASSERT_GT(buffer.Size(), 0U);
+				if (input == row.get()) {
+					EXPECT_EQ(buffer.Size(), is_bool ? protocache::WordSize(1 + size) : 1 + size * width);
+					EXPECT_EQ(buffer.Head()[0] & 0xffU, (size << 2U) | width);
+				}
+				std::unique_ptr<google::protobuf::Message> output(input->New());
+				ASSERT_TRUE(protocache::Deserialize(buffer.View(), output.get()));
+				// Compare array contents; empty nested aliases may lose message presence.
+				const auto& decoded = input == row.get() ? *output
+					: output->GetReflection()->GetMessage(*output, field);
+				EXPECT_EQ(decoded.SerializeAsString(), row->SerializeAsString());
+			}
+		}
+	}
 }
 
 TEST(PtotoCache, ExtensionUtilsFailurePaths) {

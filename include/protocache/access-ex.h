@@ -126,7 +126,7 @@ public:
 	}
 	bool Serialize(Buffer* buf, const uint32_t* end=nullptr) const {
 		Unit dummy;
-		return Serialize(*buf, dummy, end);
+		return Serialize(*buf, dummy, end) && Spill(*buf, dummy);
 	}
 	bool Serialize(Buffer& buf, Unit& unit, const uint32_t* end) const {
 		std::vector<Unit> elements(this->size());
@@ -307,7 +307,7 @@ public:
 	}
 	bool Serialize(Buffer* buf, const uint32_t* end=nullptr) const {
 		Unit dummy;
-		return Serialize(*buf, dummy, end);
+		return Serialize(*buf, dummy, end) && Spill(*buf, dummy);
 	}
 	bool Serialize(Buffer& buf, Unit& unit, const uint32_t* end) const {
 		std::vector<const std::pair<const KeyEX,ValEX>*> memo;

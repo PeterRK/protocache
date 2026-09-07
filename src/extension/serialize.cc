@@ -57,7 +57,7 @@ private:
 bool Serialize(const google::protobuf::Message& message, Buffer* buf) {
 	Unit dummy;
 	SerializeContext ctx(*buf);
-	return ctx.Serialize(message, dummy);
+	return ctx.Serialize(message, dummy) && Spill(*buf, dummy);
 }
 
 template<typename T>
@@ -332,7 +332,7 @@ bool SerializeContext::SerializeField(const google::protobuf::Message& message,
 			if (unit.len == 0) {
 				unit.seg.len = 0;
 				buf_.Shrink(1);
-			} else {
+			} else if (unit.data[0] == 0) {
 				unit.len = 0;
 			}
 		}
@@ -372,20 +372,13 @@ bool SerializeContext::Serialize(const google::protobuf::Message& message, Unit&
 	}
 
 	if (fields.size() == 1 && fields.front() != nullptr && fields.front()->name() == "_") {
-		if (!fields.front()->is_repeated()
-			|| !SerializeField(message, reflection, fields.front(), unit)) {
+		auto field = fields.front();
+		if (!field->is_repeated()) {
 			return false;
 		}
-		assert(unit.len == 0);
-		if (unit.seg.len == 0) {
-			if (fields.front()->is_map()) {
-				unit.data[0] = 5U << 28U;
-			} else {
-				unit.data[0] = 1U;
-			}
-			unit.len = 1;
-		}
-		return true;
+		return field->is_map()
+			? SerializeMapField(message, reflection, field, unit)
+			: SerializeArrayField(message, reflection, field, unit);
 	}
 
 	auto last = buf_.Size();

@@ -70,6 +70,13 @@ static inline Unit Segment(size_t last, size_t now) {
 	return out;
 }
 
+static inline bool Spill(Buffer& buf, const Unit& unit) {
+	if (unit.len != 0) {
+		buf.Put(Slice<uint32_t>(unit.data, unit.len));
+	}
+	return true;
+}
+
 static void FoldField(Buffer& buf, Unit& unit) {
 	if (unit.len == 0 && unit.seg.len != 0 && unit.seg.len < 4) {
 		unit.len = unit.seg.len;
