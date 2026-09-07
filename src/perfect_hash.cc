@@ -464,8 +464,8 @@ static std::unique_ptr<uint8_t[]> Build(KeyReader& source, uint32_t& data_size, 
 	pt += sizeof(Word)*slot_cnt;
 	auto book = pt;
 
-	constexpr unsigned FIRST_TRIES = sizeof(Word) == 1? 8U : 4U;
-	constexpr unsigned SECOND_TRIES = sizeof(Word) == 1? 32U : 12U;
+	constexpr unsigned FIRST_TRIES = 8U;
+	constexpr unsigned SECOND_TRIES = 32U;
 
 	auto build = [&source, total, &graph,
 				  free, book, bitmap, &divisor](uint32_t seed)->bool {
