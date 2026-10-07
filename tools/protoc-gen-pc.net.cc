@@ -214,10 +214,45 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	if (IsAlias(proto, true)) {
 		oss << "}\n\n";
 		return oss.str();
-	} else if (fields.empty()) {
-		oss << "\tpublic void Init(DataView data) => throw new NotImplementedException();\n"
-			<< "}\n\n";
-		return oss.str();
+	}
+	std::unordered_set<std::string> member_names {
+		proto.name(), "Init", "HasField", "_core_"
+	};
+	auto reserve_name = [&](const std::string& name) {
+		if (member_names.insert(name).second) {
+			return true;
+		}
+		std::cerr << "C# member name collision in " << fullname << ": " << name << std::endl;
+		return false;
+	};
+	for (auto& one : proto.enum_type()) {
+		if (!one.options().deprecated() && !reserve_name(one.name())) {
+			return {};
+		}
+	}
+	for (auto& one : proto.nested_type()) {
+		if (!one.options().deprecated() && !one.options().map_entry()
+			&& !reserve_name(one.name())) {
+			return {};
+		}
+	}
+	for (auto one : fields) {
+		if (!reserve_name("_" + one->name())) {
+			return {};
+		}
+		if ((IsRepeated(*one) || one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_MESSAGE
+			|| one->type() == ::google::protobuf::FieldDescriptorProto::TYPE_STRING)
+			&& !reserve_name(one->name() + "_")) {
+			return {};
+		}
+	}
+	std::unordered_map<const ::google::protobuf::FieldDescriptorProto*, std::string> property_names;
+	for (auto one : fields) {
+		auto name = ToPascal(one->name());
+		while (!member_names.insert(name).second) {
+			name += '_';
+		}
+		property_names.emplace(one, std::move(name));
 	}
 
 	for (auto one : fields) {
@@ -242,21 +277,21 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 	}
 	oss << "\t}\n\n";
 
-	auto handle_simple_field = [&oss](
+	auto handle_simple_field = [&oss, &property_names](
 			const ::google::protobuf::FieldDescriptorProto& field,
 			const char* raw_type, const char* boxed_type, bool primary=true) {
 		if (IsRepeated(field)) {
 			oss << "\tprivate global::ProtoCache." << boxed_type << "Array? " << field.name() << "_ = null;\n"
-				<< "\tpublic global::ProtoCache." << boxed_type << "Array " << ToPascal(field.name()) << " { get {\n"
+				<< "\tpublic global::ProtoCache." << boxed_type << "Array " << property_names.at(&field) << " { get {\n"
 				<< "\t\t" << field.name() << "_ \?\?= _core_.GetObject<global::ProtoCache." << boxed_type << "Array>(_" << field.name() << ");\n"
 				<< "\t\treturn " << field.name() << "_;\n"
 				<< "\t}}\n";
 		} else if (primary) {
-			oss << "\tpublic " << raw_type << ' ' << ToPascal(field.name())
+			oss << "\tpublic " << raw_type << ' ' << property_names.at(&field)
 				<< " => _core_.Get" << boxed_type << "(_" << field.name() << ");\n";
 		} else {
 			oss << "\tprivate " << raw_type << "? " << field.name() << "_ = null;\n"
-				<< "\tpublic " << raw_type << ' ' << ToPascal(field.name()) << " { get {\n"
+				<< "\tpublic " << raw_type << ' ' << property_names.at(&field) << " { get {\n"
 				<< "\t\t" << field.name() << "_ \?\?= _core_.Get" << boxed_type << "(_" << field.name() << ");\n"
 				<< "\t\treturn " << field.name() << "_;\n"
 				<< "\t}}\n";
@@ -290,7 +325,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 					return {};
 				}
 				oss << "\tprivate global::" << cs_type << "? " << one->name() << "_ = null;\n"
-					<< "\tpublic global::" << cs_type << ' ' << ToPascal(one->name()) << " { get {\n"
+					<< "\tpublic global::" << cs_type << ' ' << property_names.at(one) << " { get {\n"
 					<< "\t\t" << one->name() << "_ \?\?= _core_.GetObject<global::" << cs_type << ">(_" << one->name() << ");\n"
 					<< "\t\treturn " << one->name() << "_;\n"
 					<< "\t}}\n";

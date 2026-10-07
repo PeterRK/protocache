@@ -14,6 +14,14 @@
 static std::unordered_map<std::string, AliasUnit> g_alias_book;
 static std::unordered_map<std::string, std::string> g_java_names;
 
+static std::string GetterName(const std::string& field_name) {
+	auto name = "get" + ToPascal(field_name);
+	if (name == "getClass") {
+		name += '_';
+	}
+	return name;
+}
+
 static void CollectAlias(const std::string& ns, const std::string& java_ns, const ::google::protobuf::EnumDescriptorProto& proto) {
 	auto fullname = NaiveJoinName(ns, proto.name());
 	auto java_name = NaiveJoinName(java_ns, proto.name());
@@ -243,7 +251,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 		if (IsRepeated(field)) {
 			oss << "\tprivate com.github.peterrk.protocache." << boxed_type << "Array _" << field.name() << " = null;\n"
 				<< "\tpublic com.github.peterrk.protocache." << boxed_type << "Array"
-				<< " get" << ToPascal(field.name()) << "() {\n"
+				<< " " << GetterName(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
 				<< "\t\t\t_" << field.name() << " = fetch" << boxed_type << "Array(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
@@ -251,11 +259,11 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 				<< "\t}\n";
 			to_clean.push_back(field.name());
 		} else if (primary) {
-			oss << "\tpublic " << raw_type << " get" << ToPascal(field.name())
+			oss << "\tpublic " << raw_type << " " << GetterName(field.name())
 				<< "() { return fetch" << boxed_type << "(FIELD_" << field.name() << "); }\n";
 		} else {
 			oss << "\tprivate " << raw_type << " _" << field.name() << " = null;\n"
-				<< "\tpublic " << raw_type << " get" << ToPascal(field.name()) << "() {\n"
+				<< "\tpublic " << raw_type << " " << GetterName(field.name()) << "() {\n"
 				<< "\t\tif (_" << field.name() << " == null) {\n"
 				<< "\t\t\t_" << field.name() << " = fetch" << boxed_type << "(FIELD_" << field.name() << ");\n"
 				<< "\t\t}\n"
@@ -292,7 +300,7 @@ static std::string GenMessage(const std::string& ns, const ::google::protobuf::D
 					return {};
 				}
 				oss << "\tprivate " << java_type << " _" << one->name() << " = null;\n"
-					<< "\tpublic " << java_type << " get" << ToPascal(one->name()) << "() {\n"
+					<< "\tpublic " << java_type << " " << GetterName(one->name()) << "() {\n"
 					<< "\t\tif (_" << one->name() << " == null) {\n"
 					<< "\t\t\t_" << one->name() << " = fetchObject(FIELD_" << one->name() << ", new " << java_type << "());\n"
 					<< "\t\t}\n"
