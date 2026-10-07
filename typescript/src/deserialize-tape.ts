@@ -14,7 +14,7 @@ import { setPresentFields } from "./state.js";
 import { buildDecodeTape } from "./wasm-runtime.js";
 
 const NO_TYPE = 0xffff_ffff;
-const textDecoder = new TextDecoder("utf-8", { fatal: true });
+const textDecoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const MAX_DIRECT_ASCII_LENGTH = 128;
 
 interface TapeField {

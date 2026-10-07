@@ -170,11 +170,9 @@ bool SerializeScalarArray(
     return true;
   }
   const auto last = buffer.Size();
-  for (uint32_t index = node.count; index-- > 0;) {
-    auto* destination = buffer.Expand(width_words);
-    std::memcpy(destination, payload + index * width, width);
-  }
-  buffer.Put((node.count << 2U) | width_words);
+  auto* destination = buffer.Expand(1 + static_cast<size_t>(byte_length / 4));
+  destination[0] = (node.count << 2U) | width_words;
+  std::memcpy(destination + 1, payload, static_cast<size_t>(byte_length));
   unit = protocache::Segment(last, buffer.Size());
   return true;
 }

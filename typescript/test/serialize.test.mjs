@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { testApi } from "./init-wasm.mjs";
 import * as pc from "../.test-dist/src/index.js";
+import { decodeSchemaCount } from "../.test-dist/src/wasm-runtime.js";
 
 const {
   CyclicA,
@@ -245,3 +246,91 @@ test("rejects invalid JS values, isolated surrogates, and cycles", () => {
   deep.at(-1).cyclic = undefined;
   assert.equal(deep[0].serialize().byteLength > 0, true);
 });
+
+function failOnce(type) {
+  let failed = false;
+  return () => {
+    if (!failed) {
+      failed = true;
+      throw new Error("temporary resolver failure");
+    }
+    return type;
+  };
+}
+
+test("failed message graph construction rolls back recursive placeholders", () => {
+  class Leaf extends pc.Message { value = 7; }
+  Leaf.schema = pc.messageSchemaV1([
+    ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+  ]);
+  // An already registered child must remain usable across another graph's failure.
+  assert.equal(Leaf.deserialize(new Leaf().serialize()).value, 7);
+
+  class Child extends pc.Message { value = 11; parent = undefined; }
+  class Root extends pc.Message { value = 13; child = new Child(); leaf = new Leaf(); }
+  Child.schema = pc.messageSchemaV1([
+    ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+    ["parent", 1, false, pc.Kind.None, pc.Kind.Message, () => Root],
+  ]);
+  Root.schema = pc.messageSchemaV1([
+    ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+    ["child", 1, false, pc.Kind.None, pc.Kind.Message, () => Child],
+    ["leaf", 2, false, pc.Kind.None, pc.Kind.Message, failOnce(Leaf)],
+  ]);
+
+  const count = decodeSchemaCount();
+  assert.throws(() => new Root().serialize(), /temporary resolver failure/);
+  assert.equal(decodeSchemaCount(), count);
+  assert.equal(Leaf.deserialize(new Leaf().serialize()).value, 7);
+  // Enter through a different root in the abandoned recursive graph.
+  assert.equal(Child.deserialize(new Child().serialize()).value, 11);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const out = Root.deserialize(new Root().serialize());
+    assert.equal(out.value, 13);
+    assert.equal(out.child.value, 11);
+    assert.equal(out.child.parent, undefined);
+    assert.equal(out.leaf.value, 7);
+  }
+  assert.equal(decodeSchemaCount(), count + 2);
+});
+
+for (const map of [false, true]) {
+  test(`failed repeated ${map ? "Map" : "Array"} resolver can be retried`, () => {
+    class Leaf extends pc.Message { value = 17; }
+    Leaf.schema = pc.messageSchemaV1([
+      ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+    ]);
+    class Root extends pc.Message {
+      value = 19;
+      children = map ? new Map([["key", new Leaf()]]) : [new Leaf()];
+    }
+    Root.schema = pc.messageSchemaV1([
+      ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+      ["children", 1, true, map ? pc.Kind.String : pc.Kind.None,
+        pc.Kind.Message, failOnce(Leaf)],
+    ]);
+    const count = decodeSchemaCount();
+    assert.throws(() => new Root().serialize(), /temporary resolver failure/);
+    assert.equal(decodeSchemaCount(), count);
+    const out = Root.deserialize(new Root().serialize());
+    assert.equal(out.value, 19);
+    assert.equal((map ? out.children.get("key") : out.children[0]).value, 17);
+  });
+
+  test(`failed standalone ${map ? "Map" : "Array"} resolver can be retried`, () => {
+    class Leaf extends pc.Message { value = 23; }
+    Leaf.schema = pc.messageSchemaV1([
+      ["value", 0, false, pc.Kind.None, pc.Kind.I32],
+    ]);
+    const resolver = failOnce(Leaf);
+    const schema = map
+      ? pc.mapSchemaV1(pc.Kind.String, pc.Kind.Message, resolver)
+      : pc.arraySchemaV1(pc.Kind.Message, resolver);
+    const value = map ? new Map([["key", new Leaf()]]) : [new Leaf()];
+    const count = decodeSchemaCount();
+    assert.throws(() => pc.serialize(schema, value), /temporary resolver failure/);
+    assert.equal(decodeSchemaCount(), count);
+    const out = pc.deserialize(schema, pc.serialize(schema, value));
+    assert.equal((map ? out.get("key") : out[0]).value, 23);
+  });
+}

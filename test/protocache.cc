@@ -341,6 +341,109 @@ TEST(PtotoCache, Reflection) {
 	ASSERT_EQ(-2.1f, protocache::GetField<float>(unit, it->second.id, end));
 }
 
+TEST(PtotoCache, ReflectionAbsoluteTypes) {
+	const std::string source = R"proto(
+		syntax = "proto3";
+		package test;
+		import "dependency.proto";
+		enum Mode { ZERO = 0; ONE = 1; }
+		message Small { int32 value = 1; }
+		message Rows { repeated .test.Small _ = 1; }
+		message Index { map<string, .test.Small> _ = 1; }
+		message Root {
+			message Small { bool flag = 1; }
+			message Nested { .test.Small child = 1; }
+			.test.Small object = 1;
+			.test.Mode mode = 2;
+			repeated .test.Root.Nested items = 3;
+			.test.Root self = 4;
+			map<string, .test.Small> objects = 5;
+			map<int32, .test.Mode> modes = 6;
+			.test.Rows rows = 7;
+			.test.Index index = 8;
+			.other.Child external = 9;
+		}
+	)proto";
+	for (bool resolved : {false, true}) {
+		SCOPED_TRACE(resolved ? "resolved descriptor" : "parsed proto");
+		google::protobuf::FileDescriptorProto dependency;
+		dependency.set_name("dependency.proto");
+		ASSERT_TRUE(protocache::ParseProto(
+			"syntax = \"proto3\"; package other; message Child { int32 value = 1; }", &dependency));
+		google::protobuf::FileDescriptorProto file;
+		file.set_name("absolute.proto");
+		ASSERT_TRUE(protocache::ParseProto(source, &file));
+		if (resolved) {
+			google::protobuf::DescriptorPool protobuf;
+			ASSERT_NE(protobuf.BuildFile(dependency), nullptr);
+			auto descriptor = protobuf.BuildFile(file);
+			ASSERT_NE(descriptor, nullptr);
+			file.Clear();
+			descriptor->CopyTo(&file);
+		}
+		protocache::reflection::DescriptorPool pool;
+		ASSERT_TRUE(pool.Register(file));
+		ASSERT_TRUE(pool.Register(dependency));
+		auto root = pool.Find("test.Root");
+		ASSERT_NE(root, nullptr);
+		ASSERT_EQ(pool.Find(".test.Root"), root);
+		auto small = pool.Find("test.Small");
+		auto nested = pool.Find("test.Root.Nested");
+		ASSERT_NE(small, nullptr);
+		ASSERT_NE(nested, nullptr);
+		ASSERT_NE(pool.Find("test.Root.Small"), small);
+		auto check_message = [&](const protocache::reflection::Field& field,
+								 const std::string& name) {
+			ASSERT_EQ(field.value, protocache::reflection::Field::TYPE_MESSAGE);
+			ASSERT_EQ(field.value_type, name);
+			ASSERT_NE(field.value_descriptor, nullptr);
+			ASSERT_EQ(field.value_descriptor, pool.Find(name));
+		};
+		check_message(root->fields.at("object"), "test.Small");
+		check_message(nested->fields.at("child"), "test.Small");
+		check_message(root->fields.at("items"), "test.Root.Nested");
+		ASSERT_TRUE(root->fields.at("items").repeated);
+		check_message(root->fields.at("self"), "test.Root");
+		check_message(root->fields.at("external"), "other.Child");
+		ASSERT_EQ(root->fields.at("mode").value, protocache::reflection::Field::TYPE_ENUM);
+		auto& objects = root->fields.at("objects");
+		ASSERT_TRUE(objects.IsMap());
+		ASSERT_EQ(objects.key, protocache::reflection::Field::TYPE_STRING);
+		check_message(objects, "test.Small");
+		auto& modes = root->fields.at("modes");
+		ASSERT_TRUE(modes.IsMap());
+		ASSERT_EQ(modes.key, protocache::reflection::Field::TYPE_INT32);
+		ASSERT_EQ(modes.value, protocache::reflection::Field::TYPE_ENUM);
+		check_message(root->fields.at("rows"), "test.Rows");
+		auto rows = pool.Find("test.Rows");
+		ASSERT_NE(rows, nullptr);
+		ASSERT_TRUE(rows->IsAlias());
+		ASSERT_TRUE(rows->alias.repeated);
+		check_message(rows->alias, "test.Small");
+		check_message(root->fields.at("index"), "test.Index");
+		auto index = pool.Find("test.Index");
+		ASSERT_NE(index, nullptr);
+		ASSERT_TRUE(index->IsAlias());
+		ASSERT_TRUE(index->alias.IsMap());
+		ASSERT_EQ(index->alias.key, protocache::reflection::Field::TYPE_STRING);
+		check_message(index->alias, "test.Small");
+	}
+}
+
+TEST(PtotoCache, ReflectionAbsoluteGlobalTypes) {
+	google::protobuf::FileDescriptorProto file;
+	ASSERT_TRUE(protocache::ParseProto(
+		"syntax = \"proto3\"; message Child { int32 value = 1; } "
+		"message Root { .Child child = 1; }", &file));
+	protocache::reflection::DescriptorPool pool;
+	ASSERT_TRUE(pool.Register(file));
+	auto root = pool.Find("Root");
+	ASSERT_NE(root, nullptr);
+	ASSERT_EQ(pool.Find(".Root"), root);
+	ASSERT_EQ(root->fields.at("child").value_type, "Child");
+	ASSERT_EQ(root->fields.at("child").value_descriptor, pool.Find("Child"));
+}
+
 TEST(PtotoCache, BigObject) {
 	const int fields_cnt = 1000;
 	std::ostringstream oss;

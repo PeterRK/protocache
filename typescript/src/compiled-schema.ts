@@ -47,36 +47,37 @@ function containerNode(
   keyKind: typeof Kind.None | KeyKind,
   valueKind: ValueKind,
   resolver: (() => RuntimeType) | undefined,
+  pending: Map<object, SchemaNode>,
 ): ArraySchemaNode | MapSchemaNode {
-  const cached = schemaNodes.get(identity);
+  const cached = schemaNodes.get(identity) ?? pending.get(identity);
   if (cached !== undefined) {
     return cached as ArraySchemaNode | MapSchemaNode;
   }
   const node: ArraySchemaNode | MapSchemaNode = kind === Kind.Array
     ? { kind, valueKind }
     : { kind, keyKind: keyKind as KeyKind, valueKind };
-  schemaNodes.set(identity, node);
-  if (isComplexKind(valueKind)) node.child = schemaNode(resolver!());
+  pending.set(identity, node);
+  if (isComplexKind(valueKind)) node.child = schemaNode(resolver!(), pending);
   return node;
 }
 
-function schemaNode(type: RuntimeType): SchemaNode {
+function schemaNode(type: RuntimeType, pending: Map<object, SchemaNode>): SchemaNode {
   const identity = type as object;
-  const cached = schemaNodes.get(identity);
+  const cached = schemaNodes.get(identity) ?? pending.get(identity);
   if (cached !== undefined) return cached;
   if (typeof type !== "function") {
     return type.kind === Kind.Array
       ? containerNode(
           identity, Kind.Array, Kind.None,
-          type.valueKind, type.valueType,
+          type.valueKind, type.valueType, pending,
         )
       : containerNode(
           identity, Kind.Map, type.keyKind,
-          type.valueKind, type.valueType,
+          type.valueKind, type.valueType, pending,
         );
   }
   const node: MessageSchemaNode = { kind: Kind.Message, fields: [] };
-  schemaNodes.set(identity, node);
+  pending.set(identity, node);
   for (const field of compiledMessageFields(type)) {
     let child: SchemaNode | undefined;
     if (field.repeated) {
@@ -86,9 +87,10 @@ function schemaNode(type: RuntimeType): SchemaNode {
         field.keyKind,
         field.valueKind,
         field.resolver,
+        pending,
       );
     } else if (isComplexKind(field.valueKind)) {
-      child = schemaNode(field.resolver!());
+      child = schemaNode(field.resolver!(), pending);
     }
     node.fields.push({
       id: field.id,
@@ -110,6 +112,11 @@ function wordsToBytes(words: readonly number[]): Uint8Array {
 
 export function compiledSchemaHandle(type: RuntimeType): number {
   requireWasmInitialized();
+  const cached = schemaNodes.get(type as object);
+  if (cached?.wasmHandle !== undefined) return cached.wasmHandle;
+  // Keep recursive placeholders local until the entire graph is registered.
+  // A failed resolver must not publish a partially populated message/container.
+  const pending = new Map<object, SchemaNode>();
   const touched: SchemaNode[] = [];
   const register = (node: SchemaNode): number => {
     if (node.wasmHandle !== undefined) return node.wasmHandle;
@@ -138,7 +145,9 @@ export function compiledSchemaHandle(type: RuntimeType): number {
     return handle;
   };
   try {
-    return register(schemaNode(type));
+    const handle = register(schemaNode(type, pending));
+    for (const [identity, node] of pending) schemaNodes.set(identity, node);
+    return handle;
   } catch (error) {
     for (const node of touched) {
       delete node.wasmHandle;

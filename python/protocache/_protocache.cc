@@ -51,6 +51,20 @@ private:
 	PyObject* ptr_ = nullptr;
 };
 
+class ScopedRecursion final {
+public:
+	ScopedRecursion() : entered_(Py_EnterRecursiveCall(" while serializing a ProtoCache object") == 0) {}
+	ScopedRecursion(const ScopedRecursion&) = delete;
+	ScopedRecursion& operator=(const ScopedRecursion&) = delete;
+	~ScopedRecursion() {
+		if (entered_) Py_LeaveRecursiveCall();
+	}
+	explicit operator bool() const noexcept { return entered_; }
+
+private:
+	bool entered_ = false;
+};
+
 class ScopedPyBuffer final {
 public:
 	ScopedPyBuffer() = default;
@@ -1440,12 +1454,42 @@ static bool ParseSchemaField(PyObject* item, SchemaField* field) {
 							PyTuple_GET_ITEM(item, 5), &field->type);
 }
 
+static int Schema_traverse(PySchema* self, visitproc visit, void* arg) {
+	for (const auto& field : self->schema.fields) {
+		Py_VISIT(field.name);
+		Py_VISIT(field.type.value_type);
+	}
+	return 0;
+}
+
+static int Schema_clear(PySchema* self) {
+	for (auto& field : self->schema.fields) {
+		Py_CLEAR(field.name);
+		Py_CLEAR(field.type.value_type);
+	}
+	return 0;
+}
+
+static int CompiledType_traverse(PyCompiledTypeObject* self, visitproc visit, void* arg) {
+	Py_VISIT(self->type.value_type);
+	return 0;
+}
+
+static int CompiledType_clear(PyCompiledTypeObject* self) {
+	Py_CLEAR(self->type.value_type);
+	return 0;
+}
+
 static void Schema_dealloc(PySchema* self) {
+	PyObject_GC_UnTrack(self);
+	Schema_clear(self);
 	self->schema.~Schema();
 	Py_TYPE(self)->tp_free(reinterpret_cast<PyObject*>(self));
 }
 
 static void CompiledType_dealloc(PyCompiledTypeObject* self) {
+	PyObject_GC_UnTrack(self);
+	CompiledType_clear(self);
 	self->type.~CompiledType();
 	Py_TYPE(self)->tp_free(reinterpret_cast<PyObject*>(self));
 }
@@ -1461,11 +1505,12 @@ static PyObject* CompileSchemaObject(PyObject* schema_obj) {
 	}
 	auto n = PyTuple_GET_SIZE(schema_obj);
 
-	auto* out = PyObject_New(PySchema, &SchemaType);
+	auto* out = PyObject_GC_New(PySchema, &SchemaType);
 	if (out == nullptr) {
 		return nullptr;
 	}
 	new (&out->schema) Schema();
+	PyObject_GC_Track(out);
 	PyObjectPtr keeper(reinterpret_cast<PyObject*>(out));
 	try {
 		out->schema.fields.reserve(static_cast<size_t>(n));
@@ -1501,11 +1546,12 @@ static PyObject* CompileContainerSchemaSpecObject(PyObject* schema_obj) {
 		Py_INCREF(schema_obj);
 		return schema_obj;
 	}
-	auto* out = PyObject_New(PyCompiledTypeObject, &CompiledTypeType);
+	auto* out = PyObject_GC_New(PyCompiledTypeObject, &CompiledTypeType);
 	if (out == nullptr) {
 		return nullptr;
 	}
 	new (&out->type) CompiledType();
+	PyObject_GC_Track(out);
 	PyObjectPtr keeper(reinterpret_cast<PyObject*>(out));
 	if (!ParseContainerSchemaSpec(schema_obj, &out->type)) {
 		return nullptr;
@@ -1523,6 +1569,8 @@ static PyObject* MessageInstanceDict(PyObject* obj) {
 }
 
 static bool SerializeMessageObject(PyObject* obj, const Schema& schema, protocache::Buffer& buf, protocache::Unit& unit) {
+	ScopedRecursion recursion;
+	if (!recursion) return false;
 	std::vector<protocache::Unit> fields(schema.max_id + 1);
 	PyObject* dict = MessageInstanceDict(obj);
 	if (dict == nullptr) {
@@ -1761,20 +1809,23 @@ static bool SerializeScalarArrayObject(PyObject* value, protocache::Buffer& buf,
 	}
 
 	auto last = buf.Size();
+	auto dest = buf.Expand(1 + static_cast<size_t>(n) * m);
 	for (Py_ssize_t i = n; i-- > 0;) {
 		T one;
 		if (!ReadNumber(ArrayObjectItem(value, i), &one)) {
 			return false;
 		}
-		*reinterpret_cast<T*>(buf.Expand(m)) = one;
+		std::memcpy(dest + 1 + static_cast<size_t>(i) * m, &one, sizeof(T));
 	}
-	buf.Put((static_cast<uint32_t>(n) << 2U) | m);
+	dest[0] = (static_cast<uint32_t>(n) << 2U) | m;
 	unit = protocache::Segment(last, buf.Size());
 	return true;
 }
 
 static bool SerializeArrayObject(PyObject* value, const CompiledType& type,
 								 protocache::Buffer& buf, protocache::Unit& unit) {
+	ScopedRecursion recursion;
+	if (!recursion) return false;
 	switch (type.value_kind) {
 		case KIND_BOOL:
 			return SerializeBoolArrayObject(value, buf, unit);
@@ -1811,6 +1862,8 @@ static bool SerializeArrayObject(PyObject* value, const CompiledType& type,
 
 static bool SerializeMapObject(PyObject* value, const CompiledType& type,
 							   protocache::Buffer& buf, protocache::Unit& unit) {
+	ScopedRecursion recursion;
+	if (!recursion) return false;
 	if (!PyDict_Check(value)) {
 		PyErr_SetString(PyExc_TypeError, "map field must be dict");
 		return false;
@@ -2061,6 +2114,16 @@ static PyObject* Module_decompress(PyObject*, PyObject* arg) {
 	return PyBytes_FromStringAndSize(out.data(), static_cast<Py_ssize_t>(out.size()));
 }
 
+// Unwind the local serialization buffer before reporting allocation failure.
+template <PyObject* (*Function)(PyObject*, PyObject*)>
+static PyObject* GuardSerializationAllocation(PyObject* self, PyObject* args) {
+	try {
+		return Function(self, args);
+	} catch (const std::bad_alloc&) {
+		return PyErr_NoMemory();
+	}
+}
+
 static PyMethodDef MessageViewMethods[] = {
 		{"from_bytes", reinterpret_cast<PyCFunction>(MessageView_from_bytes), METH_CLASS | METH_O,
 		 "Create a message view from a bytes-like object."},
@@ -2110,9 +2173,9 @@ static PyMethodDef ModuleMethods[] = {
 		 "Deserialize a generated container object with a compiled schema."},
 		{"deserialize_model", Module_deserialize_model, METH_VARARGS,
 		 "Deserialize a generated message object with a compiled schema."},
-		{"serialize_container", Module_serialize_container, METH_VARARGS,
+		{"serialize_container", GuardSerializationAllocation<Module_serialize_container>, METH_VARARGS,
 		 "Serialize a materialized generated container object."},
-		{"serialize_model", Module_serialize_model, METH_VARARGS,
+		{"serialize_model", GuardSerializationAllocation<Module_serialize_model>, METH_VARARGS,
 		 "Serialize a materialized generated message object."},
 		{"compress", Module_compress, METH_O,
 		 "Compress a bytes-like object with ProtoCache compression."},
@@ -2173,13 +2236,19 @@ PyMODINIT_FUNC PyInit__protocache() {
 	SchemaType.tp_name = "protocache._protocache.CompiledSchema";
 	SchemaType.tp_basicsize = sizeof(PySchema);
 	SchemaType.tp_dealloc = reinterpret_cast<destructor>(Schema_dealloc);
-	SchemaType.tp_flags = Py_TPFLAGS_DEFAULT;
+	SchemaType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC;
+	SchemaType.tp_traverse = reinterpret_cast<traverseproc>(Schema_traverse);
+	SchemaType.tp_clear = reinterpret_cast<inquiry>(Schema_clear);
+	SchemaType.tp_free = PyObject_GC_Del;
 	SchemaType.tp_doc = "Compiled ProtoCache schema";
 
 	CompiledTypeType.tp_name = "protocache._protocache.CompiledType";
 	CompiledTypeType.tp_basicsize = sizeof(PyCompiledTypeObject);
 	CompiledTypeType.tp_dealloc = reinterpret_cast<destructor>(CompiledType_dealloc);
-	CompiledTypeType.tp_flags = Py_TPFLAGS_DEFAULT;
+	CompiledTypeType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC;
+	CompiledTypeType.tp_traverse = reinterpret_cast<traverseproc>(CompiledType_traverse);
+	CompiledTypeType.tp_clear = reinterpret_cast<inquiry>(CompiledType_clear);
+	CompiledTypeType.tp_free = PyObject_GC_Del;
 	CompiledTypeType.tp_doc = "Compiled ProtoCache type";
 
 	if (PyType_Ready(&MessageViewType) < 0 ||

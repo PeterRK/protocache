@@ -101,6 +101,8 @@ the Python package.
   map key is present.
 - `Deserialize()` recursively materializes values; `Serialize()` reflects over
   the same schema tuples to emit compatible ProtoCache bytes.
+- Serialization uses Python's recursion checks; cyclic object graphs raise
+  `RecursionError`. Native serialization allocation failures raise `MemoryError`.
 - `compress()` and `decompress()` are thin bindings over the C++ helpers and
   accept bytes-like inputs.
 - The binding does not bridge Python protobuf message classes. Interchange is

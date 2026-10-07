@@ -100,11 +100,15 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 	};
 
 	auto check_type = [&fullname, &bind_type](Field& field)->bool {
-		if (field.value != Field::TYPE_UNKNOWN) {
+		if ((field.value != Field::TYPE_UNKNOWN && field.value != Field::TYPE_MESSAGE) ||
+			field.value_descriptor != nullptr) {
 			return true;
 		}
 		if (field.value_type.empty()) {
 			return false;
+		}
+		if (field.value_type.front() == '.') {
+			return bind_type(field.value_type.substr(1), field);
 		}
 		if (bind_type(field.value_type, field)) {
 			return true;
@@ -144,7 +148,7 @@ bool DescriptorPool::FixUnknownType(const std::string& fullname, Descriptor& des
 }
 
 const Descriptor* DescriptorPool::Find(const std::string& fullname) noexcept {
-	auto it = pool_.find(fullname);
+	auto it = pool_.find(!fullname.empty() && fullname.front() == '.' ? fullname.substr(1) : fullname);
 	if (it == pool_.end()) {
 		return nullptr;
 	}
@@ -155,7 +159,7 @@ const Descriptor* DescriptorPool::Find(const std::string& fullname) noexcept {
 		return nullptr;
 	}
 	descriptor->alias.id--;
-	if (!FixUnknownType(fullname, *descriptor)) {
+	if (!FixUnknownType(it->first, *descriptor)) {
 		return nullptr;
 	}
 	descriptor->alias.id = 0;
@@ -176,6 +180,7 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 		}
 		if (one.options().map_entry()) {
 			map_entries.emplace(one.name(), &one);
+			map_entries.emplace(Fullname(fullname, one.name()), &one);
 			continue;
 		}
 		if (!Register(fullname, one)) {
@@ -190,7 +195,8 @@ bool DescriptorPool::Register(const std::string& ns, const google::protobuf::Des
 			return false;
 		}
 		if (out.value == Field::TYPE_MESSAGE || out.value == Field::TYPE_UNKNOWN) {
-			auto it = map_entries.find(src.type_name());
+			const auto& type_name = src.type_name();
+			auto it = map_entries.find(!type_name.empty() && type_name.front() == '.' ? type_name.substr(1) : type_name);
 			if (it != map_entries.end()) {
 				out.key = ConvertType(it->second->field(0));
 				out.value = ConvertType(it->second->field(1));

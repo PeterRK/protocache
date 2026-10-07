@@ -1,6 +1,11 @@
+import gc
 import math
+import os
+import subprocess
 import sys
+import textwrap
 import unittest
+import weakref
 from collections import UserDict
 from pathlib import Path
 
@@ -20,6 +25,32 @@ except ImportError as exc:  # pragma: no cover - depends on local extension buil
 
 def _load_root():
     return test_pc.Main.Deserialize((Path(__file__).resolve().parent / "test.pc").read_bytes())
+
+
+def _recursive_types(kind):
+    if kind == "message":
+        class Node(pc.Message):
+            pass
+        Node._schema = (("child", 0, False, pc.NONE, pc.MESSAGE, Node),)
+        types = [Node]
+    elif kind in ("array", "map"):
+        base = pc.Array if kind == "array" else pc.Map
+        class Node(base):
+            pass
+        Node.schema = (pc.NONE if kind == "array" else pc.STRING,
+                       pc.ARRAY if kind == "array" else pc.MAP, Node)
+        types = [Node]
+    else:
+        class Node(pc.Message):
+            pass
+        class Children(pc.Array):
+            pass
+        Node._schema = (("children", 0, False, pc.NONE, pc.ARRAY, Children),)
+        Children.schema = (pc.NONE, pc.MESSAGE, Node)
+        types = [Node, Children]
+    for cls in types:
+        cls._get_internal_schema()
+    return [weakref.ref(cls) for cls in types]
 
 
 class ProtoCachePythonTest(unittest.TestCase):
@@ -324,6 +355,99 @@ class ProtoCachePythonTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             test_pc.Main(objectv=[SmallChild(i32=1)]).Serialize()
 
+
+    def _run_isolated(self, source):
+        # Keep a regression that crashes native code from taking down the suite.
+        prefix = """
+            import os
+            if os.name == 'posix':
+                import resource
+                resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        """
+        result = subprocess.run(
+            [sys.executable, "-c", textwrap.dedent(prefix) + textwrap.dedent(source)],
+            env={**os.environ, "PYTHONPATH": str(ROOT / "python")},
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_recursive_compiled_schemas_are_collected(self):
+        for kind in ("message", "array", "map", "mixed"):
+            with self.subTest(kind=kind):
+                refs = [ref for _ in range(30) for ref in _recursive_types(kind)]
+                gc.collect()
+                self.assertTrue(all(ref() is None for ref in refs))
+
+    def test_recursion_errors_and_recovery(self):
+        self._run_isolated("""
+            import protocache as pc
+
+            def expect_recursion(operation):
+                try:
+                    operation()
+                except RecursionError:
+                    return
+                raise AssertionError('expected RecursionError')
+
+            class Node(pc.Message): pass
+            Node._schema = (("value", 0, False, pc.NONE, pc.I32, None),
+                            ("child", 1, False, pc.NONE, pc.MESSAGE, Node))
+            node = Node()
+            node.child = node
+            expect_recursion(node.Serialize)
+            node.child = None
+            assert Node.Deserialize(node.Serialize()).child is None
+
+            class Rows(pc.Array): pass
+            Rows.schema = (pc.NONE, pc.ARRAY, Rows)
+            rows = Rows()
+            rows.append(rows)
+            expect_recursion(rows.Serialize)
+            rows.clear()
+            assert Rows.Deserialize(rows.Serialize()) == []
+
+            class Maps(pc.Map): pass
+            Maps.schema = (pc.STRING, pc.MAP, Maps)
+            maps = Maps()
+            maps['self'] = maps
+            expect_recursion(maps.Serialize)
+            maps.clear()
+            assert Maps.Deserialize(maps.Serialize()) == {}
+
+            # Shared children in separate branches are valid, even after errors.
+            class Pair(pc.Message): pass
+            Pair._schema = (("left", 0, False, pc.NONE, pc.MESSAGE, Node),
+                            ("right", 1, False, pc.NONE, pc.MESSAGE, Node))
+            leaf = Node(child=Node(value=7))
+            out = Pair.Deserialize(Pair(left=leaf, right=leaf).Serialize())
+            assert isinstance(out.left.child, Node)
+            assert isinstance(out.right.child, Node)
+        """)
+
+    @unittest.skipUnless(sys.platform == "linux", "requires Linux address-space limits")
+    def test_allocation_failure_raises_memory_error_and_recovers(self):
+        self._run_isolated("""
+            import os
+            import resource
+            import protocache as pc
+
+            class Numbers(pc.Array): schema = (pc.NONE, pc.I32, None)
+            numbers = Numbers([1] * 1000000)
+            with open('/proc/self/statm') as statm:
+                vm = int(statm.read().split()[0]) * os.sysconf('SC_PAGE_SIZE')
+            old_limit = resource.getrlimit(resource.RLIMIT_AS)
+            resource.setrlimit(resource.RLIMIT_AS, (vm + 2 * 1024 * 1024, old_limit[1]))
+            try:
+                try:
+                    numbers.Serialize()
+                except MemoryError:
+                    pass
+                else:
+                    raise AssertionError('expected MemoryError')
+            finally:
+                resource.setrlimit(resource.RLIMIT_AS, old_limit)
+            assert Numbers.Deserialize(Numbers([1, 2, 3]).Serialize()) == [1, 2, 3]
+        """)
 
 if __name__ == "__main__":
     unittest.main()

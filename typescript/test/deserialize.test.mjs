@@ -18,6 +18,26 @@ function sortedEntries(map) {
   );
 }
 
+test("preserves leading U+FEFF in strings, array elements, and Map keys/values", () => {
+  const strings = ["\uFEFF", "\uFEFFabc", "\uFEFF".repeat(2) + "abc",
+    "abc\uFEFF", "\uFEFF" + "x".repeat(200)];
+  const original = new Main({
+    str: strings[1],
+    strv: strings,
+    index: new Map([["abc", 1], ["\uFEFFabc", 2]]),
+  });
+  const out = Main.deserialize(original.serialize());
+  assert.equal(out.str, original.str);
+  assert.deepEqual(out.strv, strings);
+  assert.equal(out.index.size, 2);
+  assert.equal(out.index.get("abc"), 1);
+  assert.equal(out.index.get("\uFEFFabc"), 2);
+
+  const schema = pc.mapSchemaV1(pc.Kind.String, pc.Kind.String);
+  const values = new Map(strings.map((value) => [value, value]));
+  assert.deepEqual(pc.deserialize(schema, pc.serialize(schema, values)), values);
+});
+
 test("fully materializes the shared C++ test.pc fixture", () => {
   const root = Main.deserialize(fixture);
 

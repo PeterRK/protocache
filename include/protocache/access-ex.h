@@ -159,10 +159,9 @@ struct ScalarArrayEX : public BaseArrayEX<T> {
 			return false;
 		}
 		auto last = buf.Size();
-		for (size_t i = this->size(); i-- > 0;) {
-			*reinterpret_cast<T*>(buf.Expand(m)) = this->core_[i];
-		}
-		buf.Put((this->size() << 2U) | m);
+		auto dest = buf.Expand(1 + m*this->size());
+		dest[0] = (this->size() << 2U) | m;
+		memcpy(dest + 1, this->core_.data(), this->size()*sizeof(T));
 		unit = Segment(last, buf.Size());
 		return true;
 	}

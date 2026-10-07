@@ -140,10 +140,10 @@ public:
 		off_ = size_;
 	}
 
-	void Put(uint32_t v) noexcept {
+	void Put(uint32_t v) {
 		*Expand(1) = v;
 	}
-	void Put(const Slice<uint32_t>& data) noexcept {
+	void Put(const Slice<uint32_t>& data) {
 		auto dest = Expand(data.size());
 		memcpy(dest, data.data(), data.size() * sizeof(uint32_t));
 	}
